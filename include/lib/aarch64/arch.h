@@ -155,6 +155,7 @@
 #define SCTLR_A_BIT		(1 << 1)
 #define SCTLR_C_BIT		(1 << 2)
 #define SCTLR_SA_BIT		(1 << 3)
+#define SCTLR_CPUBEN_BIT	(1 << 5)
 #define SCTLR_I_BIT		(1 << 12)
 #define SCTLR_WXN_BIT		(1 << 19)
 #define SCTLR_EE_BIT		(1 << 25)
