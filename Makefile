@@ -50,7 +50,7 @@ ARCH				:= aarch64
 # Build verbosity
 V				:= 0
 # Debug build
-DEBUG				:= 0
+DEBUG				:= 1
 # Build platform
 DEFAULT_PLAT			:= fvp
 PLAT				:= ${DEFAULT_PLAT}

@@ -178,7 +178,7 @@ void bl31_prepare_next_image_entry(void)
 	assert(next_image_info);
 	assert(image_type == GET_SECURITY_STATE(next_image_info->h.attr));
 
-	INFO("BL31: Preparing for EL3 exit to %s world\n",
+	INFO("BL31: Preparing for EL3 exit to %s world, LK\n",
 		(image_type == SECURE) ? "secure" : "normal");
 	print_entry_point_info(next_image_info);
 	cm_init_my_context(next_image_info);
