@@ -35,6 +35,7 @@
 #include <mmio.h>
 #include <mt8173_def.h>
 #include <mtk_sip_svc.h>
+#include <mtk_sip_error.h>
 
 #define crypt_read32(offset)	\
 	mmio_read_32((uintptr_t)(CRYPT_BASE+((offset) * 4)))
@@ -69,7 +70,7 @@ uint64_t crypt_wait(void)
 	udelay(100);
 	crypt_write32(REG_CLR, crypt_read32(REG_STAT));
 	crypt_write32(REG_INT, 0);
-	return MTK_SIP_E_SUCCESS;
+	return SIP_SVC_E_SUCCESS;
 }
 
 static uint32_t record[4];
@@ -80,7 +81,7 @@ uint64_t crypt_set_hdcp_key_ex(uint64_t x1, uint64_t x2, uint64_t x3)
 	uint32_t j = 0;
 
 	if (i > KEY_LEN)
-		return MTK_SIP_E_INVALID_PARAM;
+		return SIP_SVC_E_INVALID_PARAMS;
 
 	if (i < KEY_LEN) {
 		crypt_write32(REG_MSC, 0x80ff3800);
@@ -118,19 +119,19 @@ uint64_t crypt_set_hdcp_key_ex(uint64_t x1, uint64_t x2, uint64_t x3)
 	record[1] = GET_H32(x2);
 	record[2] = GET_L32(x3);
 	record[3] = GET_H32(x3);
-	return MTK_SIP_E_SUCCESS;
+	return SIP_SVC_E_SUCCESS;
 }
 
 /* Set key to hdcp */
 uint64_t crypt_set_hdcp_key_num(uint32_t num)
 {
 	if (num > KEY_LEN)
-		return MTK_SIP_E_INVALID_PARAM;
+		return SIP_SVC_E_INVALID_PARAMS;
 
 	crypt_write32(REG_P68, 0x6A);
 	crypt_write32(REG_P69, 0x34 + 4 * num);
 	crypt_wait();
-	return MTK_SIP_E_SUCCESS;
+	return SIP_SVC_E_SUCCESS;
 }
 
 /* Clear key in crypt engine */
@@ -140,5 +141,5 @@ uint64_t crypt_clear_hdcp_key(void)
 
 	for (i = 0; i < KEY_SIZE; i++)
 		crypt_write32(REG_D20 + i, 0);
-	return MTK_SIP_E_SUCCESS;
+	return SIP_SVC_E_SUCCESS;
 }
