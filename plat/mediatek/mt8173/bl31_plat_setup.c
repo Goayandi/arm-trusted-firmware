@@ -125,6 +125,36 @@ entry_point_info_t *bl31_plat_get_next_image_ep_info(uint32_t type)
 		return NULL;
 }
 
+extern uint64_t get_kernel_info_pc(void);
+extern uint64_t get_kernel_info_r0(void);
+extern uint64_t get_kernel_info_r1(void);
+entry_point_info_t *bl31_plat_get_next_kernel_ep_info(uint32_t type)
+{
+	entry_point_info_t *next_image_info;
+
+	assert(sec_state_is_valid(type));
+
+	next_image_info = (type == NON_SECURE) ? &bl33_ep_info : &bl32_ep_info;
+
+	next_image_info->spsr = plat_get_spsr_for_kernel_entry();
+	next_image_info->pc = get_kernel_info_pc();
+	next_image_info->args.arg0 = get_kernel_info_r0();
+	next_image_info->args.arg1 = get_kernel_info_r1();
+
+	INFO("pc=0x%lx, r0=0x%lx, r1=0x%lx\n",
+		(unsigned long)next_image_info->pc,
+		next_image_info->args.arg0,
+		next_image_info->args.arg1);
+
+	SET_SECURITY_STATE(next_image_info->h.attr, NON_SECURE);
+
+	/* None of the images on this platform can have 0x0 as the entrypoint */
+	if (next_image_info->pc)
+		return next_image_info;
+	else
+		return NULL;
+}
+
 /*******************************************************************************
  * Perform any BL3-1 early platform setup. Here is an opportunity to copy
  * parameters passed by the calling EL (S-EL1 in BL2 & S-EL3 in BL1) before they
@@ -136,16 +166,57 @@ entry_point_info_t *bl31_plat_get_next_image_ep_info(uint32_t type)
 void bl31_early_platform_setup(bl31_params_t *from_bl2,
 			       void *plat_params_from_bl2)
 {
+	atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
+
 	console_init(MT8173_UART0_BASE, MT8173_UART_CLOCK, MT8173_BAUDRATE);
 
-	VERBOSE("bl31_setup\n");
+	/* Initialize the console to provide early debug support */
+	INFO("LK boot argument location=0x%x\n", BOOT_ARGUMENT_LOCATION);
+	INFO("LK boot argument size=0x%x\n", BOOT_ARGUMENT_SIZE);
+	INFO("teearg->atf_magic=0x%x\n", teearg->atf_magic);
+	INFO("teearg->tee_support=0x%x\n", teearg->tee_support);
+	INFO("teearg->tee_entry=0x%x\n", teearg->tee_entry);
+	INFO("teearg->tee_boot_arg_addr=0x%x\n", teearg->tee_boot_arg_addr);
+	INFO("teearg->atf_log_port=0x%x\n", teearg->atf_log_port);
+	INFO("teearg->atf_log_baudrate=0x%x\n", teearg->atf_log_baudrate);
+	INFO("teearg->atf_log_buf_start=0x%x\n", teearg->atf_log_buf_start);
+	INFO("teearg->atf_log_buf_size=0x%x\n", teearg->atf_log_buf_size);
+	INFO("teearg->atf_irq_num=%d\n", teearg->atf_irq_num);
+	INFO("BL33_START_ADDRESS=0x%x\n", BL33_START_ADDRESS);
 
+	VERBOSE("bl31_setup\n");
+#if RESET_TO_BL31
+	assert(from_bl2 == NULL);
+	assert(plat_params_from_bl2 == NULL);
+	INFO("RESET_TO_BL31!\n");
+
+	/* Populate entry point information for BL3-2 and BL3-3 */
+	SET_PARAM_HEAD(&bl32_ep_info, PARAM_EP, VERSION_1, 0);
+	SET_SECURITY_STATE(bl32_ep_info.h.attr, SECURE);
+	if (teearg->tee_support)
+		bl32_ep_info.pc = teearg->tee_entry;
+	else
+		bl32_ep_info.pc = 0; /* let it die if it runs to BL32 */
+	bl32_ep_info.spsr = plat_get_spsr_for_bl32_entry();
+
+	SET_PARAM_HEAD(&bl33_ep_info, PARAM_EP, VERSION_1, 0);
+	/*
+	 * Tell BL3-1 where the non-trusted software image
+	 * is located and the entry state information
+	 */
+	bl33_ep_info.pc = BL33_START_ADDRESS;
+	bl33_ep_info.spsr = plat_get_spsr_for_bl33_entry();
+	bl33_ep_info.args.arg4 = (unsigned long)BOOT_ARGUMENT_LOCATION;
+	bl33_ep_info.args.arg5 = (unsigned long)BOOT_ARGUMENT_SIZE;
+	SET_SECURITY_STATE(bl33_ep_info.h.attr, NON_SECURE);
+#else
 	assert(from_bl2 != NULL);
 	assert(from_bl2->h.type == PARAM_BL31);
 	assert(from_bl2->h.version >= VERSION_1);
 
 	bl32_ep_info = *from_bl2->bl32_ep_info;
 	bl33_ep_info = *from_bl2->bl33_ep_info;
+#endif
 }
 
 /*******************************************************************************
@@ -155,6 +226,11 @@ void bl31_platform_setup(void)
 {
 	platform_setup_cpu();
 	platform_setup_sram();
+
+	/* return sram to ca53 l2 cache */
+	mmio_write_32(0x10000000, 0x300);
+	/* turn off l2c sram clock */
+	mmio_write_32(0x10001040, 1 << 7);
 
 	generic_delay_timer_init();
 

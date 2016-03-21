@@ -45,6 +45,20 @@
 	 */
 
 func bl31_entrypoint
+	/*pre-loader to uboot argument Location*/
+	ldr     x8, =BOOT_ARGUMENT_LOCATION
+	str     w4, [x8]
+
+	ldr     x8, =BOOT_ARGUMENT_SIZE
+	str     w5, [x8]
+
+	ldr     x8, =BL33_START_ADDRESS
+	str     w6, [x8]
+
+	/*pre-loader to TEE argument Location*/
+	ldr     x8, =TEE_BOOT_INFO_ADDR
+	str     w7, [x8]
+
 #if !RESET_TO_BL31
 	/* ---------------------------------------------------------------
 	 * Preceding bootloader has populated x0 with a pointer to a
@@ -135,6 +149,25 @@ func bl31_entrypoint
 
 	b	el3_exit
 endfunc bl31_entrypoint
+
+
+/*pre-loader to uboot argument Location*/
+.global BOOT_ARGUMENT_LOCATION
+BOOT_ARGUMENT_LOCATION:
+.word 0x00000000
+
+.global BOOT_ARGUMENT_SIZE
+BOOT_ARGUMENT_SIZE:
+.word 0x00000000
+
+.global BL33_START_ADDRESS
+BL33_START_ADDRESS:
+.word 0x00000000
+
+/*pre-loader to TEE argument Location*/
+.global TEE_BOOT_INFO_ADDR
+TEE_BOOT_INFO_ADDR:
+.word 0x00000000
 
 	/* --------------------------------------------------------------------
 	 * This CPU has been physically powered up. It is either resuming from

@@ -33,7 +33,9 @@
 
 	.globl	plat_secondary_cold_boot_setup
 	.globl	plat_report_exception
+	.globl	platform_mem_init
 	.globl	platform_is_primary_cpu
+	.globl	plat_is_my_cpu_primary
 	.globl  plat_my_core_pos
 	.globl	plat_crash_console_init
 	.globl	plat_crash_console_putc
@@ -53,6 +55,17 @@ cb_panic:
 	b	cb_panic
 endfunc plat_secondary_cold_boot_setup
 
+	/* -----------------------------------------------------
+	 * void platform_mem_init(void);
+	 *
+	 * We don't need to carry out any memory initialization
+	 * on CSS platforms. The Secure RAM is accessible straight away.
+	 * -----------------------------------------------------
+	 */
+func platform_mem_init
+	ret
+endfunc platform_mem_init
+
 func platform_is_primary_cpu
 	and	x0, x0, #(MPIDR_CLUSTER_MASK | MPIDR_CPU_MASK)
 	cmp	x0, #MT8173_PRIMARY_CPU
@@ -61,6 +74,15 @@ func platform_is_primary_cpu
 endfunc platform_is_primary_cpu
 
 #if !ENABLE_PLAT_COMPAT
+
+func plat_is_my_cpu_primary
+	mrs	x0, mpidr_el1
+	and	x0, x0, #(MPIDR_CLUSTER_MASK | MPIDR_CPU_MASK)
+        cmp	x0, #MT8173_PRIMARY_CPU
+        cset	x0, eq
+        ret
+endfunc plat_is_my_cpu_primary
+
 	/* -----------------------------------------------------
 	 * unsigned int plat_my_core_pos(void);
 	 *

@@ -31,6 +31,30 @@
 #ifndef __PLAT_PRIVATE_H__
 #define __PLAT_PRIVATE_H__
 
+#define DEVINFO_SIZE 4
+
+typedef struct {
+	unsigned int atf_magic;
+	unsigned int tee_support;
+	unsigned int tee_entry;
+	unsigned int tee_boot_arg_addr;
+	unsigned int hwuid[4];     // HW Unique id for t-base used
+	unsigned int HRID[2];      // HW random id for t-base used
+	unsigned int atf_log_port;
+	unsigned int atf_log_baudrate;
+	unsigned int atf_log_buf_start;
+	unsigned int atf_log_buf_size;
+	unsigned int atf_irq_num;
+	unsigned int devinfo[DEVINFO_SIZE];
+	unsigned int atf_aee_debug_buf_start;
+	unsigned int atf_aee_debug_buf_size;
+} atf_arg_t, *atf_arg_t_ptr;
+
+extern unsigned int BOOT_ARGUMENT_LOCATION;
+extern unsigned int BOOT_ARGUMENT_SIZE;
+extern unsigned int BL33_START_ADDRESS;
+extern unsigned int TEE_BOOT_INFO_ADDR;
+
 /*******************************************************************************
  * Function and variable prototypes
  ******************************************************************************/
@@ -47,5 +71,9 @@ void plat_cci_disable(void);
 
 /* Declarations for plat_topology.c */
 int mt_setup_topology(void);
+
+uint32_t plat_get_spsr_for_bl32_entry(void);
+uint32_t plat_get_spsr_for_bl33_entry(void);
+uint32_t plat_get_spsr_for_kernel_entry(void);
 
 #endif /* __PLAT_PRIVATE_H__ */

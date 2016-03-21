@@ -73,26 +73,25 @@
 #define PLATFORM_NUM_AFFS		(PLATFORM_SYSTEM_COUNT +	\
 					 PLATFORM_CLUSTER_COUNT +	\
 					 PLATFORM_CORE_COUNT)
-
 /*******************************************************************************
  * Platform memory map related constants
  ******************************************************************************/
 /*
  * MT8173 SRAM memory layout
- * 0x100000 +-------------------+
- *          | shared mem (4KB)  |
- * 0x101000 +-------------------+
- *          |                   |
- *          |   BL3-1 (124KB)   |
- *          |                   |
- * 0x120000 +-------------------+
- *          |  reserved (64KB)  |
- * 0x130000 +-------------------+
+ * 0x43100000 +-------------------+
+ *            | shared mem (4KB)  |
+ * 0x43101000 +-------------------+
+ *            |                   |
+ *            |   BL3-1 (124KB)   |
+ *            |                   |
+ * 0x43120000 +-------------------+
+ *            |  reserved (64KB)  |
+ * 0x43130000 +-------------------+
  */
 /* TF txet, ro, rw, xlat table, coherent memory ... etc.
  * Size: release: 128KB, debug: 128KB
  */
-#define TZRAM_BASE		(0x100000)
+#define TZRAM_BASE		(0x43100000)
 #if DEBUG
 #define TZRAM_SIZE		(0x20000)
 #else
