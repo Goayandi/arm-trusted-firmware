@@ -264,3 +264,6 @@ void bl31_plat_arch_setup(void)
 			       BL_COHERENT_RAM_END);
 }
 
+void bl31_plat_runtime_setup(void)
+{
+}

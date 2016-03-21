@@ -93,6 +93,8 @@ $(eval $(call add_define,ARM_GIC_ARCH))
 # Enable workarounds for selected Cortex-A53 erratas.
 ERRATA_A53_826319	:=	1
 ERRATA_A53_836870	:=	1
+ERRATA_A57_829520	:=	1
+ERRATA_A57_833471	:=	1
 
 # indicate the reset vector address can be programmed
 PROGRAMMABLE_RESET_ADDRESS	:=	1
