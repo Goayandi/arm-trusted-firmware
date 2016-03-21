@@ -31,10 +31,6 @@
 #ifndef __MT8173_DEF_H__
 #define __MT8173_DEF_H__
 
-#if RESET_TO_BL31
-#error "MT8173 is incompatible with RESET_TO_BL31!"
-#endif
-
 #define MT8173_PRIMARY_CPU	0x0
 
 /* Register base address */
@@ -76,7 +72,7 @@
 #define MT8173_UART2_BASE	(IO_PHYS + 0x01004000)
 #define MT8173_UART3_BASE	(IO_PHYS + 0x01005000)
 
-#define MT8173_BAUDRATE		(115200)
+#define MT8173_BAUDRATE		(921600)
 #define MT8173_UART_CLOCK	(26000000)
 
 /*******************************************************************************

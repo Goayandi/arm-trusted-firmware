@@ -108,3 +108,49 @@ void plat_cci_disable(void)
 {
 	cci_disable_snoop_dvm_reqs(MPIDR_AFFLVL1_VAL(read_mpidr()));
 }
+
+/*******************************************************************************
+* Gets SPSR for BL32 entry
+******************************************************************************/
+uint32_t plat_get_spsr_for_bl32_entry(void)
+{
+	/*
+	 * The Secure Payload Dispatcher service is responsible for
+	 * setting the SPSR prior to entry into the BL3-2 image.
+	 */
+	return 0;
+}
+
+/*******************************************************************************
+ * Gets SPSR for BL33 entry
+ ******************************************************************************/
+uint32_t plat_get_spsr_for_bl33_entry(void)
+{
+	uint32_t spsr;
+
+	/*
+	* TODO: Consider the possibility of specifying the SPSR in
+	* the FIP ToC and allowing the platform to have a say as
+	* well.
+	*/
+	spsr = SPSR_MODE32(MODE32_svc, SPSR_T_ARM, SPSR_E_LITTLE,
+			   DAIF_ABT_BIT | DAIF_IRQ_BIT | DAIF_FIQ_BIT);
+	return spsr;
+}
+
+/*******************************************************************************
+ * Gets SPSR for BL33 entry
+ ******************************************************************************/
+uint32_t plat_get_spsr_for_kernel_entry(void)
+{
+	unsigned long el_status;
+	unsigned int mode;
+
+	el_status = read_id_aa64pfr0_el1() >> ID_AA64PFR0_EL2_SHIFT;
+	el_status &= ID_AA64PFR0_ELX_MASK;
+
+	mode = el_status ? MODE_EL2 : MODE_EL1;
+	INFO("Kernel: 64bit, mode: %d\n", mode);
+
+	return SPSR_64(mode, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
+}
