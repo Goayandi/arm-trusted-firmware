@@ -121,6 +121,7 @@ uint32_t plat_get_spsr_for_bl32_entry(void)
 	return 0;
 }
 
+#if 0
 /*******************************************************************************
  * Gets SPSR for BL33 entry
  ******************************************************************************/
@@ -137,6 +138,7 @@ uint32_t plat_get_spsr_for_bl33_entry(void)
 			   DAIF_ABT_BIT | DAIF_IRQ_BIT | DAIF_FIQ_BIT);
 	return spsr;
 }
+#endif
 
 /*******************************************************************************
  * Gets SPSR for BL33 entry
