@@ -30,9 +30,12 @@
 #ifndef __SPM_SUSPEND_H__
 #define __SPM_SUSPEND_H__
 
+/* spm auto resume for testing */
+#define SPM_AUTO_RESUME_ENABLE	0
+
 /* cpu dormant return code */
-#define CPU_DORMANT_RESET        0
-#define CPU_DORMANT_ABORT        1
+#define CPU_DORMANT_RESET	0
+#define CPU_DORMANT_ABORT	1
 
 void spm_system_suspend(void);
 void spm_system_suspend_finish(void);

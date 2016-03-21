@@ -88,6 +88,12 @@ const unsigned int mtk_pm_idle_states[] = {
 };
 #endif
 
+#if ENABLE_PLAT_COMPAT
+#define CA57_MCU_CONFIG		(MCUCFG_BASE + 0x200)
+#define CA57_MCU_CONFIG_SIZE	50
+static unsigned int ca57_mcusys[CA57_MCU_CONFIG_SIZE];
+#endif
+
 struct core_context {
 	unsigned long timer_data[8];
 	unsigned int count;
@@ -245,6 +251,24 @@ static void mt_cpu_restore(unsigned long mpidr)
 	core = get_core_data(mpidr);
 	mt_restore_generic_timer(core->timer_data);
 }
+
+#if ENABLE_PLAT_COMPAT
+static void mt_mcucfg_save(void)
+{
+	int i;
+
+	for (i = 0; i < CA57_MCU_CONFIG_SIZE; i = i + 1)
+		ca57_mcusys[i] = mmio_read_32(CA57_MCU_CONFIG + i * 4);
+}
+
+static void mt_mcucfg_restore(void)
+{
+	int i;
+
+	for (i = 0; i < CA57_MCU_CONFIG_SIZE; i = i + 1)
+		mmio_write_32(CA57_MCU_CONFIG + i * 4, ca57_mcusys[i]);
+}
+#endif
 
 static void mt_platform_save_context(unsigned long mpidr)
 {
@@ -495,6 +519,7 @@ static void plat_affinst_suspend(unsigned long sec_entrypoint,
 
 	if (afflvl >= MPIDR_AFFLVL2) {
 		disable_scu(mpidr);
+		mt_mcucfg_save();
 		generic_timer_backup();
 		spm_system_suspend();
 		/* Prevent interrupts from spuriously waking up this cpu */
@@ -615,6 +640,7 @@ static void plat_affinst_suspend_finish(unsigned int afflvl, unsigned int state)
 		return;
 
 	if (afflvl >= MPIDR_AFFLVL2) {
+		mt_mcucfg_restore();
 		/* Enable the gic cpu interface */
 		plat_arm_gic_init();
 		spm_system_suspend_finish();
