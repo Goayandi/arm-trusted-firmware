@@ -213,7 +213,12 @@ void spm_set_wakeup_event(const struct pwr_ctrl *pwrctrl)
 		val = pwrctrl->timer_val_cust;
 
 	mmio_write_32(SPM_PCM_TIMER_VAL, val);
+
+#if SPM_AUTO_RESUME_ENABLE
+	mmio_setbits_32(SPM_PCM_CON1, (CON1_CFG_KEY | CON1_PCM_TIMER_EN));
+#else
 	mmio_setbits_32(SPM_PCM_CON1, CON1_CFG_KEY);
+#endif
 
 	if (pwrctrl->wake_src_cust == 0)
 		mask = pwrctrl->wake_src;
