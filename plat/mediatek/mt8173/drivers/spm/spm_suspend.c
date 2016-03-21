@@ -41,6 +41,8 @@
  * This driver controls the system power in system suspend flow.
  */
 
+#define SPM_WAKEUP_TIMER       (5 * 32768)     /* 5 seconds */
+
 #define WAKE_SRC_FOR_SUSPEND					\
 	(WAKE_SRC_KP | WAKE_SRC_EINT | WAKE_SRC_MD32 |		\
 	WAKE_SRC_USB_CD | WAKE_SRC_USB_PDN | WAKE_SRC_THERM |	\
@@ -268,6 +270,10 @@ static void go_to_sleep_before_wfi(const unsigned int spm_flags)
 	pwrctrl = &spm_ctrl;
 
 	set_pwrctrl_pcm_flags(pwrctrl, spm_flags);
+
+#if SPM_AUTO_RESUME_ENABLE
+	pwrctrl->timer_val = SPM_WAKEUP_TIMER;
+#endif
 
 	spm_set_sysclk_settle();
 

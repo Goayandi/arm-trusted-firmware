@@ -140,6 +140,9 @@ static void cm_init_context_common(cpu_context_t *ctx, const entry_point_info_t 
 		sctlr_elx |= SCTLR_EL1_RES1;
 	else
 		sctlr_elx |= SCTLR_AARCH32_EL1_RES1;
+	/* MTK use CPU Barrier Enable bit for AARCH32 code */
+	sctlr_elx |= SCTLR_CPUBEN_BIT;
+
 	write_ctx_reg(get_sysregs_ctx(ctx), CTX_SCTLR_EL1, sctlr_elx);
 
 	if ((GET_RW(ep->spsr) == MODE_RW_64
