@@ -137,7 +137,7 @@ $(eval $(call add_define,DEBUG))
 ifneq (${DEBUG}, 0)
         BUILD_TYPE	:=	debug
         CFLAGS		+= 	-g -gdwarf-2 -O0
-        ASFLAGS		+= 	-g -Wa,--gdwarf-2
+        ASFLAGS		+= 	-g -Wa,--gdwarf-2 -O0
         # Use LOG_LEVEL_INFO by default for debug builds
         LOG_LEVEL	:=	40
 else
