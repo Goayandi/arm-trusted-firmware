@@ -27,7 +27,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <arm_gic.h>
 #include <assert.h>
 #include <bl_common.h>
 #include <console.h>
@@ -35,6 +34,7 @@
 #include <mcucfg.h>
 #include <mmio.h>
 #include <mtcmos.h>
+#include <plat_arm.h>
 #include <plat_private.h>
 #include <platform.h>
 #include <spm.h>
@@ -170,8 +170,10 @@ void bl31_platform_setup(void)
 	plat_delay_timer_init();
 
 	/* Initialize the gic cpu and distributor interfaces */
-	plat_mt_gic_init();
-	arm_gic_setup();
+	// plat_mt_gic_init();
+	// arm_gic_setup();
+	plat_arm_gic_driver_init();
+	plat_arm_gic_init();
 
 	/* Initialize spm at boot time */
 	spm_boot_init();

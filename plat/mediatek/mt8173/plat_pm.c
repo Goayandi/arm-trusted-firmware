@@ -29,13 +29,13 @@
  */
 
 #include <arch_helpers.h>
-#include <arm_gic.h>
 #include <assert.h>
 #include <bakery_lock.h>
 #include <cci.h>
 #include <console.h>
 #include <debug.h>
 #include <errno.h>
+#include <gicv2.h>
 #include <mcucfg.h>
 #include <mmio.h>
 #include <mt8173_def.h>
@@ -349,7 +349,7 @@ static void plat_power_domain_off(const psci_power_state_t *state)
 	unsigned long mpidr = read_mpidr_el1();
 
 	/* Prevent interrupts from spuriously waking up this cpu */
-	arm_gic_cpuif_deactivate();
+	gicv2_cpuif_disable();
 
 	spm_hotplug_off(mpidr);
 	trace_power_flow(mpidr, CPU_DOWN);
@@ -409,7 +409,7 @@ static void plat_power_domain_suspend(const psci_power_state_t *state)
 		generic_timer_backup();
 		spm_system_suspend();
 		/* Prevent interrupts from spuriously waking up this cpu */
-		arm_gic_cpuif_deactivate();
+		gicv2_cpuif_disable();
 	}
 }
 
@@ -432,8 +432,8 @@ static void plat_power_domain_on_finish(const psci_power_state_t *state)
 	}
 
 	/* Enable the gic cpu interface */
-	arm_gic_cpuif_setup();
-	arm_gic_pcpu_distif_setup();
+	gicv2_cpuif_enable();
+	gicv2_pcpu_distif_init();
 	trace_power_flow(mpidr, CPU_UP);
 }
 
@@ -448,8 +448,7 @@ static void plat_power_domain_suspend_finish(const psci_power_state_t *state)
 
 	if (MTK_SYSTEM_PWR_STATE(state) == MTK_LOCAL_STATE_OFF) {
 		/* Enable the gic cpu interface */
-		arm_gic_setup();
-		arm_gic_cpuif_setup();
+		gicv2_cpuif_enable();
 		spm_system_suspend_finish();
 		enable_scu(mpidr);
 	}
@@ -469,7 +468,7 @@ static void plat_power_domain_suspend_finish(const psci_power_state_t *state)
 		}
 	}
 
-	arm_gic_pcpu_distif_setup();
+	gicv2_pcpu_distif_init();
 }
 
 static void plat_get_sys_suspend_power_state(psci_power_state_t *req_state)
@@ -515,7 +514,7 @@ static void __dead2 plat_system_reset(void)
 	panic();
 }
 
-#ifndef PSCI_EXTENDED_STATE_ID
+#if !PSCI_EXTENDED_STATE_ID
 static int plat_validate_power_state(unsigned int power_state,
                             psci_power_state_t *req_state)
 {
