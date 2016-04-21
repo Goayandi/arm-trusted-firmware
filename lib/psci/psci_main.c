@@ -359,10 +359,15 @@ int psci_features(unsigned int psci_fid)
 		 * The trusted firmware does not support OS Initiated Mode.
 		 */
 		return (FF_PSTATE << FF_PSTATE_SHIFT) |
-			((!FF_SUPPORTS_OS_INIT_MODE) << FF_MODE_SUPPORT_SHIFT);
+			((FF_SUPPORTS_OS_INIT_MODE) << FF_MODE_SUPPORT_SHIFT);
 	}
 
 	/* Return 0 for all other fid's */
+	return PSCI_E_SUCCESS;
+}
+
+int psci_set_suspend_mode(unsigned int mode)
+{
 	return PSCI_E_SUCCESS;
 }
 
@@ -441,6 +446,8 @@ u_register_t psci_smc_handler(uint32_t smc_fid,
 		case PSCI_STAT_COUNT_AARCH32:
 			return psci_stat_count(x1, x2);
 #endif
+		case PSCI_SET_SUSPEND_MODE:
+			return psci_set_suspend_mode(x1);
 
 		default:
 			break;
