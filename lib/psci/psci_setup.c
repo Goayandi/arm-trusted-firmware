@@ -262,6 +262,8 @@ int psci_setup(uintptr_t mailbox_ep)
 	psci_caps |=  define_psci_cap(PSCI_STAT_COUNT_AARCH64);
 #endif
 
+	psci_caps |=  define_psci_cap(PSCI_SET_SUSPEND_MODE);
+
 	return 0;
 }
 
