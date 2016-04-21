@@ -80,6 +80,7 @@
 #define PSCI_FEATURES			0x8400000A
 #define PSCI_SYSTEM_SUSPEND_AARCH32	0x8400000E
 #define PSCI_SYSTEM_SUSPEND_AARCH64	0xc400000E
+#define PSCI_SET_SUSPEND_MODE		0x8400000F
 
 /* Macro to help build the psci capabilities bitfield */
 #define define_psci_cap(x)		(1 << (x & 0x1f))

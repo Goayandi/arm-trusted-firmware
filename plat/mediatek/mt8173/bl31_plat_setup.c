@@ -195,3 +195,6 @@ void bl31_plat_arch_setup(void)
 			       BL31_COHERENT_RAM_LIMIT);
 }
 
+void bl31_plat_runtime_setup(void)
+{
+}
