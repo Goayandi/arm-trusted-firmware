@@ -252,5 +252,7 @@ int psci_setup(void)
 	if (psci_plat_pm_ops->system_reset)
 		psci_caps |=  define_psci_cap(PSCI_SYSTEM_RESET);
 
+	psci_caps |=  define_psci_cap(PSCI_SET_SUSPEND_MODE);
+
 	return 0;
 }
