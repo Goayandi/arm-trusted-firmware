@@ -88,7 +88,7 @@
 /*
  * Number of PSCI calls (above) implemented
  */
-#define PSCI_NUM_CALLS			18
+#define PSCI_NUM_CALLS			19
 
 /*******************************************************************************
  * PSCI Migrate and friends
@@ -325,6 +325,8 @@ uint64_t psci_smc_handler(uint32_t smc_fid,
 
 /* PSCI setup function */
 int psci_setup(void);
+
+uint32_t psci_suspend_mode;
 
 #endif /*__ASSEMBLY__*/
 
