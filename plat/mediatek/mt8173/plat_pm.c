@@ -40,6 +40,7 @@
 #include <mmio.h>
 #include <mt8173_def.h>
 #include <mt_cpuxgpt.h> /* generic_timer_backup() */
+#include <plat_arm.h>
 #include <plat_private.h>
 #include <power_tracer.h>
 #include <psci.h>
@@ -434,6 +435,8 @@ static void plat_power_domain_suspend(const psci_power_state_t *state)
 	}
 }
 
+void mtk_system_pwr_domain_resume(void);
+
 /*******************************************************************************
  * MTK_platform handler called when an affinity instance has just been powered
  * on after being turned off earlier. The level and mpidr determine the affinity
@@ -447,9 +450,21 @@ static void plat_power_domain_on_finish(const psci_power_state_t *state)
 
 	assert(state->pwr_domain_state[MPIDR_AFFLVL0] == MTK_LOCAL_STATE_OFF);
 
+	if (PLAT_MAX_PWR_LVL > MTK_PWR_LVL1) {
+		if (state->pwr_domain_state[MTK_PWR_LVL2] ==
+							MTK_LOCAL_STATE_OFF)
+			mtk_system_pwr_domain_resume();
+	}
+
 	if (state->pwr_domain_state[MPIDR_AFFLVL1] == MTK_LOCAL_STATE_OFF) {
 		plat_cci_enable();
 		trace_power_flow(mpidr, CLUSTER_UP);
+	}
+
+	if (PLAT_MAX_PWR_LVL > MTK_PWR_LVL1) {
+		if (state->pwr_domain_state[MTK_PWR_LVL2] ==
+							MTK_LOCAL_STATE_OFF)
+			return;
 	}
 
 	/* Enable the gic cpu interface */
@@ -467,9 +482,12 @@ static void plat_power_domain_suspend_finish(const psci_power_state_t *state)
 {
 	unsigned long mpidr = read_mpidr_el1();
 
+	if (state->pwr_domain_state[MTK_PWR_LVL0] == MTK_LOCAL_STATE_RET)
+		return;
+
 	if (MTK_SYSTEM_PWR_STATE(state) == MTK_LOCAL_STATE_OFF) {
 		mt_mcucfg_restore();
-		gicv2_cpuif_enable();
+		plat_arm_gic_init();
 		spm_system_suspend_finish();
 		enable_scu(mpidr);
 	}
@@ -499,7 +517,7 @@ static void plat_get_sys_suspend_power_state(
 #endif
 	assert(PLAT_MAX_PWR_LVL >= 2);
 
-	for (int i = MPIDR_AFFLVL0; i < PLAT_MAX_PWR_LVL; i++)
+	for (int i = MPIDR_AFFLVL0; i <= PLAT_MAX_PWR_LVL; i++)
 		req_state->pwr_domain_state[i] = MTK_LOCAL_STATE_OFF;
 }
 
@@ -607,6 +625,16 @@ int plat_validate_power_state(unsigned int power_state,
 	return PSCI_E_SUCCESS;
 }
 #endif
+
+void mtk_system_pwr_domain_resume(void)
+{
+	console_init(MT8173_UART0_BASE, MT8173_UART_CLOCK, MT8173_BAUDRATE);
+
+        /* Assert system power domain is available on the platform */
+        assert(PLAT_MAX_PWR_LVL >= MTK_PWR_LVL2);
+
+        plat_arm_gic_init();
+}
 
 /*******************************************************************************
  * Export the platform handlers to enable psci to invoke them
