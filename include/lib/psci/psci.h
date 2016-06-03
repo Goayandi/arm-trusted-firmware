@@ -93,9 +93,9 @@
  * Number of PSCI calls (above) implemented
  */
 #if ENABLE_PSCI_STAT
-#define PSCI_NUM_CALLS			22
+#define PSCI_NUM_CALLS			23
 #else
-#define PSCI_NUM_CALLS			18
+#define PSCI_NUM_CALLS			19
 #endif
 
 /* The macros below are used to identify PSCI calls from the SMC function ID */
@@ -360,6 +360,8 @@ u_register_t psci_smc_handler(uint32_t smc_fid,
 int psci_setup(uintptr_t mailbox_ep);
 void psci_warmboot_entrypoint(void);
 void psci_register_spd_pm_hook(const spd_pm_ops_t *pm);
+
+uint32_t psci_suspend_mode;
 
 #endif /*__ASSEMBLY__*/
 
