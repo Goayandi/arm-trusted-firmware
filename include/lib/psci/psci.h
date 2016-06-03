@@ -96,9 +96,9 @@
  * Number of PSCI calls (above) implemented
  */
 #if ENABLE_PSCI_STAT
-#define PSCI_NUM_CALLS			22
+#define PSCI_NUM_CALLS			23
 #else
-#define PSCI_NUM_CALLS			18
+#define PSCI_NUM_CALLS			19
 #endif
 
 /* The macros below are used to identify PSCI calls from the SMC function ID */
@@ -414,6 +414,8 @@ void psci_warmboot_entrypoint(void);
 void psci_register_spd_pm_hook(const spd_pm_ops_t *pm);
 void psci_prepare_next_non_secure_ctx(
 			  entry_point_info_t *next_image_info);
+
+uint32_t psci_suspend_mode;
 
 #endif /*__ASSEMBLY__*/
 
