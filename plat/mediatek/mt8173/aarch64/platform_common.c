@@ -29,9 +29,9 @@
  */
 #include <arch_helpers.h>
 #include <arm_gic.h>
-#include <bl_common.h>
 #include <cci.h>
 #include <debug.h>
+#include <mmio.h>
 #include <mt8173_def.h>
 #include <platform_def.h>
 #include <utils.h>
@@ -90,10 +90,57 @@ unsigned int plat_get_syscnt_freq2(void)
 	return SYS_COUNTER_FREQ_IN_TICKS;
 }
 
+static char *revisions[] = {
+	"r0p0",
+	"r0p1",
+	"r0p2",
+	"r0p3",
+	"r0p4",
+	"r1p0",
+	"r1p1",
+	"r1p2",
+	"r1p3",
+	"r1p4",
+	"r1p5",
+};
+
+static void plat_cci_revision() {
+	unsigned int revision;
+	int i = 0;
+
+	revision =  mmio_read_32(PLAT_MT_CCI_BASE + PERIPHERAL_ID2) >> 4;
+	ERROR("CCI-400 revision = %s\n", revisions[revision]);
+	INFO("CCI-400 revision = %s\n", revisions[revision]);
+	INFO("CCI-400 ctrl overdride = %x\n",
+			mmio_read_32(PLAT_MT_CCI_BASE + CTRL_OVERRIDE_REG));
+	INFO("CCI-400 secure access = %x\n",
+			mmio_read_32(PLAT_MT_CCI_BASE + SECURE_ACCESS_REG));
+
+	mmio_write_32(PLAT_MT_CCI_BASE + SECURE_ACCESS_REG, 0x1);
+	INFO("CCI-400 secure access = %x\n",
+			mmio_read_32(PLAT_MT_CCI_BASE + SECURE_ACCESS_REG));
+	for (i = 0; i < 3; i++) {
+		INFO("CCI-400 interface %d\n", i);
+		INFO("\tsnoop control = %x\n",
+			mmio_read_32(PLAT_MT_CCI_BASE + SLAVE_IFACE_OFFSET(i)));
+	}
+	INFO("CCI-400 interface 3 snoop control = %x\n",
+			mmio_read_32(PLAT_MT_CCI_BASE + SLAVE_IFACE3_OFFSET));
+	INFO("CCI-400 interface 3 sh override = %x\n",
+			mmio_read_32(PLAT_MT_CCI_BASE + SLAVE_IFACE3_OFFSET
+			+ SH_OVERRIDE_REG));
+	INFO("CCI-400 interface 4 snoop control = %x\n",
+			mmio_read_32(PLAT_MT_CCI_BASE + SLAVE_IFACE4_OFFSET));
+	INFO("CCI-400 interface 4 sh override = %x\n",
+			mmio_read_32(PLAT_MT_CCI_BASE + SLAVE_IFACE4_OFFSET
+			+ SH_OVERRIDE_REG));
+}
+
 void plat_cci_init(void)
 {
 	/* Initialize CCI driver */
 	cci_init(PLAT_MT_CCI_BASE, cci_map, ARRAY_SIZE(cci_map));
+	plat_cci_revision();
 }
 
 void plat_cci_enable(void)

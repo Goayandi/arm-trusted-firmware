@@ -31,6 +31,7 @@
 #include <arch_helpers.h>
 #include <assert.h>
 #include <bl_common.h>
+#include <cci.h>
 #include <context_mgmt.h>
 #include <crypt.h>
 #include <debug.h>
@@ -186,6 +187,13 @@ static uint64_t sip_mcusys_write(unsigned int reg_addr, unsigned int reg_value)
 	return SIP_SVC_E_SUCCESS;
 }
 
+static unsigned int get_cci_revision() {
+	unsigned int revision;
+
+	revision =  mmio_read_32(PLAT_MT_CCI_BASE + PERIPHERAL_ID2) >> 4;
+	return revision;
+}
+
 /*******************************************************************************
  * SIP top level handler for servicing SMCs.
  ******************************************************************************/
@@ -259,6 +267,10 @@ uint64_t sip_smc_handler(uint32_t smc_fid,
 		break;
 	case MTK_SIP_SET_HDCP_KEY_EX:
 		rc = crypt_set_hdcp_key_ex(x1, x2, x3);
+		SMC_RET1(handle, rc);
+		break;
+	case MTK_SIP_GET_CCI_REVISION:
+		rc = get_cci_revision();
 		SMC_RET1(handle, rc);
 		break;
 	default:

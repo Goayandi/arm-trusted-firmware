@@ -31,6 +31,7 @@
 #ifndef __PLATFORM_DEF_H__
 #define __PLATFORM_DEF_H__
 
+#include <bl_common.h>
 #include "mt8173_def.h"
 
 
