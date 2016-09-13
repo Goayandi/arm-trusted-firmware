@@ -56,6 +56,7 @@
 
 /* Control and ID register offsets */
 #define CTRL_OVERRIDE_REG		0x0
+#define SPECULATION_CONTROL_REG		0x4
 #define SECURE_ACCESS_REG		0x8
 #define STATUS_REG			0xc
 #define IMPRECISE_ERR_REG		0x10

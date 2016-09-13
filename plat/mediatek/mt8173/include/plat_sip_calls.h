@@ -34,7 +34,7 @@
 /*******************************************************************************
  * Plat SiP function constants
  ******************************************************************************/
-#define MTK_PLAT_SIP_NUM_CALLS			7
+#define MTK_PLAT_SIP_NUM_CALLS			13
 
 #define MTK_SIP_PWR_ON_MTCMOS			0x82000402
 #define MTK_SIP_PWR_OFF_MTCMOS			0x82000403
@@ -44,5 +44,12 @@
 #define MTK_SIP_SET_HDCP_KEY_EX			0x82000407
 
 #define MTK_SIP_GET_CCI_REVISION		0x82000410
+#define MTK_SIP_CCI_CONTROL_OVERRIDE		0x82000411
+#define MTK_SIP_CCI_SPECULATION_CONTROL		0x82000412
+#define MTK_SIP_CCI_SECURE_ACCESS		0x82000413
+#define MTK_SIP_CCI_STATUS			0x82000414
+#define MTK_SIP_CCI_IMPRECISE_ERROR		0x82000415
+
+#define MTK_SIP_CCI_SLAVE_REG			0x82000420
 
 #endif /* __PLAT_SIP_CALLS_H__ */

@@ -194,6 +194,59 @@ static unsigned int get_cci_revision() {
 	return revision;
 }
 
+static unsigned int cci_control_override() {
+	unsigned int ret;
+
+	ret = mmio_read_32(PLAT_MT_CCI_BASE + CTRL_OVERRIDE_REG);
+	return ret;
+}
+
+static unsigned int cci_speculation_control() {
+	unsigned int ret;
+
+	ret = mmio_read_32(PLAT_MT_CCI_BASE + SPECULATION_CONTROL_REG);
+	return ret;
+}
+
+static unsigned int cci_secure_access(uint32_t w, uint32_t v) {
+	unsigned int ret;
+
+	INFO("v = %d\n", v);
+	if (w)
+		mmio_write_32(PLAT_MT_CCI_BASE + SECURE_ACCESS_REG, v);
+
+	ret = mmio_read_32(PLAT_MT_CCI_BASE + SECURE_ACCESS_REG);
+	INFO("ret = %d\n", ret);
+
+	return ret;
+}
+
+static unsigned int cci_status() {
+	unsigned int ret;
+
+	ret = mmio_read_32(PLAT_MT_CCI_BASE + STATUS_REG);
+	return ret;
+}
+
+static unsigned int cci_imprecise_error() {
+	unsigned int ret;
+
+	ret = mmio_read_32(PLAT_MT_CCI_BASE + IMPRECISE_ERR_REG);
+	return ret;
+}
+
+static unsigned int slave_offsets[] = {
+	0, 0x4, 0x110, 0x104, 0x10C, 0x110, 0x130, 0x134, 0x138,
+};
+
+static unsigned int cci_slave_reg(int i, int j) {
+	unsigned int ret;
+
+	ret = mmio_read_32(PLAT_MT_CCI_BASE + SLAVE_IFACE_OFFSET(i) +
+		slave_offsets[j]);
+	return ret;
+}
+
 /*******************************************************************************
  * SIP top level handler for servicing SMCs.
  ******************************************************************************/
@@ -271,6 +324,30 @@ uint64_t sip_smc_handler(uint32_t smc_fid,
 		break;
 	case MTK_SIP_GET_CCI_REVISION:
 		rc = get_cci_revision();
+		SMC_RET1(handle, rc);
+		break;
+	case MTK_SIP_CCI_CONTROL_OVERRIDE:
+		rc = cci_control_override();
+		SMC_RET1(handle, rc);
+		break;
+	case MTK_SIP_CCI_SPECULATION_CONTROL:
+		rc = cci_speculation_control();
+		SMC_RET1(handle, rc);
+		break;
+	case MTK_SIP_CCI_SECURE_ACCESS:
+		rc = cci_secure_access((uint32_t)x1, (uint32_t) x2);
+		SMC_RET1(handle, rc);
+		break;
+	case MTK_SIP_CCI_STATUS:
+		rc = cci_status();
+		SMC_RET1(handle, rc);
+		break;
+	case MTK_SIP_CCI_IMPRECISE_ERROR:
+		rc = cci_imprecise_error();
+		SMC_RET1(handle, rc);
+		break;
+	case MTK_SIP_CCI_SLAVE_REG:
+		rc = cci_slave_reg(x1, x2);
 		SMC_RET1(handle, rc);
 		break;
 	default:
