@@ -188,7 +188,7 @@ int power_on_cl3(void)
 //    flush_dcache_range(0x10222000,0x1000);
     PRINTF_SPMC("%s before top:%x c0:%x c1:%x\n",__FUNCTION__, big_spmc_status(0x10), big_spmc_status(0x01),big_spmc_status(0x02));
 	//This part was moved to kernel
-#if 0
+#if 1
     tmp = mmio_read_32(SPM_MP2_CPUSYS_PWR_CON) | (1<<0);
     mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp);//Release pwr_rst_b
 
