@@ -33,6 +33,7 @@
 
 /* Cortex-A57 midr for revision 0 */
 #define CORTEX_A57_MIDR 0x410FD070
+#define MIDR_PN_A57 ((CORTEX_A57_MIDR >> MIDR_PN_SHIFT) & MIDR_PN_MASK)
 
 /*******************************************************************************
  * CPU Extended Control register specific definitions.
@@ -43,6 +44,8 @@
 #define CPUECTLR_DIS_TWD_ACC_PFTCH_BIT	(1 << 38)
 #define CPUECTLR_L2_IPFTCH_DIST_MASK	(0x3 << 35)
 #define CPUECTLR_L2_DPFTCH_DIST_MASK	(0x3 << 32)
+#define CPUECTLR_2_TICKS        (1)
+
 
 /*******************************************************************************
  * CPU Auxiliary Control register specific definitions.
@@ -51,6 +54,7 @@
 
 #define CPUACTLR_NO_ALLOC_WBWA         (1 << 49)
 #define CPUACTLR_DCC_AS_DCCI           (1 << 44)
+#define CPUACTLR_DIS_L1_PREFETCH       (1 << 56)
 
 /*******************************************************************************
  * L2 Control register specific definitions.
@@ -62,5 +66,11 @@
 
 #define L2_DATA_RAM_LATENCY_3_CYCLES	0x2
 #define L2_TAG_RAM_LATENCY_3_CYCLES	0x2
+
+#define L2CTLR_DATA_RAM_SETUP_SHIFT   5
+#define L2CTLR_TAG_RAM_SETUP_SHIFT    9
+
+#define L2_DATA_RAM_SETUP_1_CYCLES    0x1
+#define L2_TAG_RAM_SETUP_1_CYCLES     0x1
 
 #endif /* __CORTEX_A57_H__ */

@@ -31,10 +31,11 @@
 #ifndef __CONSOLE_H__
 #define __CONSOLE_H__
 
-int console_init(unsigned long base_addr,
-		unsigned int uart_clk, unsigned int baud_rate);
+void console_init(unsigned long base_addr);
 int console_putc(int c);
 int console_getc(void);
+void set_uart_flag(void);
+void clear_uart_flag(void);
 
 #endif /* __CONSOLE_H__ */
 

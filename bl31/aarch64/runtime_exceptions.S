@@ -34,7 +34,7 @@
 #include <interrupt_mgmt.h>
 #include <platform_def.h>
 #include <runtime_svc.h>
-
+#include <mtk_macros.S>
 	.globl	runtime_exceptions
 	.globl	el3_exit
 
@@ -86,6 +86,16 @@
 	mov	sp, x2
 
 	/*
+	 * Save the EL3 system registers needed to return from
+	 * this exception.
+	 * use x2 and x30 to avoid data corruption
+	 * x2 and x30 is used previous code
+	 */
+	mrs	x2, spsr_el3
+	mrs	x30, elr_el3
+	stp	x2, x30, [x20, #CTX_EL3STATE_OFFSET + CTX_SPSR_EL3]
+
+	/*
 	 * Find out whether this is a valid interrupt type. If the
 	 * interrupt controller reports a spurious interrupt then
 	 * return to where we came from.
@@ -116,14 +126,6 @@
 	cmp	x19, x0
 	b.eq	interrupt_exit_\label
 #endif
-
-	/*
-	 * Save the EL3 system registers needed to return from
-	 * this exception.
-	 */
-	mrs	x3, spsr_el3
-	mrs	x4, elr_el3
-	stp	x3, x4, [x20, #CTX_EL3STATE_OFFSET + CTX_SPSR_EL3]
 
 	/* Set the current security state in the 'flags' parameter */
 	mrs	x2, scr_el3
@@ -163,6 +165,13 @@ interrupt_error_\label:
 	str	x18, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_SP_EL0]
 	.endm
 
+	.macro save_lr
+	 /*
+	 *Save LR to elr_el2
+	 */
+	msr	elr_el2, x30
+	.endm
+
 	.section	.vectors, "ax"; .align 11
 	.align	7
 runtime_exceptions:
@@ -175,6 +184,7 @@ sync_exception_sp_el0:
 	 * We don't expect any synchronous exceptions from EL3
 	 * -----------------------------------------------------
 	 */
+	save_lr
 	bl	report_unhandled_exception
 	check_vector_size sync_exception_sp_el0
 
@@ -185,16 +195,19 @@ sync_exception_sp_el0:
 	 * -----------------------------------------------------
 	 */
 irq_sp_el0:
+	save_lr
 	bl	report_unhandled_interrupt
 	check_vector_size irq_sp_el0
 
 	.align	7
 fiq_sp_el0:
+	save_lr
 	bl	report_unhandled_interrupt
 	check_vector_size fiq_sp_el0
 
 	.align	7
 serror_sp_el0:
+	save_lr
 	bl	report_unhandled_exception
 	check_vector_size serror_sp_el0
 
@@ -211,21 +224,25 @@ sync_exception_sp_elx:
 	 * There is a high probability that SP_EL3 is corrupted.
 	 * -----------------------------------------------------
 	 */
+	save_lr
 	bl	report_unhandled_exception
 	check_vector_size sync_exception_sp_elx
 
 	.align	7
 irq_sp_elx:
+	save_lr
 	bl	report_unhandled_interrupt
 	check_vector_size irq_sp_elx
 
 	.align	7
 fiq_sp_elx:
+	save_lr
 	bl	report_unhandled_interrupt
 	check_vector_size fiq_sp_elx
 
 	.align	7
 serror_sp_elx:
+	save_lr
 	bl	report_unhandled_exception
 	check_vector_size serror_sp_elx
 
@@ -263,6 +280,7 @@ fiq_aarch64:
 
 	.align	7
 serror_aarch64:
+       save_lr
 	bl	report_unhandled_exception
 	check_vector_size serror_aarch64
 
@@ -300,6 +318,7 @@ fiq_aarch32:
 
 	.align	7
 serror_aarch32:
+	save_lr
 	bl	report_unhandled_exception
 	check_vector_size serror_aarch32
 
@@ -320,8 +339,10 @@ serror_aarch32:
 	 */
 func smc_handler
 smc_handler32:
+#ifndef PLAT_USE_EL1_AARCH32
 	/* Check whether aarch32 issued an SMC64 */
 	tbnz	x0, #FUNCID_CC_SHIFT, smc_prohibited
+#endif
 
 	/* -----------------------------------------------------
 	 * Since we're are coming from aarch32, x8-x18 need to
@@ -357,6 +378,28 @@ smc_handler64:
 
 	mov	x5, xzr
 	mov	x6, sp
+
+	/*
+	 * PLAT_USE_EL1_AARCH64 is defined temporarily.
+	 * It will be removed after aarch64 EL1 is completed.
+	 */
+#if defined(PLAT_USE_EL1_AARCH32) || defined(PLAT_USE_EL1_AARCH64)
+	/* to support legacy SMC convention, this code converts
+	   -####(SMC identifier) to 0x8200#### */
+	ldr	w5, =0xffff0000	/* if x0 is -1 ~ -65536 */
+	and	w4, w0, w5
+	cmp	w4, w5
+	bne	1f
+	mov	w4, w0
+	mov	x5, xzr
+	orn	w5, w5, w4	/* ~x0 */
+	add	w5, w5, #1	/* x0++ */
+	ldr	w4, =0x82000000
+	orr	w0, w4, w5	/* x0 + 0x8200000 */
+1:
+	/* restore x4, x5 */
+	ldp	x4, x5, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X4]
+#endif
 
 	/* Get the unique owning entity number */
 	ubfx	x16, x0, #FUNCID_OEN_SHIFT, #FUNCID_OEN_WIDTH
@@ -425,8 +468,9 @@ smc_handler64:
 #if DEBUG
 	cbz	x15, rt_svc_fw_critical_error
 #endif
+	smc_id_log_pre
 	blr	x15
-
+	smc_id_log_post
 	/* -----------------------------------------------------
 	 * This routine assumes that the SP_EL3 is pointing to
 	 * a valid context structure from where the gp regs and
@@ -525,3 +569,8 @@ restore_gp_registers_callee_eret:
 	msr	sp_el0, x17
 	ldp	x16, x17, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_X16]
 	eret
+.section .rodata.rt_exceptions, "aS"
+dump_smc_id_in:
+	.asciz "(%u)smc_fid:0x%x in\n"
+dump_smc_id_out:
+	.asciz "(%u)smc_fid:0x%x out\n"

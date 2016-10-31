@@ -32,6 +32,9 @@
 #include <arch_helpers.h>
 #include <assert.h>
 #include <string.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <debug.h>
 #include "psci_private.h"
 
 typedef int (*afflvl_off_handler_t)(aff_map_node_t *);
@@ -67,6 +70,7 @@ static int psci_afflvl0_off(aff_map_node_t *cpu_node)
 	 * cpu caches.
 	 */
 	psci_do_pwrdown_cache_maintenance(MPIDR_AFFLVL0);
+	printf("%s: psci_do_pwrdown_cache_maintenance\n", __FUNCTION__);
 
 	if (!psci_plat_pm_ops->affinst_off)
 		return PSCI_E_SUCCESS;
@@ -229,6 +233,9 @@ int psci_afflvl_off(int start_afflvl,
 	max_phys_off_afflvl = psci_find_max_phys_off_afflvl(start_afflvl,
 							   end_afflvl,
 							   mpidr_nodes);
+
+	printf("max_phys_off_afflvl = %d\n", max_phys_off_afflvl);
+
 	assert(max_phys_off_afflvl != PSCI_INVALID_DATA);
 
 	/* Stash the highest affinity level that will enter the OFF state. */

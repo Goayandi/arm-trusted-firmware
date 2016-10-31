@@ -34,6 +34,12 @@
 #include <runtime_svc.h>
 #include <debug.h>
 #include "psci_private.h"
+#if defined(MACH_TYPE_MT6797)
+#include <platform.h>
+#include "../../../../plat/mt6797/power.h"
+#endif
+
+extern void dormant_log(int tag);
 
 /*******************************************************************************
  * PSCI frontend api for servicing SMCs. Described in the PSCI spec.
@@ -115,8 +121,11 @@ int psci_cpu_suspend(unsigned int power_state,
 				 power_state,
 				 MPIDR_AFFLVL0,
 				 target_afflvl);
-	if (rc == PSCI_E_SUCCESS)
+	if (rc == PSCI_E_SUCCESS) {
+		dormant_log(0xA7F00301);
 		psci_power_down_wfi();
+	}
+	dormant_log(0xA7F00302);
 	assert(rc == PSCI_E_INVALID_PARAMS);
 	return rc;
 }
@@ -139,8 +148,10 @@ int psci_cpu_off(void)
 	 * successfully completed. Enter a wfi loop which will allow the
 	 * power controller to physically power down this cpu.
 	 */
-	if (rc == PSCI_E_SUCCESS)
+	if (rc == PSCI_E_SUCCESS) {
+		printf("%s: call psci_power_down_wfi()\n", __FUNCTION__);
 		psci_power_down_wfi();
+	}
 
 	/*
 	 * The only error cpu_off can return is E_DENIED. So check if that's
@@ -157,12 +168,29 @@ int psci_affinity_info(unsigned long target_affinity,
 	int rc = PSCI_E_INVALID_PARAMS;
 	unsigned int aff_state;
 	aff_map_node_t *node;
+#if defined(MACH_TYPE_MT6797)
+	unsigned int linear_id;
+#endif
 
 	if (lowest_affinity_level > get_max_afflvl())
 		return rc;
 
 	node = psci_get_aff_map_node(target_affinity, lowest_affinity_level);
+#if defined(MACH_TYPE_MT6797)
+	linear_id = platform_get_core_pos(node->mpidr);
+#endif
 	if (node && (node->state & PSCI_AFF_PRESENT)) {
+#if defined(MACH_TYPE_MT6797)
+		if(linear_id < 8) {
+			power_off_little(linear_id);
+		} else {
+#if SPMC_SW_MODE
+			big_spmc_sw_pwr_off(linear_id-7);
+#else
+			power_off_big(linear_id);
+#endif
+		}
+#endif
 
 		/*
 		 * TODO: For affinity levels higher than 0 i.e. cpu, the

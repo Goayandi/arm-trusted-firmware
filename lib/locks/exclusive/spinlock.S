@@ -36,8 +36,8 @@
 
 func spin_lock
 	mov	w2, #1
-	sevl
-l1:	wfe
+	nop
+l1:	nop
 l2:	ldaxr	w1, [x0]
 	cbnz	w1, l1
 	stxr	w1, w2, [x0]

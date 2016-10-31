@@ -38,7 +38,9 @@
 #define MIDR_IMPL_MASK		0xff
 #define MIDR_IMPL_SHIFT		0x18
 #define MIDR_VAR_SHIFT		20
+#define MIDR_VAR_BITS		4
 #define MIDR_REV_SHIFT		0
+#define MIDR_REV_BITS		4
 #define MIDR_PN_MASK		0xfff
 #define MIDR_PN_SHIFT		0x4
 
@@ -59,7 +61,19 @@
 #define MPIDR_AFFLVL1		1
 #define MPIDR_AFFLVL2		2
 #define MPIDR_AFFLVL3		3
-/* TODO: Support only the first 3 affinity levels for now */
+#define MPIDR_AFFLVL0_VAL(mpidr) \
+		((mpidr >> MPIDR_AFF0_SHIFT) & MPIDR_AFFLVL_MASK)
+#define MPIDR_AFFLVL1_VAL(mpidr) \
+		((mpidr >> MPIDR_AFF1_SHIFT) & MPIDR_AFFLVL_MASK)
+#define MPIDR_AFFLVL2_VAL(mpidr) \
+		((mpidr >> MPIDR_AFF2_SHIFT) & MPIDR_AFFLVL_MASK)
+#define MPIDR_AFFLVL3_VAL(mpidr) \
+		((mpidr >> MPIDR_AFF3_SHIFT) & MPIDR_AFFLVL_MASK)
+/*
+ * The MPIDR_MAX_AFFLVL count starts from 0. Take care to
+ * add one while using this macro to define array sizes.
+ * TODO: Support only the first 3 affinity levels for now.
+ */
 #define MPIDR_MAX_AFFLVL	2
 
 /* Constant to highlight the assumption that MPIDR allocation starts from 0 */
@@ -121,10 +135,15 @@
 
 #define SCTLR_EL1_RES1  ((1 << 29) | (1 << 28) | (1 << 23) | (1 << 22) | \
 			(1 << 11))
+#define SCTLR_AARCH32_EL1_RES1 \
+			((1 << 23) | (1 << 22) | (1 << 11) | (1 << 4) | \
+			(1 << 3))
+
 #define SCTLR_M_BIT		(1 << 0)
 #define SCTLR_A_BIT		(1 << 1)
 #define SCTLR_C_BIT		(1 << 2)
 #define SCTLR_SA_BIT		(1 << 3)
+#define SCTLR_CPUBEN_BIT	(1 << 5)
 #define SCTLR_I_BIT		(1 << 12)
 #define SCTLR_WXN_BIT		(1 << 19)
 #define SCTLR_EE_BIT		(1 << 25)
@@ -284,6 +303,23 @@
 	((endian) & SPSR_E_MASK) << SPSR_E_SHIFT |	\
 	((aif) & SPSR_AIF_MASK) << SPSR_AIF_SHIFT)
 
+/*
+ * CTR_EL0 definitions
+ */
+#define CTR_CWG_SHIFT		24
+#define CTR_CWG_MASK		0xf
+#define CTR_ERG_SHIFT		20
+#define CTR_ERG_MASK		0xf
+#define CTR_DMINLINE_SHIFT	16
+#define CTR_DMINLINE_MASK	0xf
+#define CTR_L1IP_SHIFT		14
+#define CTR_L1IP_MASK		0x3
+#define CTR_IMINLINE_SHIFT	0
+#define CTR_IMINLINE_MASK	0xf
+
+#define MAX_CACHE_LINE_SIZE	0x800 /* 2KB */
+#define SIZE_FROM_LOG2_WORDS(n)	(4 << (n))
+
 
 /* Physical timer control register bit fields shifts and masks */
 #define CNTP_CTL_ENABLE_SHIFT   0
@@ -347,6 +383,11 @@
 #define PAGE_SIZE		(1 << PAGE_SIZE_SHIFT)
 #define PAGE_SIZE_MASK		(PAGE_SIZE - 1)
 #define IS_PAGE_ALIGNED(addr)	(((addr) & PAGE_SIZE_MASK) == 0)
+
+#define PAGE_SIZE_2MB_SHIFT		TWO_MB_SHIFT
+#define PAGE_SIZE_2MB		(1 << PAGE_SIZE_2MB_SHIFT)
+#define PAGE_SIZE_2MB_MASK		(PAGE_SIZE_2MB - 1)
+#define IS_PAGE_2MB_ALIGNED(addr)	(((addr) & PAGE_SIZE_2MB_MASK) == 0)
 
 #define XLAT_ENTRY_SIZE_SHIFT	3 /* Each MMU table entry is 8 bytes (1 << 3) */
 #define XLAT_ENTRY_SIZE		(1 << XLAT_ENTRY_SIZE_SHIFT)
@@ -428,5 +469,8 @@
 #define CNTACR_RVOFF_SHIFT	0x3
 #define CNTACR_RWVT_SHIFT	0x4
 #define CNTACR_RWPT_SHIFT	0x5
+
+/* MTK Define */
+#define ACTLR_CPUECTLR_BIT		(1 << 1)
 
 #endif /* __ARCH_H__ */

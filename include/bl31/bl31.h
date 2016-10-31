@@ -42,5 +42,6 @@ void bl31_set_next_image_type(uint32_t type);
 uint32_t bl31_get_next_image_type(void);
 void bl31_prepare_next_image_entry(void);
 void bl31_register_bl32_init(int32_t (*)(void));
+void bl31_prepare_kernel_entry(uint64_t k32_64);
 
 #endif /* __BL31_H__ */

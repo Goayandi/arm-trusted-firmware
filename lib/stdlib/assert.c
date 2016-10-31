@@ -30,12 +30,17 @@
 
 #include <debug.h>
 
+extern void el3_panic(void);
 /*
  * This is a basic implementation. This could be improved.
  */
 void __assert (const char *function, const char *file, unsigned int line,
 		const char *assertion)
 {
-	tf_printf("ASSERT: %s <%d> : %s\n", function, line, assertion);
+	/* use printf directly, print log dor ram log buffer */
+	printf("ASSERT: %s <%d> : %s\n", function, line, assertion);
+
+	/* trigger ATF_CRASH, do regs dump and get the assert log */
+	el3_panic();
 	while(1);
 }

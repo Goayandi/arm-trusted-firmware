@@ -47,22 +47,59 @@ ARCH 			:= aarch64
 # Build platform
 DEFAULT_PLAT		:= fvp
 PLAT			:= ${DEFAULT_PLAT}
+# Secure OS Support
+SECURE_OS		:= no
+$(info secure OS support : ${SECURE_OS})
 # SPD choice
-SPD			:= none
+SPD			:= fiqd
+ifeq (${SECURE_OS},tbase)
+SPD			:= tbase
+endif
+ifeq (${SECURE_OS},mtee)
+SPD			:= mtee
+endif
+ifeq (${SECURE_OS},trusty)
+SPD			:= trusty
+endif
+ifeq (${SECURE_OS},teeid)
+SPD			:= teeid
+endif
+# OEM choice
+OEMS			:= oems
 # Base commit to perform code check on
 BASE_COMMIT		:= origin/master
 # NS timer register save and restore
 NS_TIMER_SWITCH		:= 0
 # By default, Bl1 acts as the reset handler, not BL31
 RESET_TO_BL31		:= 0
+ifeq (${SECURE_OS},teeid)
 # Include FP registers in cpu context
+CTX_INCLUDE_FPREGS		:= 1
+else
 CTX_INCLUDE_FPREGS		:= 0
+endif
 # Determine the version of ARM GIC architecture to use for interrupt management
 # in EL3. The platform port can change this value if needed.
 ARM_GIC_ARCH		:=	2
 # Flag used to indicate if ASM_ASSERTION should be enabled for the build.
 # This defaults to being present in DEBUG builds only.
 ASM_ASSERTION		:=	${DEBUG}
+
+# MACH_TYPE build
+MACH_TYPE			:= MTXXXX
+$(info MACH_TYPE support : ${MACH_TYPE})
+
+ifneq ($(filter mt6752 mt6795,$(MACH_TYPE)),)
+  $(error "Error: Invalid platform, the MACH type is not supported with ATF 1.0 : ${MACH_TYPE}")
+endif
+
+# Temp solution for code size of MT6797 TEEI
+ifeq (${SECURE_OS},teeid)
+ifneq ($(filter mt6797,$(MACH_TYPE)),)
+  $(warning "Temp solution for code size of MT6797 TEEI")
+  CTX_INCLUDE_FPREGS		:= 0
+endif
+endif
 
 # Checkpatch ignores
 CHECK_IGNORE		=	--ignore COMPLEX_MACRO
@@ -105,10 +142,12 @@ BL_COMMON_SOURCES	:=	common/bl_common.c			\
 				plat/common/aarch64/platform_helpers.S
 
 BUILD_BASE		:=	./build
-BUILD_PLAT		:=	${BUILD_BASE}/${PLAT}/${BUILD_TYPE}
+#BUILD_PLAT		:=	${BUILD_BASE}/${PLAT}/${BUILD_TYPE}
+BUILD_PLAT		:=	${BUILD_BASE}/${BUILD_TYPE}
 
-PLATFORMS		:=	$(shell ls -I common plat/)
-SPDS			:=	$(shell ls -I none services/spd)
+#PLATFORMS		:=	$(shell ls -I common plat/)
+PLATFORMS		:=	$(PLAT)
+SPDS			:=	$(filter-out none,$(shell ls services/spd))
 HELP_PLATFORMS		:=	$(shell echo ${PLATFORMS} | sed 's/ /|/g')
 
 # Convenience function for adding build definitions
@@ -143,13 +182,13 @@ include plat/${PLAT}/platform.mk
 include lib/cpus/cpu-errata.mk
 
 ifdef BL1_SOURCES
-NEED_BL1 := yes
-include bl1/bl1.mk
+NEED_BL1 := no
+#include bl1/bl1.mk
 endif
 
 ifdef BL2_SOURCES
-NEED_BL2 := yes
-include bl2/bl2.mk
+NEED_BL2 := no
+#include bl2/bl2.mk
 endif
 
 ifdef BL31_SOURCES
@@ -173,6 +212,18 @@ ifneq (${SPD},none)
   # variable to "yes"
 endif
 
+# Include OEM Makefile if one has been specified
+ifneq (${OEMS},none)
+  # We expect to locate an oems.mk under the specified OEMS directory
+  OEMS_MAKE		:=	$(shell m="custom/${OEMS}.mk"; [ -f "$$m" ] && echo "$$m")
+
+  ifeq (${OEMS_MAKE},)
+    $(error Error: No custom/${OEMS}.mk located)
+  endif
+  $(info Including ${OEMS_MAKE})
+  include ${OEMS_MAKE}
+endif
+
 .PHONY:			all msg_start clean realclean distclean cscope locate-checkpatch checkcodebase checkpatch fiptool fip
 .SUFFIXES:
 
@@ -189,6 +240,7 @@ INCLUDES		+=	-Iinclude/bl31			\
 				-Iinclude/stdlib		\
 				-Iinclude/stdlib/sys		\
 				${PLAT_INCLUDES}		\
+				${OEMS_INCLUDES}		\
 				${SPD_INCLUDES}
 
 # Process DEBUG flag
@@ -197,9 +249,13 @@ $(eval $(call add_define,DEBUG))
 ifeq (${DEBUG},0)
   $(eval $(call add_define,NDEBUG))
 else
-CFLAGS			+= 	-g
+CFLAGS			+= 	-g -gdwarf-2 -O0
 ASFLAGS			+= 	-g -Wa,--gdwarf-2
 endif
+
+# Process MACH_TYPE flag
+# Transfer all letters to upper case
+$(eval $(call add_define,MACH_TYPE_$(shell echo $(MACH_TYPE) | tr '[a-z]' '[A-Z]')))
 
 # Process NS_TIMER_SWITCH flag
 $(eval $(call assert_boolean,NS_TIMER_SWITCH))
@@ -223,6 +279,9 @@ $(eval $(call add_define,ASM_ASSERTION))
 # Process LOG_LEVEL flag
 $(eval $(call add_define,LOG_LEVEL))
 
+# Process SPD flag
+$(eval $(call add_define,SPD_${SECURE_OS}))
+
 ASFLAGS			+= 	-nostdinc -ffreestanding -Wa,--fatal-warnings	\
 				-Werror -Wmissing-include-dirs			\
 				-mgeneral-regs-only -D__ASSEMBLY__		\
@@ -232,6 +291,37 @@ CFLAGS			+= 	-nostdinc -pedantic -ffreestanding -Wall	\
 				-mgeneral-regs-only -std=c99 -c -Os		\
 				${DEFINES} ${INCLUDES}
 CFLAGS			+=	-ffunction-sections -fdata-sections
+
+ifneq (${SECURE_OS},teeid)
+ASFLAGS += -Werror
+CFLAGS += -Werror
+endif
+
+ifeq (${SECURE_OS},teeid)
+CFLAGS += -DCFG_MICROTRUST_TEE_SUPPORT=1
+endif
+
+ifeq (${SECURE_DEINT_SUPPORT},yes)
+CFLAGS += -DSECURE_DEINT_SUPPORT=1
+endif
+
+#stack protector
+ifeq (${MTK_STACK_PROTECTOR},yes)
+CFLAGS += -fstack-protector-all
+CFLAGS += -DMTK_STACK_PROTECTOR
+endif
+
+#Full ATF ram dump
+ifeq (${MTK_ATF_RAM_DUMP},yes)
+CFLAGS += -DMTK_ATF_RAM_DUMP
+ASFLAGS += -DMTK_ATF_RAM_DUMP
+endif
+
+#SMC ID logging
+ifeq (${DEBUG_SMC_ID_LOG},yes)
+CFLAGS += -DDEBUG_SMC_ID_LOG
+ASFLAGS += -DDEBUG_SMC_ID_LOG
+endif
 
 LDFLAGS			+=	--fatal-warnings -O1
 LDFLAGS			+=	--gc-sections
@@ -302,6 +392,15 @@ BUILD_TARGETS := all bl1 bl2 bl31 bl32 fip
 ifneq ($(call match_goals,${BUILD_TARGETS}),)
 IS_ANYTHING_TO_BUILD := 1
 endif
+
+
+# For incremental build
+define MAKE_DEPS
+$(eval DEPS_PREREQUISITES := $(filter-out %.d,$(MAKEFILE_LIST)) $(ATF_ADDITIONAL_DEPENDENCIES))
+$(eval DEPS_TARGETS := $(OBJS) $(OEM_OBJS) $(patsubst %.o,%.d,$(OBJS) $(OEM_OBJS)) $(LINKERFILE) $(LINKERFILE).d)
+$(DEPS_TARGETS) : $(DEPS_PREREQUISITES)
+endef
+
 
 define MAKE_C
 
@@ -399,17 +498,19 @@ define MAKE_BL
 
 	$(eval $(call MAKE_OBJS,$(BUILD_DIR),$(SOURCES),$(1)))
 	$(eval $(call MAKE_LD,$(LINKERFILE),$(BL$(1)_LINKERFILE)))
+	$(eval $(call MAKE_DEPS))
 
 $(BUILD_DIR) :
 	$$(Q)mkdir -p "$$@"
 
 $(ELF) : $(OBJS) $(LINKERFILE)
+	@echo "BL31_LINKERFILE: ${BL31_LINKERFILE}"
 	@echo "  LD      $$@"
 	@echo 'const char build_message[] = "Built : "__TIME__", "__DATE__; \
 	       const char version_string[] = "${VERSION_STRING}";' | \
 		$$(CC) $$(CFLAGS) -xc - -o $(BUILD_DIR)/build_message.o
 	$$(Q)$$(LD) -o $$@ $$(LDFLAGS) -Map=$(MAPFILE) --script $(LINKERFILE) \
-					$(BUILD_DIR)/build_message.o $(OBJS)
+					$(BUILD_DIR)/build_message.o $(OBJS) $(STATIC_LIBS)
 
 $(DUMP) : $(ELF)
 	@echo "  OD      $$@"

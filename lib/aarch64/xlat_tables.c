@@ -42,6 +42,7 @@
 #endif
 
 #if DEBUG_XLAT_TABLE
+#include <stdio.h>  //for printf
 #define debug_print(...) printf(__VA_ARGS__)
 #else
 #define debug_print(...) ((void)0)
@@ -63,6 +64,8 @@ static unsigned next_xlat;
 static unsigned long max_pa;
 static unsigned long max_va;
 static unsigned long tcr_ps_bits;
+
+extern void dormant_log(int tag);
 
 /*
  * Array of all memory regions stored in order of ascending base address.
@@ -202,6 +205,9 @@ static mmap_region_t *init_xlation_table(mmap_region_t *mm,
 	do  {
 		unsigned long desc = UNSET_DESC;
 
+        debug_print("level=0x%x, table=0x%x, next_xlat=0x%x, mm->base_va=x0x%8lx, mm->size=0x%8lx\n",
+                     level, table,next_xlat, mm->base_va,mm->size);
+
 		if (mm->base_va + mm->size <= base_va) {
 			/* Area now after the region so skip it */
 			++mm;
@@ -336,7 +342,9 @@ void init_xlat_tables(void)
 		else							\
 			sctlr |= SCTLR_C_BIT;				\
 									\
+		dormant_log(0xA7F00402);				\
 		write_sctlr_el##_el(sctlr);				\
+		dormant_log(0xA7F00403);				\
 									\
 		/* Ensure the MMU enable takes effect immediately */	\
 		isb();							\

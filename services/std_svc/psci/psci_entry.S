@@ -157,7 +157,10 @@ psci_aff_common_finish_entry:
 	 */
 func psci_power_down_wfi
 	dsb	sy		// ensure write buffer empty
-	wfi
+
 wfi_spill:
+	wfi
+	bl	dump_wfi_spill
+	bl	report_unhandled_exception
 	b	wfi_spill
 

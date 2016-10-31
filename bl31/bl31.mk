@@ -53,11 +53,19 @@ BL31_SOURCES		+=	bl31/bl31_main.c				\
 				services/std_svc/psci/psci_setup.c		\
 				services/std_svc/psci/psci_system_off.c
 
+MTK_PLATFORM_LC := $(shell echo ${PLAT} | tr A-Z a-z )
+MTK_ATF_PLATFORM_FOLDER := plat
+CHIP_LD_S := $(MTK_ATF_PLATFORM_FOLDER)/$(MTK_PLATFORM_LC)/bl31.ld.S
+
+ifneq ($(wildcard $(CHIP_LD_S)),)
+BL31_LINKERFILE		:=	$(CHIP_LD_S)
+else
 BL31_LINKERFILE		:=	bl31/bl31.ld.S
+endif
 
 # Flag used by the generic interrupt management framework to  determine if
 # upon the assertion of an interrupt, it should pass the interrupt id or not
-IMF_READ_INTERRUPT_ID	:=	0
+IMF_READ_INTERRUPT_ID	:=	1
 
 $(eval $(call assert_boolean,IMF_READ_INTERRUPT_ID))
 $(eval $(call add_define,IMF_READ_INTERRUPT_ID))

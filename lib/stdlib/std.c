@@ -41,3 +41,6 @@
 #include "strlen.c"
 #include "strncmp.c"
 #include "subr_prf.c"
+#ifdef MTK_STACK_PROTECTOR
+#include "stack_protector.c"
+#endif

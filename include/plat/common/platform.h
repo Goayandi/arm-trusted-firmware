@@ -65,7 +65,16 @@ uint32_t plat_ic_get_interrupt_type(uint32_t id);
 void plat_ic_end_of_interrupt(uint32_t id);
 uint32_t plat_interrupt_type_to_line(uint32_t type,
 				     uint32_t security_state);
+void irq_raise_softirq(unsigned int map, unsigned int irq);
+unsigned int get_ack_info();
+void ack_sgi(unsigned int iar);
+void mt_atf_trigger_irq();
 
+void gic_dist_save(void);
+void gic_dist_restore(void);
+uint64_t mt_irq_dump_status(uint32_t irq);
+/* FIQ migration */
+uint64_t mt_irq_migrate(uint32_t irq, uint32_t cpu_id);
 /*******************************************************************************
  * Optional common functions (may be overridden)
  ******************************************************************************/
@@ -191,4 +200,35 @@ void bl31_plat_enable_mmu(uint32_t flags);
  ******************************************************************************/
 void bl32_plat_enable_mmu(uint32_t flags);
 
+/*******************************************************************************
+ * MTK struct
+ ******************************************************************************/
+#define ATF_AEE_BUFFER_SIZE             (0x4000)//16KB
+
+extern unsigned int BOOT_ARGUMENT_LOCATION;
+extern unsigned int BOOT_ARGUMENT_SIZE;
+extern unsigned int BL33_START_ADDRESS;
+extern unsigned int TEE_BOOT_INFO_ADDR;
+
+struct atf_aee_regs {
+    uint64_t    regs[31];
+    uint64_t    sp;
+    uint64_t    pc;
+    uint64_t    pstate;
+};
+
+/* WDT callback function */
+void aee_wdt_dump();
+extern uint64_t wdt_kernel_cb_addr;
+
+/* for chip version */
+typedef enum {
+    CHIP_SW_VER_01 = 0x0000,
+    CHIP_SW_VER_02 = 0x0001
+} CHIP_SW_VER;
+
+unsigned int mt_get_chip_hw_code(void);
+CHIP_SW_VER mt_get_chip_sw_ver(void);
+
+void dump_wfi_spill(void);
 #endif /* __PLATFORM_H__ */

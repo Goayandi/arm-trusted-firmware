@@ -37,6 +37,7 @@ ENTRY(bl31_entrypoint)
 
 MEMORY {
     RAM (rwx): ORIGIN = BL31_BASE, LENGTH = BL31_LIMIT
+    RAM2 (rwx): ORIGIN = TZRAM2_BASE, LENGTH = TZRAM2_SIZE
 }
 
 
@@ -108,6 +109,8 @@ SECTIONS
         __BSS_END__ = .;
     } >RAM
 
+    ASSERT(. <= BL31_LIMIT, "BL3-1 image has exceeded its limit.")
+
     /*
      * The xlat_table section is for full, aligned page tables (4K).
      * Removing them from .bss avoids forcing 4K alignment on
@@ -115,7 +118,7 @@ SECTIONS
      */
     xlat_table (NOLOAD) : {
         *(xlat_table)
-    } >RAM
+    } >RAM2
 
     /*
      * The base address of the coherent memory section must be page-aligned (4K)
@@ -134,7 +137,7 @@ SECTIONS
          */
         . = NEXT(4096);
         __COHERENT_RAM_END__ = .;
-    } >RAM
+    } >RAM2
 
     __BL31_END__ = .;
 
@@ -142,5 +145,5 @@ SECTIONS
     __COHERENT_RAM_UNALIGNED_SIZE__ =
         __COHERENT_RAM_END_UNALIGNED__ - __COHERENT_RAM_START__;
 
-    ASSERT(. <= BL31_LIMIT, "BL3-1 image has exceeded its limit.")
+    ASSERT(. <= TZRAM2_LIMIT, "TZRAM2 image has exceeded its limit.")
 }

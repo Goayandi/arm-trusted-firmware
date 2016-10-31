@@ -38,6 +38,9 @@
 #include <platform.h>
 #include <runtime_svc.h>
 #include <string.h>
+#include <log.h>
+#include <console.h>    //for disable uart log when leaving ATF booting flow
+#include "plat_private.h"   //for atf_arg_t_ptr
 
 /*******************************************************************************
  * This function pointer is used to initialise the BL32 image. It's initialized
@@ -71,8 +74,35 @@ void bl31_lib_init(void)
  ******************************************************************************/
 void bl31_main(void)
 {
+    /* Show Only to UART */
 	NOTICE("BL3-1: %s\n", version_string);
 	NOTICE("BL3-1: %s\n", build_message);
+
+    /* compatible to the earlier chipset */
+#if (defined(MACH_TYPE_MT6735) || defined(MACH_TYPE_MT6735M) || \
+     defined(MACH_TYPE_MT6753) || defined(MACH_TYPE_MT8173))
+	atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
+#else
+	atf_arg_t_ptr teearg = &gteearg;
+#endif
+
+	/* Initialize for ATF log buffer */
+	if(teearg->atf_log_buf_size != 0)
+	{
+	    teearg->atf_aee_debug_buf_size = ATF_AEE_BUFFER_SIZE;
+        teearg->atf_aee_debug_buf_start = teearg->atf_log_buf_start + teearg->atf_log_buf_size - ATF_AEE_BUFFER_SIZE;
+		mt_log_setup(teearg->atf_log_buf_start, teearg->atf_log_buf_size, teearg->atf_aee_debug_buf_size);
+		printf("ATF log service is registered (0x%x, aee:0x%x)\n", teearg->atf_log_buf_start, teearg->atf_aee_debug_buf_start);
+	}
+	else
+	{
+		teearg->atf_aee_debug_buf_size = 0;
+		teearg->atf_aee_debug_buf_start = 0;
+	}
+
+	/* Show to ATF log buffer & UART */
+	printf("BL3-1: %s\n", version_string);
+	printf("BL3-1: %s\n", build_message);
 
 	/* Perform remaining generic architectural setup from EL3 */
 	bl31_arch_setup();
@@ -103,15 +133,42 @@ void bl31_main(void)
 	/*
 	 * If SPD had registerd an init hook, invoke it.
 	 */
-	if (bl32_init) {
-		INFO("BL3-1: Initializing BL3-2\n");
-		(*bl32_init)();
+	if(teearg->tee_support)
+	{
+		printf("[BL31] Jump to secure OS for initialization!\n\r");
+		if (bl32_init)
+		{
+			(*bl32_init)();
+		}
+		else
+		{
+			printf("[ERROR] Secure OS is not initialized!\n\r");
+		}
 	}
+	else
+	{
+		printf("[BL31] Jump to FIQD for initialization!\n\r");
+		if (bl32_init)
+		{
+			(*bl32_init)();
+		}
+	}
+
 	/*
 	 * We are ready to enter the next EL. Prepare entry into the image
 	 * corresponding to the desired security state after the next ERET.
 	 */
+#ifndef SVP3_ENABLE
 	bl31_prepare_next_image_entry();
+#else
+	bl31_prepare_kernel_entry(1);	// prepare 64 bits kernel directly
+#endif
+
+	printf("[BL31] Final dump!\n\r");
+
+	clear_uart_flag();
+
+	printf("[BL31] SHOULD not dump in UART but in log buffer!\n\r");
 }
 
 /*******************************************************************************
@@ -133,6 +190,35 @@ uint32_t bl31_get_next_image_type(void)
 	return next_image_type;
 }
 
+extern entry_point_info_t *bl31_plat_get_next_kernel64_ep_info(uint32_t type);
+extern entry_point_info_t *bl31_plat_get_next_kernel32_ep_info(uint32_t type);
+
+void bl31_prepare_kernel_entry(uint64_t k32_64)
+{
+	entry_point_info_t *next_image_info;
+	uint32_t image_type;
+
+    /* Determine which image to execute next */
+    image_type = NON_SECURE; //bl31_get_next_image_type();
+
+    /* Program EL3 registers to enable entry into the next EL */
+    if (0 == k32_64) {
+        next_image_info = bl31_plat_get_next_kernel32_ep_info(image_type);
+    } else {
+        next_image_info = bl31_plat_get_next_kernel64_ep_info(image_type);
+    }
+	assert(next_image_info);
+	assert(image_type == GET_SECURITY_STATE(next_image_info->h.attr));
+
+	INFO("BL3-1: Preparing for EL3 exit to %s world, Kernel\n",
+		(image_type == SECURE) ? "secure" : "normal");
+	INFO("BL3-1: Next image address = 0x%llx\n",
+		(unsigned long long) next_image_info->pc);
+	INFO("BL3-1: Next image spsr = 0x%x\n", next_image_info->spsr);
+	cm_init_context(read_mpidr_el1(), next_image_info);
+	cm_prepare_el3_exit(image_type);
+}
+
 /*******************************************************************************
  * This function programs EL3 registers and performs other setup to enable entry
  * into the next image after BL31 at the next ERET.
@@ -150,7 +236,7 @@ void bl31_prepare_next_image_entry(void)
 	assert(next_image_info);
 	assert(image_type == GET_SECURITY_STATE(next_image_info->h.attr));
 
-	INFO("BL3-1: Preparing for EL3 exit to %s world\n",
+	INFO("BL3-1: Preparing for EL3 exit to %s world, LK\n",
 		(image_type == SECURE) ? "secure" : "normal");
 	INFO("BL3-1: Next image address = 0x%llx\n",
 		(unsigned long long) next_image_info->pc);

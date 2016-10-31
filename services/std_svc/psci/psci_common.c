@@ -127,6 +127,7 @@ int get_power_on_target_afflvl()
 {
 	int afflvl;
 
+#if SCOTT
 #if DEBUG
 	unsigned int state;
 	aff_map_node_t *node;
@@ -142,6 +143,7 @@ int get_power_on_target_afflvl()
 	 */
 	state = psci_get_state(node);
 	assert(state == PSCI_STATE_SUSPEND || state == PSCI_STATE_ON_PENDING);
+#endif
 #endif
 
 	/*

@@ -31,8 +31,10 @@
 #include <arch.h>
 #include <arch_helpers.h>
 #include <assert.h>
-#include <bl_common.h>
 #include <bl31.h>
+#if (!defined(CFG_MICROTRUST_TEE_SUPPORT))
+#include <bl_common.h>
+#endif
 #include <context.h>
 #include <context_mgmt.h>
 #include <cpu_data.h>
@@ -182,6 +184,8 @@ void cm_init_context(uint64_t mpidr, const entry_point_info_t *ep)
 	 * against the CPU support, security state, endianess and pc
 	 */
 	sctlr_elx = EP_GET_EE(ep->h.attr) ? SCTLR_EE_BIT : 0;
+	//MTK set CPU Barrie Enable bit for ARCH32 code (LK, 32 bits Linux)
+	sctlr_elx |= SCTLR_CPUBEN_BIT;  
 	sctlr_elx |= SCTLR_EL1_RES1;
 	write_ctx_reg(get_sysregs_ctx(ctx), CTX_SCTLR_EL1, sctlr_elx);
 
@@ -257,6 +261,37 @@ void cm_prepare_el3_exit(uint32_t security_state)
 
 	cm_set_next_context(ctx);
 }
+
+#if defined(CFG_MICROTRUST_TEE_SUPPORT)
+/*******************************************************************************
+ * The next four functions are used by runtime services to save and restore
+ * EL1 context on the 'cpu_context' structure for the specified security
+ * state.
+ ******************************************************************************/
+void cm_fpregs_context_save(uint32_t security_state)
+{
+	cpu_context_t *ctx;
+
+	ctx = cm_get_context(security_state);
+	assert(ctx);
+
+#if !defined(MACH_TYPE_MT6797)
+	fpregs_context_save(get_fpregs_ctx(ctx));
+#endif	
+}
+
+void cm_fpregs_context_restore(uint32_t security_state)
+{
+	cpu_context_t *ctx;
+
+	ctx = cm_get_context(security_state);
+	assert(ctx);
+	
+#if !defined(MACH_TYPE_MT6797)
+	fpregs_context_restore(get_fpregs_ctx(ctx));
+#endif
+}
+#endif
 
 /*******************************************************************************
  * The next four functions are used by runtime services to save and restore

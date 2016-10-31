@@ -30,6 +30,9 @@
 #include <debug.h>
 #include <stdarg.h>
 #include <stdint.h>
+extern int (*log_lock_acquire)();
+extern int (*log_write)(unsigned char);
+extern int (*log_lock_release)();
 
 /***********************************************************
  * The tf_printf implementation for all BL stages
@@ -48,14 +51,20 @@ static void unsigned_num_print(unsigned long int unum, unsigned int radix)
 			num_buf[i++] = 'a' + (rem - 0xa);
 	} while (unum /= radix);
 
-	while (--i >= 0)
+	while (--i >= 0){
+		if (log_write)
+			(*log_write)(num_buf[i]);
 		putchar(num_buf[i]);
+	}
 }
 
 static void string_print(const char *str)
 {
-	while (*str)
+	while (*str){
+		if (log_write)
+			(*log_write)(*str);
 		putchar(*str++);
+	}
 }
 
 /*******************************************************************
@@ -79,6 +88,9 @@ void tf_printf(const char *fmt, ...)
 	uint64_t unum;
 	char *str;
 
+	/* try get buffer lock */
+    if (log_lock_acquire)
+        (*log_lock_acquire)();
 	va_start(args, fmt);
 	while (*fmt) {
 		bit64 = 0;
@@ -134,8 +146,14 @@ loop:
 			fmt++;
 			continue;
 		}
+		if (log_write)
+			(*log_write)(*fmt);
 		putchar(*fmt++);
 	}
 exit:
 	va_end(args);
+
+    /* release buffer lock */
+    if (log_lock_release)
+        (*log_lock_release)();
 }

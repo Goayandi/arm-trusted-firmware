@@ -33,7 +33,9 @@
 
 #include <cpu_data.h>
 #include <stdint.h>
-
+#if CFG_MICROTRUST_TEE_SUPPORT
+#include <bl_common.h>
+#endif
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/

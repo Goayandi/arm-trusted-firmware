@@ -37,11 +37,14 @@
 	.globl	report_unhandled_exception
 	.globl	report_unhandled_interrupt
 	.globl	el3_panic
-
+	.globl	plat_print_dormant_log
 #if CRASH_REPORTING
 #define REG_SIZE	0x8
-
-	/* ------------------------------------------------------
+#define ATF_RAM_DUMP_LOCK_PATTERN	0x5ac8
+#define ATF_RAM_DUMP_START_FLAG 0xa7fd07eea7fd07ee
+#define ATF_RAM_DUMP_END_FLAG 	0xe1de2de3de4de5d6
+#define ATF_RAM_DUMP_BAD_FLAG	0xbadbadbadbadbadb
+/* ------------------------------------------------------
 	 * The below section deals with dumping the system state
 	 * when an unhandled exception is taken in EL3.
 	 * The layout and the names of the registers which will
@@ -78,7 +81,10 @@ excpt_msg:
 	.asciz "Unhandled Exception in EL3.\nx30 =\t\t0x"
 intr_excpt_msg:
 	.asciz "Unhandled Interrupt Exception in EL3.\nx30 =\t\t0x"
-
+dump_reg_msg:
+	.asciz "Dump address :\t\t0x"
+dump_last_lr_msg:
+	.asciz "Dump last LR address :\t\t0x"
 	/*
 	 * Helper function to print newline to console.
 	 */
@@ -162,6 +168,115 @@ func str_in_crash_buf_print
 	str	x1, [x0]
 	.endm
 
+	/*
+	*Take x9 as dump stack base address
+	*Clobbers: x4, x9, x10
+	*/
+	.macro print_dump_stack
+	/* Last LR */
+	adr	x4, dump_last_lr_msg
+	bl	asm_print_str
+	mrs	x4, elr_el2
+	bl	asm_print_hex
+	bl	print_newline
+	adr	x4, dump_reg_msg
+	bl	asm_print_str
+	mov x4, x9
+	bl	asm_print_hex
+	bl	print_newline
+
+	add  x10, x9, #0x100
+print_dump_loop:
+	cmp	x9, x10
+	b.eq	exit_print_dump
+	ldr	x4, [x9], #8
+	bl	asm_print_hex
+	bl	print_newline
+	b	print_dump_loop
+exit_print_dump:
+	bl	print_newline
+	.endm
+
+	.macro ram_dump
+	/* See if ram dump is done by other CPUs*/
+	mov	w2, #ATF_RAM_DUMP_LOCK_PATTERN
+	adr	x0, atf_ram_dump_lock
+	ldr	w1, [x0]
+	cmp	w1, w2
+	b.eq	done
+	str	w2, [x0]
+	/* Disable MMU, which imply cache flush & invalidate */
+	bl disable_mmu_el3
+	/* Sanity check ram dump base address and size */
+	/* x22=ram dump base, x23=ram dump size, x24=flag, x25=ram dump end address */
+	adr 	x22, atf_ram_dump_base
+	ldr 	x22, [x22]
+	adr 	x23, atf_ram_dump_size
+	ldr 	x23, [x23]
+	sub	x23, x23, #8
+	add	x25, x22, x23
+
+	ldr   x2, =DRAM_EMI_BASE
+	cmp	x22, x2
+	b.hi	start		/*if(atf_ram_dump_base > DRAM_EMI_BASE){jump start:}*/
+
+	b	done
+start:
+	ldr	x24, =ATF_RAM_DUMP_START_FLAG
+	str	x24, [x25]
+	/* x20=RAM1 size, x21=RAM2 size */
+	mov	x0, x23
+	ldr 	x1, =BL31_TZRAM_SIZE
+	ldr 	x2, =TZRAM2_SIZE
+	cmp x0, x1
+	b.ls	1f	/* if(atf_ram_dump_size > BL31_TZRAM_SIZE) x20=BL31_TZRAM_SIZE else x20=atf_ram_dump_size */
+	mov x20, x1
+	sub	x0, x0, x1
+	cmp	x0, x2
+	b.ls	2f	/* if((atf_ram_dump_size-BL31_TZRAM_SIZE) > TZRAM2_SIZE) x21=TZRAM2_SIZE else x21=atf_ram_dump_size-BL31_TZRAM_SIZE*/
+	mov	x21, x2
+	b 3f
+1:
+	mov x20, x0
+	mov x21, #0
+	b 3f
+2:
+	mov x21, x0
+3:
+	mov	x0, x22
+	ldr 	x1, =BL31_BASE
+	mov	x2, x20
+	bl	memcpy16
+	ldr 	x1,=TZRAM2_BASE
+	mov	x2, x21
+	bl	memcpy16
+	ldr	x24, =ATF_RAM_DUMP_END_FLAG
+	str	x24, [x25]
+done:
+	.endm
+/*
+ * This function print dormant flag from x2.
+ * In: x2 = flag value.
+ * Clobber: x30, x0, x1, x2, x3
+ */
+func plat_print_dormant_log
+	mov	x3, x30
+
+	/* x0 will get the cpuid (posion) */
+	mrs	x0,	mpidr_el1
+	bl	platform_get_core_pos
+
+    /* x0 will get the address of  g_dormant_log_base[cpuid]
+    	unsigned long g_dormant_log_base = 0;  */
+	ldr	x1,	=DORMANT_LOG_BASE
+	ldr	x1,	[x1]
+	ldr	x1,	[x1]
+	/* long, left shift 3 bits*/
+	add	x0, x1, x0, LSL #3
+	str	w2,	[x0]
+
+	ret	x3
+
 	/* -----------------------------------------------------
 	 * This function allows to report a crash (if crash
 	 * reporting is enabled) when an unhandled exception
@@ -229,17 +344,22 @@ func el3_panic
 	 * ------------------------------------------------------------
 	 */
 func do_crash_reporting
+	/* kick watchdog first */
+	ldr	x0, =MTK_WDT_RESTART
+	ldr	x1, =MTK_WDT_RESTART_KEY
+	str 	x1, [x0]
 	/* Retrieve the crash buf from tpidr_el3 */
 	mrs	x0, tpidr_el3
 	/* Store x2 - x6, x30 in the crash buffer */
 	stp	x2, x3, [x0, #REG_SIZE * 2]
 	stp	x4, x5, [x0, #REG_SIZE * 4]
 	stp	x6, x30, [x0, #REG_SIZE * 6]
-	/* Initialize the crash console */
-	bl	plat_crash_console_init
-	/* Verify the console is initialized */
-	cbz	x0, crash_panic
+
+	mov_imm x2, ATF_LOW_LEVEL_LOG_D
+	bl plat_print_dormant_log
+
 	/* Print the crash message. sp points to the crash message */
+	bl	print_newline
 	mov	x4, sp
 	bl	asm_print_str
 	/* load the crash buf address */
@@ -290,6 +410,9 @@ func do_crash_reporting
 	mrs	x9, esr_el3
 	mrs	x10, far_el3
 	bl	str_in_crash_buf_print
+
+	mov_imm x2, ATF_LOW_LEVEL_LOG_E
+	bl plat_print_dormant_log
 
 	/* Print the non el3 sys registers */
 	adr	x6, non_el3_sys_regs
@@ -344,6 +467,13 @@ func do_crash_reporting
 	/* Print the interconnect registers */
 	plat_print_interconnect_regs
 
+	/* Since we dump all context, we can crash GP registers */
+	mrs x9, sp_el0
+	print_dump_stack
+#ifdef MTK_ATF_RAM_DUMP
+	/* Full ram dump */
+	ram_dump
+#endif
 	/* Done reporting */
 	b	crash_panic
 
@@ -355,4 +485,9 @@ report_unhandled_interrupt:
 
 
 func crash_panic
+
+	mov_imm x2, ATF_LOW_LEVEL_LOG_F
+	bl plat_print_dormant_log
+
 	b	crash_panic
+

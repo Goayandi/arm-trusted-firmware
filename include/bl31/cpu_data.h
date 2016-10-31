@@ -42,12 +42,22 @@
 #define CPU_DATA_CRASH_BUF_SIZE		64
 #define CPU_DATA_CPU_OPS_PTR		0x10
 
+
+/* for ATF CRASH log */
+#define ATF_LOW_LEVEL_LOG_D     0xA7F00C0D
+#define ATF_LOW_LEVEL_LOG_E     0xA7F00C0E
+#define ATF_LOW_LEVEL_LOG_F     0xA7F00C0F
+
+
 #ifndef __ASSEMBLY__
 
 #include <arch_helpers.h>
 #include <platform_def.h>
 #include <psci.h>
 #include <stdint.h>
+#if CFG_MICROTRUST_TEE_SUPPORT
+#include <cassert.h>
+#endif
 
 /*******************************************************************************
  * Function & variable prototypes

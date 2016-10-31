@@ -150,7 +150,7 @@ void bakery_lock_get(bakery_lock_t *bakery)
 
 		/* Wait for the contender to get their ticket */
 		while (bakery->entering[they])
-			wfe();
+            ;
 
 		/*
 		 * If the other party is a contender, they'll have non-zero
@@ -165,7 +165,7 @@ void bakery_lock_get(bakery_lock_t *bakery)
 			 * again for the same lock to have an even higher value)
 			 */
 			do {
-				wfe();
+				;
 			} while (their_ticket == bakery->number[they]);
 		}
 	}

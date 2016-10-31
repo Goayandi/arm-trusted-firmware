@@ -35,6 +35,9 @@
 	.globl	inv_dcache_range
 	.globl	dcsw_op_louis
 	.globl	dcsw_op_all
+	.globl	dcsw_op_level1
+	.globl	dcsw_op_level2
+	.globl	dcsw_op_level3
 
 	/* ------------------------------------------
 	 * Clean+Invalidate from base address till
@@ -81,6 +84,7 @@ inv_loop:
 	 * x0: The operation type (0-2), as defined in arch.h
 	 * x3: The last cache level to operate on
 	 * x9: clidr_el1
+	 * x10: The cache level to begin operation from
 	 * and will carry out the operation on each data cache from level 0
 	 * to the level in x3 in sequence
 	 *
@@ -93,6 +97,7 @@ inv_loop:
 	mrs	x9, clidr_el1
 	ubfx	x3, x9, \shift, \fw
 	lsl	x3, x3, \ls
+	mov	x10, xzr
 	b	do_dcsw_op
 	.endm
 
@@ -160,6 +165,47 @@ dcsw_loop_table:
 func dcsw_op_louis
 	dcsw_op #LOUIS_SHIFT, #CLIDR_FIELD_WIDTH, #LEVEL_SHIFT
 
-
 func dcsw_op_all
 	dcsw_op #LOC_SHIFT, #CLIDR_FIELD_WIDTH, #LEVEL_SHIFT
+
+	/* ---------------------------------------------------------------
+	 *  Helper macro for data cache operations by set/way for the
+	 *  level specified
+	 * ---------------------------------------------------------------
+	 */
+	.macro dcsw_op_level level
+	mrs	x9, clidr_el1
+	mov	x3, \level
+	sub	x10, x3, #2
+	b	do_dcsw_op
+	.endm
+
+	/* ---------------------------------------------------------------
+	 * Data cache operations by set/way for level 1 cache
+	 *
+	 * The main function, do_dcsw_op requires:
+	 * x0: The operation type (0-2), as defined in arch.h
+	 * ---------------------------------------------------------------
+	 */
+func dcsw_op_level1
+	dcsw_op_level #(1 << LEVEL_SHIFT)
+
+	/* ---------------------------------------------------------------
+	 * Data cache operations by set/way for level 2 cache
+	 *
+	 * The main function, do_dcsw_op requires:
+	 * x0: The operation type (0-2), as defined in arch.h
+	 * ---------------------------------------------------------------
+	 */
+func dcsw_op_level2
+	dcsw_op_level #(2 << LEVEL_SHIFT)
+
+	/* ---------------------------------------------------------------
+	 * Data cache operations by set/way for level 3 cache
+	 *
+	 * The main function, do_dcsw_op requires:
+	 * x0: The operation type (0-2), as defined in arch.h
+	 * ---------------------------------------------------------------
+	 */
+func dcsw_op_level3
+	dcsw_op_level #(3 << LEVEL_SHIFT)

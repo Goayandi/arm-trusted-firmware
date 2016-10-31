@@ -344,6 +344,9 @@ uint32_t arm_gic_interrupt_type_to_line(uint32_t type,
  ******************************************************************************/
 uint32_t arm_gic_get_pending_interrupt_type(void)
 {
+#if defined(SPD_trusty)
+	return INTR_TYPE_S_EL1;
+#else
 	uint32_t id;
 
 	assert(g_gicc_base);
@@ -357,6 +360,7 @@ uint32_t arm_gic_get_pending_interrupt_type(void)
 		return INTR_TYPE_INVAL;
 
 	return INTR_TYPE_NS;
+#endif
 }
 
 /*******************************************************************************
