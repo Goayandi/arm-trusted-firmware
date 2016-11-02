@@ -31,6 +31,17 @@
 #ifndef __PSCI_H__
 #define __PSCI_H__
 
+#include <bakery_lock.h>
+#include <platform_def.h>	/* for PLATFORM_NUM_AFFS */
+
+/*******************************************************************************
+ * Number of affinity instances whose state this psci imp. can track
+ ******************************************************************************/
+#ifdef PLATFORM_NUM_AFFS
+#define PSCI_NUM_AFFS		PLATFORM_NUM_AFFS
+#else
+#define PSCI_NUM_AFFS		(2 * PLATFORM_CORE_COUNT)
+#endif
 
 /*******************************************************************************
  * Defines for runtime services func ids
@@ -50,11 +61,15 @@
 #define PSCI_MIG_INFO_UP_CPU_AARCH64	0xc4000007
 #define PSCI_SYSTEM_OFF			0x84000008
 #define PSCI_SYSTEM_RESET		0x84000009
+#define PSCI_FEATURES			0x8400000A
+
+/* Macro to help build the psci capabilities bitfield */
+#define define_psci_cap(x)		(1 << (x & 0x1f))
 
 /*
  * Number of PSCI calls (above) implemented
  */
-#define PSCI_NUM_CALLS			15
+#define PSCI_NUM_CALLS			16
 
 /*******************************************************************************
  * PSCI Migrate and friends
@@ -78,18 +93,30 @@
 #define PSTATE_TYPE_STANDBY	0x0
 #define PSTATE_TYPE_POWERDOWN	0x1
 
-#define psci_get_pstate_id(pstate)	(pstate >> PSTATE_ID_SHIFT) & \
-					PSTATE_ID_MASK
-#define psci_get_pstate_type(pstate)	(pstate >> PSTATE_TYPE_SHIFT) & \
-					PSTATE_TYPE_MASK
-#define psci_get_pstate_afflvl(pstate)	(pstate >> PSTATE_AFF_LVL_SHIFT) & \
-					PSTATE_AFF_LVL_MASK
+#define psci_get_pstate_id(pstate)	((pstate >> PSTATE_ID_SHIFT) & \
+					PSTATE_ID_MASK)
+#define psci_get_pstate_type(pstate)	((pstate >> PSTATE_TYPE_SHIFT) & \
+					PSTATE_TYPE_MASK)
+#define psci_get_pstate_afflvl(pstate)	((pstate >> PSTATE_AFF_LVL_SHIFT) & \
+					PSTATE_AFF_LVL_MASK)
+
+/*******************************************************************************
+ * PSCI CPU_FEATURES feature flag specific defines
+ ******************************************************************************/
+/* Features flags for CPU SUSPEND power state parameter format. Bits [1:1] */
+#define FF_PSTATE_SHIFT		1
+#define FF_PSTATE_ORIG		0
+#define FF_PSTATE_EXTENDED	1
+
+/* Features flags for CPU SUSPEND OS Initiated mode support. Bits [0:0] */
+#define FF_MODE_SUPPORT_SHIFT		0
+#define FF_SUPPORTS_OS_INIT_MODE	1
 
 /*******************************************************************************
  * PSCI version
  ******************************************************************************/
-#define PSCI_MAJOR_VER		(0 << 16)
-#define PSCI_MINOR_VER		0x2
+#define PSCI_MAJOR_VER		(1 << 16)
+#define PSCI_MINOR_VER		0x0
 
 /*******************************************************************************
  * PSCI error codes
@@ -140,6 +167,9 @@ typedef struct psci_cpu_data {
 	uint32_t power_state;
 	uint32_t max_phys_off_afflvl;	/* Highest affinity level in physically
 					   powered off state */
+#if !USE_COHERENT_MEM
+	bakery_info_t pcpu_bakery_info[PSCI_NUM_AFFS];
+#endif
 } psci_cpu_data_t;
 
 /*******************************************************************************
@@ -147,24 +177,22 @@ typedef struct psci_cpu_data {
  * perform common low level pm functions
  ******************************************************************************/
 typedef struct plat_pm_ops {
-	int (*affinst_standby)(unsigned int);
-	int (*affinst_on)(unsigned long,
-			  unsigned long,
-			  unsigned long,
-			  unsigned int,
-			  unsigned int);
-	int (*affinst_off)(unsigned long, unsigned int, unsigned int);
-	int (*affinst_suspend)(unsigned long,
-			       unsigned long,
-			       unsigned long,
-			       unsigned int,
-			       unsigned int);
-	int (*affinst_on_finish)(unsigned long, unsigned int, unsigned int);
-	int (*affinst_suspend_finish)(unsigned long,
-				      unsigned int,
-				      unsigned int);
+	void (*affinst_standby)(unsigned int power_state);
+	int (*affinst_on)(unsigned long mpidr,
+			  unsigned long sec_entrypoint,
+			  unsigned int afflvl,
+			  unsigned int state);
+	void (*affinst_off)(unsigned int afflvl, unsigned int state);
+	void (*affinst_suspend)(unsigned long sec_entrypoint,
+			       unsigned int afflvl,
+			       unsigned int state);
+	void (*affinst_on_finish)(unsigned int afflvl, unsigned int state);
+	void (*affinst_suspend_finish)(unsigned int afflvl,
+				      unsigned int state);
 	void (*system_off)(void) __dead2;
 	void (*system_reset)(void) __dead2;
+	int (*validate_power_state)(unsigned int power_state);
+	int (*validate_ns_entrypoint)(unsigned long ns_entrypoint);
 } plat_pm_ops_t;
 
 /*******************************************************************************
@@ -176,11 +204,11 @@ typedef struct plat_pm_ops {
 typedef struct spd_pm_ops {
 	void (*svc_on)(uint64_t target_cpu);
 	int32_t (*svc_off)(uint64_t __unused);
-	void (*svc_suspend)(uint64_t power_state);
+	void (*svc_suspend)(uint64_t __unused);
 	void (*svc_on_finish)(uint64_t __unused);
 	void (*svc_suspend_finish)(uint64_t suspend_level);
-	void (*svc_migrate)(uint64_t __unused1, uint64_t __unused2);
-	int32_t (*svc_migrate_info)(uint64_t *__unused);
+	int32_t (*svc_migrate)(uint64_t from_cpu, uint64_t to_cpu);
+	int32_t (*svc_migrate_info)(uint64_t *resident_cpu);
 	void (*svc_system_off)(void);
 	void (*svc_system_reset)(void);
 } spd_pm_ops_t;
@@ -190,9 +218,9 @@ typedef struct spd_pm_ops {
  ******************************************************************************/
 unsigned int psci_version(void);
 int psci_affinity_info(unsigned long, unsigned int);
-int psci_migrate(unsigned int);
-unsigned int psci_migrate_info_type(void);
-unsigned long psci_migrate_info_up_cpu(void);
+int psci_migrate(unsigned long);
+int psci_migrate_info_type(void);
+long psci_migrate_info_up_cpu(void);
 int psci_cpu_on(unsigned long,
 		unsigned long,
 		unsigned long);

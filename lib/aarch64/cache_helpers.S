@@ -103,7 +103,6 @@ inv_loop:
 
 func do_dcsw_op
 	cbz	x3, exit
-	mov	x10, xzr
 	adr	x14, dcsw_loop_table	// compute inner loop address
 	add	x14, x14, x0, lsl #5	// inner loop is 8x32-bit instructions
 	mov	x0, x9

@@ -231,4 +231,10 @@ unsigned int mt_get_chip_hw_code(void);
 CHIP_SW_VER mt_get_chip_sw_ver(void);
 
 void dump_wfi_spill(void);
+
+/*******************************************************************************
+ * Trusted Boot functions
+ ******************************************************************************/
+int plat_match_rotpk(const unsigned char *, unsigned int);
+
 #endif /* __PLATFORM_H__ */

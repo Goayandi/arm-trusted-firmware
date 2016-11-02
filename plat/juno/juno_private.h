@@ -31,7 +31,9 @@
 #ifndef __JUNO_PRIVATE_H__
 #define __JUNO_PRIVATE_H__
 
+#include <bakery_lock.h>
 #include <bl_common.h>
+#include <cpu_data.h>
 #include <platform_def.h>
 #include <stdint.h>
 
@@ -59,6 +61,68 @@ typedef struct bl2_to_bl31_params_mem {
 	struct entry_point_info bl31_ep_info;
 } bl2_to_bl31_params_mem_t;
 
+#if IMAGE_BL31
+#if USE_COHERENT_MEM
+/*
+ * These are wrapper macros to the Coherent Memory Bakery Lock API.
+ */
+#define juno_lock_init(_lock_arg)		bakery_lock_init(_lock_arg)
+#define juno_lock_get(_lock_arg)		bakery_lock_get(_lock_arg)
+#define juno_lock_release(_lock_arg)		bakery_lock_release(_lock_arg)
+
+#else
+
+/*******************************************************************************
+ * Constants that specify how many bakeries this platform implements and bakery
+ * ids.
+ ******************************************************************************/
+#define JUNO_MAX_BAKERIES	1
+#define JUNO_MHU_BAKERY_ID	0
+
+/*******************************************************************************
+ * Definition of structure which holds platform specific per-cpu data. Currently
+ * it holds only the bakery lock information for each cpu. Constants to specify
+ * how many bakeries this platform implements and bakery ids are specified in
+ * juno_def.h
+ ******************************************************************************/
+typedef struct juno_cpu_data {
+	bakery_info_t pcpu_bakery_info[JUNO_MAX_BAKERIES];
+} juno_cpu_data_t;
+
+/* Macro to define the offset of bakery_info_t in juno_cpu_data_t */
+#define JUNO_CPU_DATA_LOCK_OFFSET	__builtin_offsetof\
+					    (juno_cpu_data_t, pcpu_bakery_info)
+
+/*******************************************************************************
+ * Helper macros for bakery lock api when using the above juno_cpu_data_t for
+ * bakery lock data structures. It assumes that the bakery_info is at the
+ * beginning of the platform specific per-cpu data.
+ ******************************************************************************/
+#define juno_lock_init(_lock_arg)		/* No init required */
+#define juno_lock_get(_lock_arg)		bakery_lock_get(_lock_arg,	\
+						    CPU_DATA_PLAT_PCPU_OFFSET + \
+						    JUNO_CPU_DATA_LOCK_OFFSET)
+#define juno_lock_release(_lock_arg)		bakery_lock_release(_lock_arg,	\
+						    CPU_DATA_PLAT_PCPU_OFFSET + \
+						    JUNO_CPU_DATA_LOCK_OFFSET)
+
+/*
+ * Ensure that the size of the Juno specific per-cpu data structure and the size
+ * of the memory allocated in generic per-cpu data for the platform are the same.
+ */
+CASSERT(PLAT_PCPU_DATA_SIZE == sizeof(juno_cpu_data_t),	\
+	juno_pcpu_data_size_mismatch);
+#endif /* __USE_COHERENT_MEM__ */
+#else
+/*
+ * Dummy wrapper macros for all other BL stages other than BL3-1
+ */
+#define juno_lock_init(_lock_arg)
+#define juno_lock_get(_lock_arg)
+#define juno_lock_release(_lock_arg)
+
+#endif /* __IMAGE_BL31__ */
+
 /*******************************************************************************
  * Function and variable prototypes
  ******************************************************************************/
@@ -70,31 +134,26 @@ unsigned int platform_get_core_pos(unsigned long mpidr);
 void configure_mmu_el1(unsigned long total_base,
 		       unsigned long total_size,
 		       unsigned long ro_start,
-		       unsigned long ro_limit,
-		       unsigned long coh_start,
-		       unsigned long coh_limit);
+		       unsigned long ro_limit
+#if USE_COHERENT_MEM
+		       , unsigned long coh_start,
+		       unsigned long coh_limit
+#endif
+		       );
 void configure_mmu_el3(unsigned long total_base,
 		       unsigned long total_size,
 		       unsigned long ro_start,
-		       unsigned long ro_limit,
-		       unsigned long coh_start,
-		       unsigned long coh_limit);
+		       unsigned long ro_limit
+#if USE_COHERENT_MEM
+		       , unsigned long coh_start,
+		       unsigned long coh_limit
+#endif
+		       );
 void plat_report_exception(unsigned long type);
 unsigned long plat_get_ns_image_entrypoint(void);
 unsigned long platform_get_stack(unsigned long mpidr);
 uint64_t plat_get_syscnt_freq(void);
-
-/* Declarations for plat_gic.c */
-uint32_t ic_get_pending_interrupt_id(void);
-uint32_t ic_get_pending_interrupt_type(void);
-uint32_t ic_acknowledge_interrupt(void);
-uint32_t ic_get_interrupt_type(uint32_t id);
-void ic_end_of_interrupt(uint32_t id);
-void gic_cpuif_deactivate(unsigned int gicc_base);
-void gic_cpuif_setup(unsigned int gicc_base);
-void gic_pcpu_distif_setup(unsigned int gicd_base);
-void gic_setup(void);
-uint32_t plat_interrupt_type_to_line(uint32_t type, uint32_t security_state);
+void plat_gic_init(void);
 
 /* Declarations for plat_topology.c */
 int plat_setup_topology(void);
@@ -107,6 +166,9 @@ void io_setup(void);
 int plat_get_image_source(const char *image_name,
 			  uintptr_t *dev_handle,
 			  uintptr_t *image_spec);
+
+/* Declarations for security.c */
+void plat_security_setup(void);
 
 /*
  * Before calling this function BL2 is loaded in memory and its entrypoint

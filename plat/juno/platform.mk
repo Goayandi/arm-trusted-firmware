@@ -28,6 +28,23 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
+# On Juno, the Secure Payload can be loaded either in Trusted SRAM (default) or
+# Secure DRAM allocated by the TrustZone Controller.
+
+PLAT_TSP_LOCATION	:=	tsram
+
+ifeq (${PLAT_TSP_LOCATION}, tsram)
+  PLAT_TSP_LOCATION_ID := PLAT_TRUSTED_SRAM_ID
+else ifeq (${PLAT_TSP_LOCATION}, dram)
+  PLAT_TSP_LOCATION_ID := PLAT_DRAM_ID
+else
+  $(error "Unsupported PLAT_TSP_LOCATION value")
+endif
+
+# Process flags
+$(eval $(call add_define,PLAT_TSP_LOCATION_ID))
+
+
 PLAT_INCLUDES		:=	-Iplat/juno/include/
 
 PLAT_BL_COMMON_SOURCES	:=	drivers/arm/pl011/pl011_console.S	\
@@ -36,6 +53,7 @@ PLAT_BL_COMMON_SOURCES	:=	drivers/arm/pl011/pl011_console.S	\
 				drivers/io/io_storage.c			\
 				lib/aarch64/xlat_tables.c		\
 				plat/common/aarch64/plat_common.c	\
+				plat/common/plat_gic.c			\
 				plat/juno/plat_io_storage.c
 
 BL1_SOURCES		+=	drivers/arm/cci400/cci400.c		\
@@ -47,17 +65,20 @@ BL1_SOURCES		+=	drivers/arm/cci400/cci400.c		\
 				plat/juno/aarch64/plat_helpers.S	\
 				plat/juno/aarch64/juno_common.c
 
-BL2_SOURCES		+=	lib/locks/bakery/bakery_lock.c		\
+BL2_SOURCES		+=	drivers/arm/tzc400/tzc400.c		\
 				plat/common/aarch64/platform_up_stack.S	\
 				plat/juno/bl2_plat_setup.c		\
 				plat/juno/mhu.c				\
+				plat/juno/plat_security.c		\
 				plat/juno/aarch64/plat_helpers.S	\
 				plat/juno/aarch64/juno_common.c		\
 				plat/juno/scp_bootloader.c		\
 				plat/juno/scpi.c
 
 BL31_SOURCES		+=	drivers/arm/cci400/cci400.c		\
+				drivers/arm/gic/arm_gic.c		\
 				drivers/arm/gic/gic_v2.c		\
+				drivers/arm/gic/gic_v3.c		\
 				lib/cpus/aarch64/cortex_a53.S		\
 				lib/cpus/aarch64/cortex_a57.S		\
 				plat/common/aarch64/platform_mp_stack.S	\
@@ -67,8 +88,12 @@ BL31_SOURCES		+=	drivers/arm/cci400/cci400.c		\
 				plat/juno/aarch64/juno_common.c		\
 				plat/juno/plat_pm.c			\
 				plat/juno/plat_topology.c		\
-				plat/juno/plat_gic.c			\
 				plat/juno/scpi.c
+
+ifneq (${TRUSTED_BOARD_BOOT},0)
+  BL1_SOURCES		+=	plat/juno/juno_trusted_boot.c
+  BL2_SOURCES		+=	plat/juno/juno_trusted_boot.c
+endif
 
 ifneq (${RESET_TO_BL31},0)
   $(error "Using BL3-1 as the reset vector is not supported on Juno. \
@@ -80,3 +105,7 @@ NEED_BL30		:=	yes
 # Enable workarounds for selected Cortex-A57 erratas.
 ERRATA_A57_806969	:=	1
 ERRATA_A57_813420	:=	1
+
+# Enable option to skip L1 data cache flush during the Cortex-A57 cluster
+# power down sequence
+SKIP_A57_L1_FLUSH_PWR_DWN	:=	 1

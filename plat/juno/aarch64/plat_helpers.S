@@ -44,7 +44,7 @@
 	.globl	platform_mem_init
 
 	/* Define a crash console for the plaform */
-#define JUNO_CRASH_CONSOLE_BASE		PL011_UART0_BASE
+#define JUNO_CRASH_CONSOLE_BASE		PL011_UART3_BASE
 
 	/* ---------------------------------------------
 	 * int plat_crash_console_init(void)
@@ -55,7 +55,7 @@
 	 */
 func plat_crash_console_init
 	mov_imm	x0, JUNO_CRASH_CONSOLE_BASE
-	mov_imm	x1, PL011_UART0_CLK_IN_HZ
+	mov_imm	x1, PL011_UART3_CLK_IN_HZ
 	mov_imm	x2, PL011_BAUDRATE
 	b	console_core_init
 
@@ -115,12 +115,20 @@ func platform_mem_init
 	/* -----------------------------------------------------
 	 * void plat_reset_handler(void);
 	 *
+	 * Before adding code in this function, refer to the
+	 * guidelines in docs/firmware-design.md to determine
+	 * whether the code should reside within the
+	 * FIRST_RESET_HANDLER_CALL block or not.
+	 *
 	 * Implement workaround for defect id 831273 by enabling
 	 * an event stream every 65536 cycles and set the L2 RAM
-	 * latencies for Cortex-A57.
+	 * latencies for Cortex-A57. This code is included only
+	 * when FIRST_RESET_HANDLER_CALL is defined since it
+	 * should be executed only during BL1.
 	 * -----------------------------------------------------
 	 */
 func plat_reset_handler
+#ifdef FIRST_RESET_HANDLER_CALL
 	/* Read the MIDR_EL1 */
 	mrs	x0, midr_el1
 	ubfx	x1, x0, MIDR_PN_SHIFT, #12
@@ -135,11 +143,12 @@ func plat_reset_handler
 
 1:
 	/* ---------------------------------------------
-	* Enable the event stream every 65536 cycles
-	* ---------------------------------------------
-	*/
+	 * Enable the event stream every 65536 cycles
+	 * ---------------------------------------------
+	 */
 	mov     x0, #(0xf << EVNTI_SHIFT)
 	orr     x0, x0, #EVNTEN_BIT
 	msr     CNTKCTL_EL1, x0
 	isb
+#endif /* FIRST_RESET_HANDLER_CALL */
 	ret

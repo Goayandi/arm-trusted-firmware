@@ -45,8 +45,10 @@
 extern unsigned long __RO_START__;
 extern unsigned long __RO_END__;
 
+#if USE_COHERENT_MEM
 extern unsigned long __COHERENT_RAM_START__;
 extern unsigned long __COHERENT_RAM_END__;
+#endif
 
 /*
  * The next 2 constants identify the extents of the code & RO data region.
@@ -57,6 +59,7 @@ extern unsigned long __COHERENT_RAM_END__;
 #define BL2_RO_BASE (unsigned long)(&__RO_START__)
 #define BL2_RO_LIMIT (unsigned long)(&__RO_END__)
 
+#if USE_COHERENT_MEM
 /*
  * The next 2 constants identify the extents of the coherent memory region.
  * These addresses are used by the MMU setup code and therefore they must be
@@ -66,15 +69,15 @@ extern unsigned long __COHERENT_RAM_END__;
  */
 #define BL2_COHERENT_RAM_BASE (unsigned long)(&__COHERENT_RAM_START__)
 #define BL2_COHERENT_RAM_LIMIT (unsigned long)(&__COHERENT_RAM_END__)
+#endif
 
 /* Data structure which holds the extents of the trusted SRAM for BL2 */
 static meminfo_t bl2_tzram_layout
-__attribute__ ((aligned(PLATFORM_CACHE_LINE_SIZE),
-		section("tzfw_coherent_mem")));
+__attribute__ ((aligned(PLATFORM_CACHE_LINE_SIZE)));
 
 /* Assert that BL3-1 parameters fit in shared memory */
 CASSERT((PARAMS_BASE + sizeof(bl2_to_bl31_params_mem_t)) <
-	(FVP_SHARED_RAM_BASE + FVP_SHARED_RAM_SIZE),
+	(FVP_SHARED_MEM_BASE + FVP_SHARED_MEM_SIZE),
 	assert_bl31_params_do_not_fit_in_shared_memory);
 
 /*******************************************************************************
@@ -172,6 +175,9 @@ void bl2_early_platform_setup(meminfo_t *mem_layout)
 
 	/* Initialize the platform config for future decision making */
 	fvp_config_setup();
+
+	/* Initialise the IO layer and register platform IO devices */
+	fvp_io_setup();
 }
 
 /*******************************************************************************
@@ -187,9 +193,6 @@ void bl2_platform_setup(void)
 	 * present.
 	 */
 	fvp_security_setup();
-
-	/* Initialise the IO layer and register platform IO devices */
-	fvp_io_setup();
 }
 
 /* Flush the TF params and the TF plat params */
@@ -209,9 +212,12 @@ void bl2_plat_arch_setup(void)
 	fvp_configure_mmu_el1(bl2_tzram_layout.total_base,
 			      bl2_tzram_layout.total_size,
 			      BL2_RO_BASE,
-			      BL2_RO_LIMIT,
-			      BL2_COHERENT_RAM_BASE,
-			      BL2_COHERENT_RAM_LIMIT);
+			      BL2_RO_LIMIT
+#if USE_COHERENT_MEM
+			      , BL2_COHERENT_RAM_BASE,
+			      BL2_COHERENT_RAM_LIMIT
+#endif
+			      );
 }
 
 /*******************************************************************************
@@ -278,8 +284,8 @@ void bl2_plat_get_bl32_meminfo(meminfo_t *bl32_meminfo)
  ******************************************************************************/
 void bl2_plat_get_bl33_meminfo(meminfo_t *bl33_meminfo)
 {
-	bl33_meminfo->total_base = DRAM_BASE;
-	bl33_meminfo->total_size = DRAM_SIZE - DRAM1_SEC_SIZE;
-	bl33_meminfo->free_base = DRAM_BASE;
-	bl33_meminfo->free_size = DRAM_SIZE - DRAM1_SEC_SIZE;
+	bl33_meminfo->total_base = DRAM1_NS_BASE;
+	bl33_meminfo->total_size = DRAM1_NS_SIZE;
+	bl33_meminfo->free_base = DRAM1_NS_BASE;
+	bl33_meminfo->free_size = DRAM1_NS_SIZE;
 }

@@ -45,7 +45,11 @@
  ******************************************************************************/
 
 /* Size of cacheable stacks */
-#define PLATFORM_STACK_SIZE    0x800
+#if TRUSTED_BOARD_BOOT && (IMAGE_BL1 || IMAGE_BL2)
+#define PLATFORM_STACK_SIZE 0x1000
+#else
+#define PLATFORM_STACK_SIZE 0x800
+#endif
 
 #define FIRMWARE_WELCOME_STR		"Booting Trusted Firmware\n"
 
@@ -67,6 +71,22 @@
 /* Firmware Image Package */
 #define FIP_IMAGE_NAME			"fip.bin"
 
+#if TRUSTED_BOARD_BOOT
+/* Certificates */
+# define BL2_CERT_NAME			"bl2.crt"
+# define TRUSTED_KEY_CERT_NAME		"trusted_key.crt"
+
+# define BL30_KEY_CERT_NAME		"bl30_key.crt"
+# define BL31_KEY_CERT_NAME		"bl31_key.crt"
+# define BL32_KEY_CERT_NAME		"bl32_key.crt"
+# define BL33_KEY_CERT_NAME		"bl33_key.crt"
+
+# define BL30_CERT_NAME			"bl30.crt"
+# define BL31_CERT_NAME			"bl31.crt"
+# define BL32_CERT_NAME			"bl32.crt"
+# define BL33_CERT_NAME			"bl33.crt"
+#endif /* TRUSTED_BOARD_BOOT */
+
 #define PLATFORM_CACHE_LINE_SIZE	64
 #define PLATFORM_CLUSTER_COUNT		2
 #define PLATFORM_CORE_COUNT             6
@@ -76,38 +96,37 @@
 #define MAX_IO_HANDLES			4
 
 /*******************************************************************************
- * Platform memory map related constants
- ******************************************************************************/
-#define FLASH_BASE		0x08000000
-#define FLASH_SIZE		0x04000000
-
-/* Bypass offset from start of NOR flash */
-#define BL1_ROM_BYPASS_OFFSET	0x03EC0000
-
-#ifndef TZROM_BASE
-/* Use the bypass address */
-#define TZROM_BASE		FLASH_BASE + BL1_ROM_BYPASS_OFFSET
-#endif
-#define TZROM_SIZE		0x00010000
-
-#define TZRAM_BASE		0x04001000
-#define TZRAM_SIZE		0x0003F000
-
-/*******************************************************************************
  * BL1 specific defines.
  * BL1 RW data is relocated from ROM to RAM at runtime so we need 2 base
  * addresses.
  ******************************************************************************/
 #define BL1_RO_BASE			TZROM_BASE
 #define BL1_RO_LIMIT			(TZROM_BASE + TZROM_SIZE)
-#define BL1_RW_BASE			TZRAM_BASE
-#define BL1_RW_LIMIT			BL31_BASE
+
+/*
+ * Put BL1 RW at the top of the Trusted SRAM. BL1_RW_BASE is calculated using
+ * the current BL1 RW debug size plus a little space for growth.
+ */
+#if TRUSTED_BOARD_BOOT
+#define BL1_RW_BASE			(TZRAM_BASE + TZRAM_SIZE - 0x8000)
+#else
+#define BL1_RW_BASE			(TZRAM_BASE + TZRAM_SIZE - 0x6000)
+#endif
+#define BL1_RW_LIMIT			(TZRAM_BASE + TZRAM_SIZE)
 
 /*******************************************************************************
  * BL2 specific defines.
  ******************************************************************************/
-#define BL2_BASE			(TZRAM_BASE + TZRAM_SIZE - 0xd000)
-#define BL2_LIMIT			(TZRAM_BASE + TZRAM_SIZE)
+/*
+ * Put BL2 just below BL3-1. BL2_BASE is calculated using the current BL2 debug
+ * size plus a little space for growth.
+ */
+#if TRUSTED_BOARD_BOOT
+#define BL2_BASE			(BL31_BASE - 0x1D000)
+#else
+#define BL2_BASE			(BL31_BASE - 0xC000)
+#endif
+#define BL2_LIMIT			BL31_BASE
 
 /*******************************************************************************
  * Load address of BL3-0 in the Juno port
@@ -119,16 +138,32 @@
 /*******************************************************************************
  * BL3-1 specific defines.
  ******************************************************************************/
-#define BL31_BASE			(TZRAM_BASE + 0x8000)
-#define BL31_LIMIT			BL32_BASE
+/*
+ * Put BL3-1 at the top of the Trusted SRAM. BL31_BASE is calculated using the
+ * current BL3-1 debug size plus a little space for growth.
+ */
+#define BL31_BASE			(TZRAM_BASE + TZRAM_SIZE - 0x1D000)
+#define BL31_PROGBITS_LIMIT		BL1_RW_BASE
+#define BL31_LIMIT			(TZRAM_BASE + TZRAM_SIZE)
 
 /*******************************************************************************
  * BL3-2 specific defines.
  ******************************************************************************/
-#define TSP_SEC_MEM_BASE		TZRAM_BASE
-#define TSP_SEC_MEM_SIZE		TZRAM_SIZE
-#define BL32_BASE			(TZRAM_BASE + TZRAM_SIZE - 0x1d000)
-#define BL32_LIMIT			BL2_BASE
+#if (PLAT_TSP_LOCATION_ID == PLAT_TRUSTED_SRAM_ID)
+# define TSP_SEC_MEM_BASE		TZRAM_BASE
+# define TSP_SEC_MEM_SIZE		TZRAM_SIZE
+# define BL32_BASE			TZRAM_BASE
+# define BL32_LIMIT			BL31_BASE
+# define BL32_PROGBITS_LIMIT		BL2_BASE
+#elif (PLAT_TSP_LOCATION_ID == PLAT_DRAM_ID)
+# define TSP_SEC_MEM_BASE		DRAM_SEC_BASE
+# define TSP_SEC_MEM_SIZE		(DRAM_SEC_SIZE - DRAM_SCP_SIZE)
+# define BL32_BASE			DRAM_SEC_BASE
+# define BL32_LIMIT			(DRAM_SEC_BASE + DRAM_SEC_SIZE - \
+					DRAM_SCP_SIZE)
+#else
+# error "Unsupported PLAT_TSP_LOCATION_ID value"
+#endif
 
 /*******************************************************************************
  * Load address of BL3-3 in the Juno port
@@ -139,7 +174,15 @@
  * Platform specific page table and MMU setup constants
  ******************************************************************************/
 #define ADDR_SPACE_SIZE			(1ull << 32)
-#define MAX_XLAT_TABLES			2
+
+#if IMAGE_BL1 || IMAGE_BL31
+# define MAX_XLAT_TABLES		2
+#endif
+
+#if IMAGE_BL2 || IMAGE_BL32
+# define MAX_XLAT_TABLES		3
+#endif
+
 #define MAX_MMAP_REGIONS		16
 
 /*******************************************************************************
@@ -158,5 +201,13 @@
  ******************************************************************************/
 #define CACHE_WRITEBACK_SHIFT   6
 #define CACHE_WRITEBACK_GRANULE (1 << CACHE_WRITEBACK_SHIFT)
+
+#if !USE_COHERENT_MEM
+/*******************************************************************************
+ * Size of the per-cpu data in bytes that should be reserved in the generic
+ * per-cpu data structure for the Juno port.
+ ******************************************************************************/
+#define PLAT_PCPU_DATA_SIZE	2
+#endif
 
 #endif /* __PLATFORM_DEF_H__ */

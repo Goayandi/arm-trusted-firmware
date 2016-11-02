@@ -57,6 +57,12 @@ static cpu_context_t psci_ns_context[PLATFORM_CORE_COUNT];
  ******************************************************************************/
 static aff_limits_node_t psci_aff_limits[MPIDR_MAX_AFFLVL + 1];
 
+/******************************************************************************
+ * Define the psci capability variable.
+ *****************************************************************************/
+uint32_t psci_caps;
+
+
 /*******************************************************************************
  * Routines for retrieving the node corresponding to an affinity level instance
  * in the mpidr. The first one uses binary search to find the node corresponding
@@ -77,12 +83,18 @@ static int psci_aff_map_get_idx(unsigned long key,
 		return PSCI_E_INVALID_PARAMS;
 
 	/*
+	 * Make sure we are within array limits.
+	 */
+	assert(min_idx >= 0 && max_idx < PSCI_NUM_AFFS);
+
+	/*
 	 * Bisect the array around 'mid' and then recurse into the array chunk
 	 * where the key is likely to be found. The mpidrs in each node in the
 	 * 'psci_aff_map' for a given affinity level are stored in an ascending
 	 * order which makes the binary search possible.
 	 */
 	mid = min_idx + ((max_idx - min_idx) >> 1);	/* Divide by 2 */
+
 	if (psci_aff_map[mid].mpidr > key)
 		return psci_aff_map_get_idx(key, min_idx, mid - 1);
 	else if (psci_aff_map[mid].mpidr < key)
@@ -94,6 +106,9 @@ static int psci_aff_map_get_idx(unsigned long key,
 aff_map_node_t *psci_get_aff_map_node(unsigned long mpidr, int aff_lvl)
 {
 	int rc;
+
+	if (aff_lvl > get_max_afflvl())
+		return NULL;
 
 	/* Right shift the mpidr to the required affinity level */
 	mpidr = mpidr_mask_lower_afflvls(mpidr, aff_lvl);
@@ -172,7 +187,7 @@ static void psci_init_aff_map_node(unsigned long mpidr,
 	uint32_t linear_id;
 	psci_aff_map[idx].mpidr = mpidr;
 	psci_aff_map[idx].level = level;
-	bakery_lock_init(&psci_aff_map[idx].lock);
+	psci_lock_init(psci_aff_map, idx);
 
 	/*
 	 * If an affinity instance is present then mark it as OFF to begin with.
@@ -210,10 +225,11 @@ static void psci_init_aff_map_node(unsigned long mpidr,
 				      psci_svc_cpu_data.max_phys_off_afflvl,
 				      PSCI_INVALID_DATA);
 
+		flush_cpu_data_by_index(linear_id, psci_svc_cpu_data);
+
 		cm_set_context_by_mpidr(mpidr,
 					(void *) &psci_ns_context[linear_id],
 					NON_SECURE);
-
 	}
 
 	return;
@@ -321,13 +337,20 @@ int32_t psci_setup(void)
 					       afflvl);
 	}
 
+#if !USE_COHERENT_MEM
+	/*
+	 * The psci_aff_map only needs flushing when it's not allocated in
+	 * coherent memory.
+	 */
+	flush_dcache_range((uint64_t) &psci_aff_map, sizeof(psci_aff_map));
+#endif
+
 	/*
 	 * Set the bounds for the affinity counts of each level in the map. Also
 	 * flush out the entire array so that it's visible to subsequent power
-	 * management operations. The 'psci_aff_map' array is allocated in
-	 * coherent memory so does not need flushing. The 'psci_aff_limits'
-	 * array is allocated in normal memory. It will be accessed when the mmu
-	 * is off e.g. after reset. Hence it needs to be flushed.
+	 * management operations. The 'psci_aff_limits' array is allocated in
+	 * normal memory. It will be accessed when the mmu is off e.g. after
+	 * reset. Hence it needs to be flushed.
 	 */
 	for (afflvl = MPIDR_AFFLVL0; afflvl < max_afflvl; afflvl++) {
 		psci_aff_limits[afflvl].min =
@@ -354,6 +377,20 @@ int32_t psci_setup(void)
 
 	platform_setup_pm(&psci_plat_pm_ops);
 	assert(psci_plat_pm_ops);
+
+	/* Initialize the psci capability */
+	psci_caps = PSCI_GENERIC_CAP;
+
+	if (psci_plat_pm_ops->affinst_off)
+		psci_caps |=  define_psci_cap(PSCI_CPU_OFF);
+	if (psci_plat_pm_ops->affinst_on && psci_plat_pm_ops->affinst_on_finish)
+		psci_caps |=  define_psci_cap(PSCI_CPU_ON_AARCH64);
+	if (psci_plat_pm_ops->affinst_suspend && psci_plat_pm_ops->affinst_suspend_finish)
+		psci_caps |=  define_psci_cap(PSCI_CPU_SUSPEND_AARCH64);
+	if (psci_plat_pm_ops->system_off)
+		psci_caps |=  define_psci_cap(PSCI_SYSTEM_OFF);
+	if (psci_plat_pm_ops->system_reset)
+		psci_caps |=  define_psci_cap(PSCI_SYSTEM_RESET);
 
 	return 0;
 }

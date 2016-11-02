@@ -189,15 +189,21 @@ cold_boot:
 	bic	x0, x0, #SCTLR_EE_BIT
 	msr	sctlr_el3, x0
 	isb
+#endif
 
-	/* -----------------------------------------------------
-	 * Perform any processor specific actions upon reset
-	 * e.g. cache, tlb invalidations etc. Override the
-	 * Boot ROM(BL0) programming sequence
-	 * -----------------------------------------------------
+	/* ---------------------------------------------
+	 * When RESET_TO_BL31 is true, perform any
+	 * processor specific actions upon reset e.g.
+	 * cache, tlb invalidations, errata workarounds
+	 * etc.
+	 * When RESET_TO_BL31 is false, perform any
+	 * processor specific actions which undo or are
+	 * in addition to the actions performed by the
+	 * reset handler in the Boot ROM (BL1).
+	 * ---------------------------------------------
 	 */
 	bl	reset_handler
-#endif
+
 	/* ---------------------------------------------
 	 * Enable the instruction cache, stack pointer
 	 * and data access alignment checks
@@ -283,9 +289,11 @@ cold_boot:
 	bl	zeromem16
 #endif
 
+#if USE_COHERENT_MEM
 	ldr	x0, =__COHERENT_RAM_START__
 	ldr	x1, =__COHERENT_RAM_UNALIGNED_SIZE__
 	bl	zeromem16
+#endif
 
 	/* ---------------------------------------------
 	 * Initialize the cpu_ops pointer.

@@ -37,6 +37,30 @@
 /*******************************************************************************
  * Juno memory map related constants
  ******************************************************************************/
+#define FLASH_BASE		0x08000000
+#define FLASH_SIZE		0x04000000
+
+/* Bypass offset from start of NOR flash */
+#define BL1_ROM_BYPASS_OFFSET	0x03EC0000
+
+#ifndef TZROM_BASE
+/* Use the bypass address */
+#define TZROM_BASE		FLASH_BASE + BL1_ROM_BYPASS_OFFSET
+#endif
+/* Actual ROM size on Juno is 64 KB, but TBB requires at least 80 KB in debug
+ * mode. We can test TBB on Juno bypassing the ROM and using 128 KB of flash */
+#if TRUSTED_BOARD_BOOT
+#define TZROM_SIZE		0x00020000
+#else
+#define TZROM_SIZE		0x00010000
+#endif
+
+#define TZRAM_BASE		0x04001000
+#define TZRAM_SIZE		0x0003F000
+
+#define PLAT_TRUSTED_SRAM_ID	0
+#define PLAT_DRAM_ID		1
+
 #define MHU_SECURE_BASE		0x04000000
 #define MHU_SECURE_SIZE		0x00001000
 
@@ -72,6 +96,26 @@
 
 #define DRAM_BASE		0x80000000
 #define DRAM_SIZE		0x80000000
+
+/*
+ * DRAM at 0x8000_0000 is divided in two regions:
+ *   - Secure DRAM (default is the top 16MB except for the last 2MB, which are
+ *     used by the SCP for DDR retraining)
+ *   - Non-Secure DRAM (remaining DRAM starting at DRAM_BASE)
+ */
+
+#define DRAM_SCP_SIZE		0x00200000
+#define DRAM_SCP_BASE		(DRAM_BASE + DRAM_SIZE - DRAM_SCP_SIZE)
+
+#define DRAM_SEC_SIZE		0x00E00000
+#define DRAM_SEC_BASE		(DRAM_SCP_BASE - DRAM_SEC_SIZE)
+
+#define DRAM_NS_BASE		DRAM_BASE
+#define DRAM_NS_SIZE		(DRAM_SIZE - DRAM_SCP_SIZE - DRAM_SEC_SIZE)
+
+/* Second region of DRAM */
+#define DRAM2_BASE		0x880000000
+#define DRAM2_SIZE		0x180000000
 
 /* Memory mapped Generic timer interfaces  */
 #define SYS_CNTCTL_BASE		0x2a430000
@@ -120,7 +164,6 @@
 #define IRQ_SEC_SGI_5			13
 #define IRQ_SEC_SGI_6			14
 #define IRQ_SEC_SGI_7			15
-#define IRQ_SEC_SGI_8			16
 
 /*******************************************************************************
  * PL011 related constants

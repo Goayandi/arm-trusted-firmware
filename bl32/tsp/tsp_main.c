@@ -43,7 +43,7 @@
  * of trusted SRAM
  ******************************************************************************/
 extern unsigned long __RO_START__;
-extern unsigned long __COHERENT_RAM_END__;
+extern unsigned long __BL32_END__;
 
 /*******************************************************************************
  * Lock to control access to the console
@@ -63,11 +63,11 @@ work_statistics_t tsp_stats[PLATFORM_CORE_COUNT];
 
 /*******************************************************************************
  * The BL32 memory footprint starts with an RO sections and ends
- * with a section for coherent RAM. Use it to find the memory size
+ * with the linker symbol __BL32_END__. Use it to find the memory size
  ******************************************************************************/
 #define BL32_TOTAL_BASE (unsigned long)(&__RO_START__)
 
-#define BL32_TOTAL_LIMIT (unsigned long)(&__COHERENT_RAM_END__)
+#define BL32_TOTAL_LIMIT (unsigned long)(&__BL32_END__)
 
 static tsp_args_t *set_smc_args(uint64_t arg0,
 			     uint64_t arg1,
@@ -216,7 +216,7 @@ tsp_args_t *tsp_cpu_off_main(uint64_t arg0,
  * this cpu's architectural state is saved in response to an earlier psci
  * cpu_suspend request.
  ******************************************************************************/
-tsp_args_t *tsp_cpu_suspend_main(uint64_t power_state,
+tsp_args_t *tsp_cpu_suspend_main(uint64_t arg0,
 			       uint64_t arg1,
 			       uint64_t arg2,
 			       uint64_t arg3,
@@ -242,8 +242,6 @@ tsp_args_t *tsp_cpu_suspend_main(uint64_t power_state,
 
 #if LOG_LEVEL >= LOG_LEVEL_INFO
 	spin_lock(&console_lock);
-	INFO("TSP: cpu 0x%x suspend request. power state: 0x%x\n",
-		mpidr, power_state);
 	INFO("TSP: cpu 0x%x: %d smcs, %d erets %d cpu suspend requests\n",
 		mpidr,
 		tsp_stats[linear_id].smc_count,

@@ -30,6 +30,7 @@
 
 #include <assert.h>
 #include <arch_helpers.h>
+#include <arm_gic.h>
 #include <debug.h>
 #include <cci400.h>
 #include <errno.h>
@@ -84,12 +85,36 @@ static int32_t juno_do_plat_actions(uint32_t afflvl, uint32_t state)
 }
 
 /*******************************************************************************
+ * Juno handler called to check the validity of the power state parameter.
+ ******************************************************************************/
+int32_t juno_validate_power_state(unsigned int power_state)
+{
+	/* Sanity check the requested state */
+	if (psci_get_pstate_type(power_state) == PSTATE_TYPE_STANDBY) {
+		/*
+		 * It's possible to enter standby only on affinity level 0 i.e.
+		 * a cpu on the Juno. Ignore any other affinity level.
+		 */
+		if (psci_get_pstate_afflvl(power_state) != MPIDR_AFFLVL0)
+			return PSCI_E_INVALID_PARAMS;
+	}
+
+	/*
+	 * We expect the 'state id' to be zero.
+	 */
+	if (psci_get_pstate_id(power_state))
+		return PSCI_E_INVALID_PARAMS;
+
+	return PSCI_E_SUCCESS;
+}
+
+
+/*******************************************************************************
  * Juno handler called when an affinity instance is about to be turned on. The
  * level and mpidr determine the affinity instance.
  ******************************************************************************/
 int32_t juno_affinst_on(uint64_t mpidr,
 			uint64_t sec_entrypoint,
-			uint64_t ns_entrypoint,
 			uint32_t afflvl,
 			uint32_t state)
 {
@@ -118,11 +143,16 @@ int32_t juno_affinst_on(uint64_t mpidr,
  * was turned off prior to wakeup and do what's necessary to setup it up
  * correctly.
  ******************************************************************************/
-int32_t juno_affinst_on_finish(uint64_t mpidr, uint32_t afflvl, uint32_t state)
+void juno_affinst_on_finish(uint32_t afflvl, uint32_t state)
 {
+	unsigned long mpidr;
+
 	/* Determine if any platform actions need to be executed. */
 	if (juno_do_plat_actions(afflvl, state) == -EAGAIN)
-		return PSCI_E_SUCCESS;
+		return;
+
+	/* Get the mpidr for this cpu */
+	mpidr = read_mpidr_el1();
 
 	/*
 	 * Perform the common cluster specific operations i.e enable coherency
@@ -133,15 +163,13 @@ int32_t juno_affinst_on_finish(uint64_t mpidr, uint32_t afflvl, uint32_t state)
 
 
 	/* Enable the gic cpu interface */
-	gic_cpuif_setup(GICC_BASE);
+	arm_gic_cpuif_setup();
 
 	/* Juno todo: Is this setup only needed after a cold boot? */
-	gic_pcpu_distif_setup(GICD_BASE);
+	arm_gic_pcpu_distif_setup();
 
 	/* Clear the mailbox for this cpu. */
 	juno_program_mailbox(mpidr, 0);
-
-	return PSCI_E_SUCCESS;
 }
 
 /*******************************************************************************
@@ -150,12 +178,12 @@ int32_t juno_affinst_on_finish(uint64_t mpidr, uint32_t afflvl, uint32_t state)
  * the highest affinity level which will be powered down. It performs the
  * actions common to the OFF and SUSPEND calls.
  ******************************************************************************/
-static int32_t juno_power_down_common(uint32_t afflvl)
+static void juno_power_down_common(uint32_t afflvl)
 {
 	uint32_t cluster_state = scpi_power_on;
 
 	/* Prevent interrupts from spuriously waking up this cpu */
-	gic_cpuif_deactivate(GICC_BASE);
+	arm_gic_cpuif_deactivate();
 
 	/* Cluster is to be turned off, so disable coherency */
 	if (afflvl > MPIDR_AFFLVL0) {
@@ -171,8 +199,6 @@ static int32_t juno_power_down_common(uint32_t afflvl)
 				 scpi_power_off,
 				 cluster_state,
 				 scpi_power_on);
-
-	return PSCI_E_SUCCESS;
 }
 
 /*******************************************************************************
@@ -186,13 +212,13 @@ static int32_t juno_power_down_common(uint32_t afflvl)
  * global variables across calls. It will be wise to do flush a write to the
  * global to prevent unpredictable results.
  ******************************************************************************/
-static int32_t juno_affinst_off(uint64_t mpidr, uint32_t afflvl, uint32_t state)
+static void juno_affinst_off(uint32_t afflvl, uint32_t state)
 {
 	/* Determine if any platform actions need to be executed */
 	if (juno_do_plat_actions(afflvl, state) == -EAGAIN)
-		return PSCI_E_SUCCESS;
+		return;
 
-	return juno_power_down_common(afflvl);
+	juno_power_down_common(afflvl);
 }
 
 /*******************************************************************************
@@ -207,22 +233,20 @@ static int32_t juno_affinst_off(uint64_t mpidr, uint32_t afflvl, uint32_t state)
  * global variables across calls. It will be wise to do flush a write to the
  * global to prevent unpredictable results.
  ******************************************************************************/
-static int32_t juno_affinst_suspend(uint64_t mpidr,
-				    uint64_t sec_entrypoint,
-				    uint64_t ns_entrypoint,
+static void juno_affinst_suspend(uint64_t sec_entrypoint,
 				    uint32_t afflvl,
 				    uint32_t state)
 {
 	/* Determine if any platform actions need to be executed */
 	if (juno_do_plat_actions(afflvl, state) == -EAGAIN)
-		return PSCI_E_SUCCESS;
+		return;
 
 	/*
 	 * Setup mailbox with address for CPU entrypoint when it next powers up.
 	 */
-	juno_program_mailbox(mpidr, sec_entrypoint);
+	juno_program_mailbox(read_mpidr_el1(), sec_entrypoint);
 
-	return juno_power_down_common(afflvl);
+	juno_power_down_common(afflvl);
 }
 
 /*******************************************************************************
@@ -232,11 +256,10 @@ static int32_t juno_affinst_suspend(uint64_t mpidr,
  * TODO: At the moment we reuse the on finisher and reinitialize the secure
  * context. Need to implement a separate suspend finisher.
  ******************************************************************************/
-static int32_t juno_affinst_suspend_finish(uint64_t mpidr,
-					   uint32_t afflvl,
+static void juno_affinst_suspend_finish(uint32_t afflvl,
 					   uint32_t state)
 {
-	return juno_affinst_on_finish(mpidr, afflvl, state);
+	juno_affinst_on_finish(afflvl, state);
 }
 
 /*******************************************************************************
@@ -275,16 +298,39 @@ static void __dead2 juno_system_reset(void)
 }
 
 /*******************************************************************************
+ * Handler called when an affinity instance is about to enter standby.
+ ******************************************************************************/
+void juno_affinst_standby(unsigned int power_state)
+{
+	unsigned int scr;
+
+	scr = read_scr_el3();
+	/* Enable PhysicalIRQ bit for NS world to wake the CPU */
+	write_scr_el3(scr | SCR_IRQ_BIT);
+	isb();
+	dsb();
+	wfi();
+
+	/*
+	 * Restore SCR to the original value, synchronisation of scr_el3 is
+	 * done by eret while el3_exit to save some execution cycles.
+	 */
+	write_scr_el3(scr);
+}
+
+/*******************************************************************************
  * Export the platform handlers to enable psci to invoke them
  ******************************************************************************/
 static const plat_pm_ops_t juno_ops = {
 	.affinst_on		= juno_affinst_on,
 	.affinst_on_finish	= juno_affinst_on_finish,
 	.affinst_off		= juno_affinst_off,
+	.affinst_standby	= juno_affinst_standby,
 	.affinst_suspend	= juno_affinst_suspend,
 	.affinst_suspend_finish	= juno_affinst_suspend_finish,
 	.system_off		= juno_system_off,
-	.system_reset		= juno_system_reset
+	.system_reset		= juno_system_reset,
+	.validate_power_state	= juno_validate_power_state
 };
 
 /*******************************************************************************

@@ -29,6 +29,7 @@
  */
 
 #include <arch_helpers.h>
+#include <arm_gic.h>
 #include <assert.h>
 #include <bl_common.h>
 #include <debug.h>
@@ -38,28 +39,108 @@
 #include <xlat_tables.h>
 #include "../juno_def.h"
 
+#define MAP_MHU_SECURE	MAP_REGION_FLAT(MHU_SECURE_BASE,		\
+					MHU_SECURE_SIZE,		\
+					(MHU_PAYLOAD_CACHED ?		\
+					 MT_MEMORY : MT_DEVICE)		\
+					| MT_RW | MT_SECURE)
+
+#define MAP_FLASH	MAP_REGION_FLAT(FLASH_BASE,			\
+					FLASH_SIZE,			\
+					MT_MEMORY | MT_RO | MT_SECURE)
+
+#define MAP_IOFPGA	MAP_REGION_FLAT(IOFPGA_BASE,			\
+					IOFPGA_SIZE,			\
+					MT_DEVICE | MT_RW | MT_SECURE)
+
+#define MAP_DEVICE0	MAP_REGION_FLAT(DEVICE0_BASE,			\
+					DEVICE0_SIZE,			\
+					MT_DEVICE | MT_RW | MT_SECURE)
+
+#define MAP_DEVICE1	MAP_REGION_FLAT(DEVICE1_BASE,			\
+					DEVICE1_SIZE,			\
+					MT_DEVICE | MT_RW | MT_SECURE)
+
+#define MAP_NS_DRAM	MAP_REGION_FLAT(DRAM_NS_BASE,			\
+					DRAM_NS_SIZE,			\
+					MT_MEMORY | MT_RW | MT_NS)
+
+#define MAP_TSP_MEM	MAP_REGION_FLAT(TSP_SEC_MEM_BASE, 		\
+					TSP_SEC_MEM_SIZE,		\
+					MT_MEMORY | MT_RW | MT_SECURE)
+
 /*
- * Table of regions to map using the MMU.
+ * Table of regions for different BL stages to map using the MMU.
  * This doesn't include Trusted RAM as the 'mem_layout' argument passed to
  * configure_mmu_elx() will give the available subset of that,
  */
+#if IMAGE_BL1
 static const mmap_region_t juno_mmap[] = {
-	{ TZROM_BASE,		TZROM_BASE,		TZROM_SIZE,		MT_MEMORY | MT_RO | MT_SECURE },
-	{ MHU_SECURE_BASE,	MHU_SECURE_BASE,	MHU_SECURE_SIZE,	(MHU_PAYLOAD_CACHED ? MT_MEMORY : MT_DEVICE) | MT_RW | MT_SECURE },
-	{ FLASH_BASE,		FLASH_BASE,		FLASH_SIZE,		MT_MEMORY | MT_RO | MT_SECURE },
-	{ EMMC_BASE,		EMMC_BASE,		EMMC_SIZE,		MT_MEMORY | MT_RO | MT_SECURE },
-	{ PSRAM_BASE,		PSRAM_BASE,		PSRAM_SIZE,		MT_MEMORY | MT_RW | MT_SECURE }, /* Used for 'TZDRAM' */
-	{ IOFPGA_BASE,		IOFPGA_BASE,		IOFPGA_SIZE,		MT_DEVICE | MT_RW | MT_SECURE },
-	{ DEVICE0_BASE,		DEVICE0_BASE,		DEVICE0_SIZE,		MT_DEVICE | MT_RW | MT_SECURE },
-	{ DEVICE1_BASE,		DEVICE1_BASE,		DEVICE1_SIZE,		MT_DEVICE | MT_RW | MT_SECURE },
-	{ DRAM_BASE,		DRAM_BASE,		DRAM_SIZE,		MT_MEMORY | MT_RW | MT_NS },
+	MAP_MHU_SECURE,
+	MAP_FLASH,
+	MAP_IOFPGA,
+	MAP_DEVICE0,
+	MAP_DEVICE1,
 	{0}
 };
+#endif
+#if IMAGE_BL2
+static const mmap_region_t juno_mmap[] = {
+	MAP_MHU_SECURE,
+	MAP_FLASH,
+	MAP_IOFPGA,
+	MAP_DEVICE0,
+	MAP_DEVICE1,
+	MAP_NS_DRAM,
+	MAP_TSP_MEM,
+	{0}
+};
+#endif
+#if IMAGE_BL31
+static const mmap_region_t juno_mmap[] = {
+	MAP_MHU_SECURE,
+	MAP_IOFPGA,
+	MAP_DEVICE0,
+	MAP_DEVICE1,
+	{0}
+};
+#endif
+#if IMAGE_BL32
+static const mmap_region_t juno_mmap[] = {
+	MAP_IOFPGA,
+	MAP_DEVICE0,
+	MAP_DEVICE1,
+	{0}
+};
+#endif
+
+/* Array of secure interrupts to be configured by the gic driver */
+const unsigned int irq_sec_array[] = {
+	IRQ_MHU,
+	IRQ_GPU_SMMU_0,
+	IRQ_GPU_SMMU_1,
+	IRQ_ETR_SMMU,
+	IRQ_TZC400,
+	IRQ_TZ_WDOG,
+	IRQ_SEC_PHY_TIMER,
+	IRQ_SEC_SGI_0,
+	IRQ_SEC_SGI_1,
+	IRQ_SEC_SGI_2,
+	IRQ_SEC_SGI_3,
+	IRQ_SEC_SGI_4,
+	IRQ_SEC_SGI_5,
+	IRQ_SEC_SGI_6,
+	IRQ_SEC_SGI_7
+};
+
+const unsigned int num_sec_irqs = sizeof(irq_sec_array) /
+	sizeof(irq_sec_array[0]);
 
 /*******************************************************************************
  * Macro generating the code for the function setting up the pagetables as per
  * the platform memory map & initialize the mmu, for the given exception level
  ******************************************************************************/
+#if USE_COHERENT_MEM
 #define DEFINE_CONFIGURE_MMU_EL(_el)				\
 	void configure_mmu_el##_el(unsigned long total_base,	\
 				  unsigned long total_size,	\
@@ -82,7 +163,25 @@ static const mmap_region_t juno_mmap[] = {
 								\
 	       enable_mmu_el##_el(0);				\
 	}
-
+#else
+#define DEFINE_CONFIGURE_MMU_EL(_el)				\
+	void configure_mmu_el##_el(unsigned long total_base,	\
+				  unsigned long total_size,	\
+				  unsigned long ro_start,	\
+				  unsigned long ro_limit)	\
+	{							\
+	       mmap_add_region(total_base, total_base,		\
+			       total_size,			\
+			       MT_MEMORY | MT_RW | MT_SECURE);	\
+	       mmap_add_region(ro_start, ro_start,		\
+			       ro_limit - ro_start,		\
+			       MT_MEMORY | MT_RO | MT_SECURE);	\
+	       mmap_add(juno_mmap);				\
+	       init_xlat_tables();				\
+								\
+	       enable_mmu_el##_el(0);				\
+	}
+#endif
 /* Define EL1 and EL3 variants of the function initialising the MMU */
 DEFINE_CONFIGURE_MMU_EL(1)
 DEFINE_CONFIGURE_MMU_EL(3)
@@ -105,4 +204,9 @@ uint64_t plat_get_syscnt_freq(void)
 		panic();
 
 	return counter_base_frequency;
+}
+
+void plat_gic_init(void)
+{
+	arm_gic_init(GICC_BASE, GICD_BASE, 0, irq_sec_array, num_sec_irqs);
 }

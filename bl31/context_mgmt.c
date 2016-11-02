@@ -184,9 +184,15 @@ void cm_init_context(uint64_t mpidr, const entry_point_info_t *ep)
 	 * against the CPU support, security state, endianess and pc
 	 */
 	sctlr_elx = EP_GET_EE(ep->h.attr) ? SCTLR_EE_BIT : 0;
-	//MTK set CPU Barrie Enable bit for ARCH32 code (LK, 32 bits Linux)
-	sctlr_elx |= SCTLR_CPUBEN_BIT;  
-	sctlr_elx |= SCTLR_EL1_RES1;
+	if (GET_RW(ep->spsr) == MODE_RW_64)
+		sctlr_elx |= SCTLR_EL1_RES1;
+	else {
+		sctlr_elx |= SCTLR_AARCH32_EL1_RES1;
+
+		// MTK set CPU Barrie Enable bit for ARCH32 code (LK, 32 bits Linux)
+		sctlr_elx |= SCTLR_CPUBEN_BIT;
+	}
+
 	write_ctx_reg(get_sysregs_ctx(ctx), CTX_SCTLR_EL1, sctlr_elx);
 
 	if ((GET_RW(ep->spsr) == MODE_RW_64
@@ -250,6 +256,9 @@ void cm_prepare_el3_exit(uint32_t security_state)
 
 			/* Enable EL1 access to timer */
 			write_cnthctl_el2(EL1PCEN_BIT | EL1PCTEN_BIT);
+
+			/* Reset CNTVOFF_EL2 */
+			write_cntvoff_el2(0);
 
 			/* Set VPIDR, VMPIDR to match MIDR, MPIDR */
 			write_vpidr_el2(read_midr_el1());

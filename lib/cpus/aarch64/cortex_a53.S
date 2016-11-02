@@ -29,6 +29,7 @@
  */
 #include <arch.h>
 #include <asm_macros.S>
+#include <bl_common.h>
 #include <cortex_a53.h>
 #include <cpu_macros.S>
 #include <plat_macros.S>
@@ -126,13 +127,18 @@ func cortex_a53_reset_func
 #endif
 
 	/* ---------------------------------------------
-	 * As a bare minimum enable the SMP bit.
+	 * As a bare minimum enable the SMP bit if it is
+	 * not already set.
+	 * Clobbers : x0
 	 * ---------------------------------------------
 	 */
 	mrs	x0, CPUECTLR_EL1
+	tst	x0, #CPUECTLR_SMP_BIT
+	b.ne	skip_smp_setup
 	orr	x0, x0, #CPUECTLR_SMP_BIT
 	msr	CPUECTLR_EL1, x0
 	isb
+skip_smp_setup:
 	ret	x19
 
 func cortex_a53_core_pwr_dwn
@@ -145,11 +151,11 @@ func cortex_a53_core_pwr_dwn
 	bl	cortex_a53_disable_dcache
 
 	/* ---------------------------------------------
-	 * Flush L1 cache to PoU.
+	 * Flush L1 caches.
 	 * ---------------------------------------------
 	 */
 	mov	x0, #DCCISW
-	bl	dcsw_op_louis
+	bl	dcsw_op_level1
 
 	/* ---------------------------------------------
 	 * Come out of intra cluster coherency
@@ -168,17 +174,24 @@ func cortex_a53_cluster_pwr_dwn
 	bl	cortex_a53_disable_dcache
 
 	/* ---------------------------------------------
+	 * Flush L1 caches.
+	 * ---------------------------------------------
+	 */
+	mov	x0, #DCCISW
+	bl	dcsw_op_level1
+
+	/* ---------------------------------------------
 	 * Disable the optional ACP.
 	 * ---------------------------------------------
 	 */
 	bl	plat_disable_acp
 
 	/* ---------------------------------------------
-	 * Flush L1 and L2 caches to PoC.
+	 * Flush L2 caches.
 	 * ---------------------------------------------
 	 */
 	mov	x0, #DCCISW
-	bl	dcsw_op_all
+	bl	dcsw_op_level2
 
 	/* ---------------------------------------------
 	 * Come out of intra cluster coherency

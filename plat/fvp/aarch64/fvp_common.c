@@ -36,6 +36,7 @@
 #include <debug.h>
 #include <mmio.h>
 #include <platform.h>
+#include <platform_def.h>
 #include <plat_config.h>
 #include <xlat_tables.h>
 #include "../fvp_def.h"
@@ -49,33 +50,70 @@
  ******************************************************************************/
 plat_config_t plat_config;
 
+#define MAP_SHARED_RAM	MAP_REGION_FLAT(FVP_SHARED_MEM_BASE,		\
+					FVP_SHARED_MEM_SIZE,		\
+					MT_MEMORY | MT_RW | MT_SECURE)
+
+#define MAP_FLASH0	MAP_REGION_FLAT(FLASH0_BASE,			\
+					FLASH0_SIZE,			\
+					MT_MEMORY | MT_RO | MT_SECURE)
+
+#define MAP_DEVICE0	MAP_REGION_FLAT(DEVICE0_BASE,			\
+					DEVICE0_SIZE,			\
+					MT_DEVICE | MT_RW | MT_SECURE)
+
+#define MAP_DEVICE1	MAP_REGION_FLAT(DEVICE1_BASE,			\
+					DEVICE1_SIZE,			\
+					MT_DEVICE | MT_RW | MT_SECURE)
+
+#define MAP_DRAM1_NS	MAP_REGION_FLAT(DRAM1_NS_BASE,			\
+					DRAM1_NS_SIZE,			\
+					MT_MEMORY | MT_RW | MT_NS)
+
+#define MAP_TSP_SEC_MEM	MAP_REGION_FLAT(TSP_SEC_MEM_BASE,		\
+					TSP_SEC_MEM_SIZE,		\
+					MT_MEMORY | MT_RW | MT_SECURE)
+
 /*
- * Table of regions to map using the MMU.
+ * Table of regions for various BL stages to map using the MMU.
  * This doesn't include TZRAM as the 'mem_layout' argument passed to
  * configure_mmu_elx() will give the available subset of that,
  */
+#if IMAGE_BL1
 const mmap_region_t fvp_mmap[] = {
-	{ FVP_SHARED_RAM_BASE,	FVP_SHARED_RAM_BASE,	FVP_SHARED_RAM_SIZE,
-						MT_MEMORY | MT_RW | MT_SECURE },
-	{ FVP_TRUSTED_DRAM_BASE, FVP_TRUSTED_DRAM_BASE,	FVP_TRUSTED_DRAM_SIZE,
-						MT_MEMORY | MT_RW | MT_SECURE },
-	{ FLASH0_BASE,	FLASH0_BASE,	FLASH0_SIZE,
-						MT_MEMORY | MT_RO | MT_SECURE },
-	{ FLASH1_BASE,	FLASH1_BASE,	FLASH1_SIZE,
-						MT_MEMORY | MT_RO | MT_SECURE },
-	{ VRAM_BASE,	VRAM_BASE,	VRAM_SIZE,
-						MT_MEMORY | MT_RW | MT_SECURE },
-	{ DEVICE0_BASE,	DEVICE0_BASE,	DEVICE0_SIZE,
-						MT_DEVICE | MT_RW | MT_SECURE },
-	{ DEVICE1_BASE,	DEVICE1_BASE,	DEVICE1_SIZE,
-						MT_DEVICE | MT_RW | MT_SECURE },
-	/* 2nd GB as device for now...*/
-	{ 0x40000000,	0x40000000,	0x40000000,
-						MT_DEVICE | MT_RW | MT_SECURE },
-	{ DRAM1_BASE,	DRAM1_BASE,	DRAM1_SIZE,
-						MT_MEMORY | MT_RW | MT_NS },
+	MAP_SHARED_RAM,
+	MAP_FLASH0,
+	MAP_DEVICE0,
+	MAP_DEVICE1,
 	{0}
 };
+#endif
+#if IMAGE_BL2
+const mmap_region_t fvp_mmap[] = {
+	MAP_SHARED_RAM,
+	MAP_FLASH0,
+	MAP_DEVICE0,
+	MAP_DEVICE1,
+	MAP_DRAM1_NS,
+	MAP_TSP_SEC_MEM,
+	{0}
+};
+#endif
+#if IMAGE_BL31
+const mmap_region_t fvp_mmap[] = {
+	MAP_SHARED_RAM,
+	MAP_DEVICE0,
+	MAP_DEVICE1,
+	{0}
+};
+#endif
+#if IMAGE_BL32
+const mmap_region_t fvp_mmap[] = {
+	MAP_DEVICE0,
+	MAP_DEVICE1,
+	{0}
+};
+#endif
 
 /* Array of secure interrupts to be configured by the gic driver */
 const unsigned int irq_sec_array[] = {
@@ -98,7 +136,8 @@ const unsigned int num_sec_irqs = sizeof(irq_sec_array) /
  * Macro generating the code for the function setting up the pagetables as per
  * the platform memory map & initialize the mmu, for the given exception level
  ******************************************************************************/
-#define DEFINE_CONFIGURE_MMU_EL(_el)					\
+#if USE_COHERENT_MEM
+#define DEFINE_CONFIGURE_MMU_EL(_el)				\
 	void fvp_configure_mmu_el##_el(unsigned long total_base,	\
 				   unsigned long total_size,		\
 				   unsigned long ro_start,		\
@@ -120,6 +159,25 @@ const unsigned int num_sec_irqs = sizeof(irq_sec_array) /
 									\
 		enable_mmu_el##_el(0);					\
 	}
+#else
+#define DEFINE_CONFIGURE_MMU_EL(_el)				\
+	void fvp_configure_mmu_el##_el(unsigned long total_base,	\
+				   unsigned long total_size,		\
+				   unsigned long ro_start,		\
+				   unsigned long ro_limit)		\
+	{								\
+		mmap_add_region(total_base, total_base,			\
+				total_size,				\
+				MT_MEMORY | MT_RW | MT_SECURE);		\
+		mmap_add_region(ro_start, ro_start,			\
+				ro_limit - ro_start,			\
+				MT_MEMORY | MT_RO | MT_SECURE);		\
+		mmap_add(fvp_mmap);					\
+		init_xlat_tables();					\
+									\
+		enable_mmu_el##_el(0);					\
+	}
+#endif
 
 /* Define EL1 and EL3 variants of the function initialising the MMU */
 DEFINE_CONFIGURE_MMU_EL(1)

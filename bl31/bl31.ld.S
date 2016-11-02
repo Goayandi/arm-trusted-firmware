@@ -36,8 +36,12 @@ ENTRY(bl31_entrypoint)
 
 
 MEMORY {
+<<<<<<< HEAD
     RAM (rwx): ORIGIN = BL31_BASE, LENGTH = BL31_LIMIT
     RAM2 (rwx): ORIGIN = TZRAM2_BASE, LENGTH = TZRAM2_SIZE
+=======
+    RAM (rwx): ORIGIN = BL31_BASE, LENGTH = BL31_LIMIT - BL31_BASE
+>>>>>>> v1.1
 }
 
 
@@ -120,6 +124,7 @@ SECTIONS
         *(xlat_table)
     } >RAM2
 
+#if USE_COHERENT_MEM
     /*
      * The base address of the coherent memory section must be page-aligned (4K)
      * to guarantee that the coherent data are stored on their own pages and
@@ -137,13 +142,20 @@ SECTIONS
          */
         . = NEXT(4096);
         __COHERENT_RAM_END__ = .;
+<<<<<<< HEAD
     } >RAM2
+=======
+    } >RAM
+#endif
+>>>>>>> v1.1
 
     __BL31_END__ = .;
 
     __BSS_SIZE__ = SIZEOF(.bss);
+#if USE_COHERENT_MEM
     __COHERENT_RAM_UNALIGNED_SIZE__ =
         __COHERENT_RAM_END_UNALIGNED__ - __COHERENT_RAM_START__;
+#endif
 
     ASSERT(. <= TZRAM2_LIMIT, "TZRAM2 image has exceeded its limit.")
 }

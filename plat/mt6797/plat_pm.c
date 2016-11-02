@@ -267,39 +267,24 @@ static int32_t plat_do_plat_actions(unsigned int afflvl, unsigned int state)
 /*******************************************************************************
  * FVP handler called when an affinity instance is about to enter standby.
  ******************************************************************************/
-int plat_affinst_standby(unsigned int power_state)
+void plat_affinst_standby(unsigned int power_state)
 {
-	unsigned int target_afflvl;
-
-	/* Sanity check the requested state */
-	target_afflvl = psci_get_pstate_afflvl(power_state);
-
-	/*
-	 * It's possible to enter standby only on affinity level 0 i.e. a cpu
-	 * on the FVP. Ignore any other affinity level.
-	 */
-	if (target_afflvl != MPIDR_AFFLVL0)
-		return PSCI_E_INVALID_PARAMS;
-
 	/*
 	 * Enter standby state
 	 * dsb is good practice before using wfi to enter low power states
 	 */
 	dsb();
 	wfi();
-
-	return PSCI_E_SUCCESS;
 }
 
 /*******************************************************************************
  * FVP handler called when an affinity instance is about to be turned on. The
  * level and mpidr determine the affinity instance.
  ******************************************************************************/
-int plat_affinst_on(unsigned long mpidr,
-		   unsigned long sec_entrypoint,
-		   unsigned long ns_entrypoint,
-		   unsigned int afflvl,
-		   unsigned int state)
+int32_t plat_affinst_on(uint64_t mpidr,
+		   uint64_t sec_entrypoint,
+		   uint32_t afflvl,
+		   uint32_t state)
 {
 	int rc = PSCI_E_SUCCESS;
 	unsigned long linear_id;
@@ -371,15 +356,14 @@ int plat_affinst_on(unsigned long mpidr,
  * global variables across calls. It will be wise to do flush a write to the
  * global to prevent unpredictable results.
  ******************************************************************************/
-int plat_affinst_off(unsigned long mpidr,
-		    unsigned int afflvl,
-		    unsigned int state)
+void plat_affinst_off(uint32_t afflvl, uint32_t state)
 {
 	/* Determine if any platform actions need to be executed */
 	if (plat_do_plat_actions(afflvl, state) == -EAGAIN)
-		return PSCI_E_SUCCESS;
+		return;
 
 	unsigned int gicc_base;
+        unsigned long mpidr = read_mpidr_el1();
 
 	/*
 	 * If execution reaches this stage then this affinity level will be
@@ -428,8 +412,6 @@ int plat_affinst_off(unsigned long mpidr,
 			printf("%s: disable_scu(%d)\n", __FUNCTION__, linear_id);
 		}
 	}
-
-	return PSCI_E_SUCCESS;
 }
 
 /*******************************************************************************
@@ -443,19 +425,18 @@ int plat_affinst_off(unsigned long mpidr,
  * global variables across calls. It will be wise to do flush a write to the
  * global to prevent unpredictable results.
  ******************************************************************************/
-int plat_affinst_suspend(unsigned long mpidr,
-			unsigned long sec_entrypoint,
-			unsigned long ns_entrypoint,
+void plat_affinst_suspend(unsigned long sec_entrypoint,
 			unsigned int afflvl,
 			unsigned int state)
 {
 	/* Determine if any platform actions need to be executed. */
 	if (plat_do_plat_actions(afflvl, state) == -EAGAIN)
-		return PSCI_E_SUCCESS;
+		return;
 
 	//set cpu0 as aa64 for cpu reset
 	mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | (1<<12));
 
+        unsigned long mpidr = read_mpidr_el1();
 #if SPMC_SPARK2
 	uint64_t linear_id;
 
@@ -491,7 +472,7 @@ int plat_affinst_suspend(unsigned long mpidr,
 		gic_rdist_save();
 	}
 
-	return PSCI_E_SUCCESS;
+	return;
 }
 
 /*******************************************************************************
@@ -501,15 +482,13 @@ int plat_affinst_suspend(unsigned long mpidr,
  * was turned off prior to wakeup and do what's necessary to setup it up
  * correctly.
  ******************************************************************************/
-int plat_affinst_on_finish(unsigned long mpidr,
-			  unsigned int afflvl,
-			  unsigned int state)
+void plat_affinst_on_finish(unsigned int afflvl, unsigned int state)
 {
-	int rc = PSCI_E_SUCCESS;
+	unsigned long mpidr = read_mpidr_el1();
 
 	/* Determine if any platform actions need to be executed. */
 	if (plat_do_plat_actions(afflvl, state) == -EAGAIN)
-		return PSCI_E_SUCCESS;
+		return;
 
 	/* Perform the common cluster specific operations */
 	if (afflvl != MPIDR_AFFLVL0) {
@@ -570,8 +549,6 @@ int plat_affinst_on_finish(unsigned long mpidr,
 	// arm_gic_pcpu_distif_setup();
 
 	enable_ns_access_to_cpuectlr();
-
-	return rc;
 }
 
 /*******************************************************************************
@@ -581,14 +558,12 @@ int plat_affinst_on_finish(unsigned long mpidr,
  * TODO: At the moment we reuse the on finisher and reinitialize the secure
  * context. Need to implement a separate suspend finisher.
  ******************************************************************************/
-int plat_affinst_suspend_finish(unsigned long mpidr,
-			       unsigned int afflvl,
-			       unsigned int state)
+void plat_affinst_suspend_finish(unsigned int afflvl, unsigned int state)
 {
-	int rc = PSCI_E_SUCCESS;
+	unsigned long mpidr = read_mpidr_el1();
 
 	if (plat_do_plat_actions(afflvl, state) == -EAGAIN)
-		return PSCI_E_SUCCESS;
+		return;
 
 	if (afflvl != MPIDR_AFFLVL0) {
 		plat_restore_el3_dormant_data();
@@ -656,7 +631,7 @@ int plat_affinst_suspend_finish(unsigned long mpidr,
 
 	enable_ns_access_to_cpuectlr();
 
-	return rc;
+	return;
 }
 
 /*******************************************************************************

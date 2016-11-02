@@ -3,17 +3,19 @@ ARM Trusted Firmware Design
 
 Contents :
 
-1.  Introduction
-2.  Cold boot
-3.  EL3 runtime services framework
-4.  Power State Coordination Interface
-5.  Secure-EL1 Payloads and Dispatchers
-6.  Crash Reporting in BL3-1
-7.  CPU specific operations framework
-8.  Memory layout of BL images
-9.  Firmware Image Package (FIP)
-10.  Code Structure
-11.  References
+1.  [Introduction](#1--introduction)
+2.  [Cold boot](#2--cold-boot)
+3.  [EL3 runtime services framework](#3--el3-runtime-services-framework)
+4.  [Power State Coordination Interface](#4--power-state-coordination-interface)
+5.  [Secure-EL1 Payloads and Dispatchers](#5--secure-el1-payloads-and-dispatchers)
+6.  [Crash Reporting in BL3-1](#6--crash-reporting-in-bl3-1)
+7.  [Guidelines for Reset Handlers](#7--guidelines-for-reset-handlers)
+8.  [CPU specific operations framework](#8--cpu-specific-operations-framework)
+9.  [Memory layout of BL images](#9-memory-layout-of-bl-images)
+10. [Firmware Image Package (FIP)](#10--firmware-image-package-fip)
+11. [Use of coherent memory in Trusted Firmware](#11--use-of-coherent-memory-in-trusted-firmware)
+12. [Code Structure](#12--code-structure)
+13. [References](#13--references)
 
 
 1.  Introduction
@@ -368,10 +370,10 @@ level implementation of the generic timer through the memory mapped interface.
     `ON`; any other cluster is `OFF`. BL3-1 initializes the data structures that
     implement the state machine, including the locks that protect them. BL3-1
     accesses the state of a CPU or cluster immediately after reset and before
-    the MMU is enabled in the warm boot path. It is not currently possible to
-    use 'exclusive' based spinlocks, therefore BL3-1 uses locks based on
-    Lamport's Bakery algorithm instead. BL3-1 allocates these locks in device
-    memory. They are accessible irrespective of MMU state.
+    the data cache is enabled in the warm boot path. It is not currently
+    possible to use 'exclusive' based spinlocks, therefore BL3-1 uses locks
+    based on Lamport's Bakery algorithm instead. BL3-1 allocates these locks in
+    device memory by default.
 
 *   Runtime services initialization:
 
@@ -423,7 +425,7 @@ EL3, little-endian data access, and all interrupt sources masked:
     PSTATE.EL = 3
     PSTATE.RW = 1
     PSTATE.DAIF = 0xf
-    CTLR_EL3.EE = 0
+    SCTLR_EL3.EE = 0
 
 X0 and X1 can be used to pass information from the Trusted Boot Firmware to the
 platform code in BL3-1:
@@ -733,32 +735,43 @@ restoring the stack and CPU state and returning from the original SMC.
 
 TODO: Provide design walkthrough of PSCI implementation.
 
-The complete PSCI API is not yet implemented. The following functions are
-currently implemented:
+The PSCI v1.0 specification categorizes APIs as optional and mandatory. All the
+mandatory APIs in PSCI v1.0 and all the APIs in PSCI v0.2 draft specification
+[Power State Coordination Interface PDD] [PSCI] are implemented. The table lists
+the PSCI v1.0 APIs and their support in generic code.
 
--   `PSCI_VERSION`
--   `CPU_OFF`
--   `CPU_ON`
--   `CPU_SUSPEND`
--   `AFFINITY_INFO`
--   `SYSTEM_OFF`
--   `SYSTEM_RESET`
+An API implementation might have a dependency on platform code e.g. CPU_SUSPEND
+requires the platform to export a part of the implementation. Hence the level
+of support of the mandatory APIs depends upon the support exported by the
+platform port as well. The Juno and FVP (all variants) platforms export all the
+required support.
 
-The `CPU_ON`, `CPU_OFF` and `CPU_SUSPEND` functions implement the warm boot
-path in ARM Trusted Firmware. `CPU_ON` and `CPU_OFF` have undergone testing
-on all the supported FVPs. `CPU_SUSPEND` & `AFFINITY_INFO` have undergone
-testing only on the AEM v8 Base FVP. Support for `AFFINITY_INFO` is still
-experimental. Support for `CPU_SUSPEND` is stable for entry into power down
-states. Standby states are currently not supported. `PSCI_VERSION` is
-present but completely untested in this version of the software.
+| PSCI v1.0 API         |Supported| Comments                                  |
+|:----------------------|:--------|:------------------------------------------|
+|`PSCI_VERSION`         | Yes     | The version returned is 1.0               |
+|`CPU_SUSPEND`          | Yes*    | The original `power_state` format is used |
+|`CPU_OFF`              | Yes*    |                                           |
+|`CPU_ON`               | Yes*    |                                           |
+|`AFFINITY_INFO`        | Yes     |                                           |
+|`MIGRATE`              | Yes**   |                                           |
+|`MIGRATE_INFO_TYPE`    | Yes**   |                                           |
+|`MIGRATE_INFO_CPU`     | Yes**   |                                           |
+|`SYSTEM_OFF`           | Yes*    |                                           |
+|`SYSTEM_RESET`         | Yes*    |                                           |
+|`PSCI_FEATURES`        | Yes     |                                           |
+|`CPU_FREEZE`           | No      |                                           |
+|`CPU_DEFAULT_SUSPEND`  | No      |                                           |
+|`CPU_HW_STATE`         | No      |                                           |
+|`SYSTEM_SUSPEND`       | No      |                                           |
+|`PSCI_SET_SUSPEND_MODE`| No      |                                           |
+|`PSCI_STAT_RESIDENCY`  | No      |                                           |
+|`PSCI_STAT_COUNT`      | No      |                                           |
 
-The following unsupported functions return with a error code as documented in
-the [Power State Coordination Interface PDD] [PSCI].
+*Note : These PSCI APIs require platform power management hooks to be
+registered with the generic PSCI code to be supported.
 
--   `MIGRATE` : -1 (NOT_SUPPORTED)
--   `MIGRATE_INFO_TYPE` : 2 (Trusted OS is either not present or does not
-     require migration)
--   `MIGRATE_INFO_UP_CPU` : 0 (Return value is UNDEFINED)
+**Note : These PSCI APIs require appropriate Secure Payload Dispatcher
+hooks to be registered with the generic PSCI code to be supported.
 
 
 5.  Secure-EL1 Payloads and Dispatchers
@@ -778,7 +791,10 @@ The ARM Trusted Firmware provides a Test Secure-EL1 Payload (TSP) and a Test
 Secure-EL1 Payload Dispatcher (TSPD) service as an example of how a Trusted OS
 is supported on a production system using the Runtime Services Framework. On
 such a system, the Test BL3-2 image and service are replaced by the Trusted OS
-and its dispatcher service.
+and its dispatcher service. The ARM Trusted Firmware build system expects that
+the dispatcher will define the build flag `NEED_BL32` to enable it to include
+the BL3-2 in the build either as a binary or to compile from source depending
+on whether the `BL32` build option is specified or not.
 
 The TSP runs in Secure-EL1. It is designed to demonstrate synchronous
 communication with the normal-world software running in EL1/EL2. Communication
@@ -945,8 +961,48 @@ The sample crash output is shown below.
     fpexc32_el2	:0x0000000004000700
     sp_el0	:0x0000000004010780
 
+7.  Guidelines for Reset Handlers
+---------------------------------
 
-7.  CPU specific operations framework
+Trusted Firmware implements a framework that allows CPU and platform ports to
+perform actions immediately after a CPU is released from reset in both the cold
+and warm boot paths. This is done by calling the `reset_handler()` function in
+both the BL1 and BL3-1 images. It in turn calls the platform and CPU specific
+reset handling functions.
+
+Details for implementing a CPU specific reset handler can be found in
+Section 8. Details for implementing a platform specific reset handler can be
+found in the [Porting Guide](see the `plat_reset_handler()` function).
+
+When adding functionality to a reset handler, the following points should be
+kept in mind.
+
+1.   The first reset handler in the system exists either in a ROM image
+     (e.g. BL1), or BL3-1 if `RESET_TO_BL31` is true. This may be detected at
+     compile time using the constant `FIRST_RESET_HANDLER_CALL`.
+
+2.   When considering ROM images, it's important to consider non TF-based ROMs
+     and ROMs based on previous versions of the TF code.
+
+3.   If the functionality should be applied to a ROM and there is no possibility
+     of a ROM being used that does not apply the functionality (or equivalent),
+     then the functionality should be applied within a `#if
+     FIRST_RESET_HANDLER_CALL` block.
+
+4.   If the functionality should execute in BL3-1 in order to override or
+     supplement a ROM version of the functionality, then the functionality
+     should be applied in the `#else` part of a `#if FIRST_RESET_HANDLER_CALL`
+     block.
+
+5.   If the functionality should be applied to a ROM but there is a possibility
+     of ROMs being used that do not apply the functionality, then the
+     functionality should be applied outside of a `FIRST_RESET_HANDLER_CALL`
+     block, so that BL3-1 has an opportunity to apply the functionality instead.
+     In this case, additional code may be needed to cope with different ROMs
+     that do or do not apply the functionality.
+
+
+8.  CPU specific operations framework
 -----------------------------
 
 Certain aspects of the ARMv8 architecture are implementation defined,
@@ -979,9 +1035,10 @@ Please note that only 2. is mandated by the TRM.
 
 The CPU specific operations framework scales to accommodate a large number of
 different CPUs during power down and reset handling. The platform can specify
+any CPU optimization it wants to enable for each CPU. It can also specify
 the CPU errata workarounds to be applied for each CPU type during reset
 handling by defining CPU errata compile time macros. Details on these macros
-can be found in the [cpu-errata-workarounds.md][ERRW] file.
+can be found in the [cpu-specific-build-macros.md][CPUBM] file.
 
 The CPU specific operations framework depends on the `cpu_ops` structure which
 needs to be exported for each type of CPU in the platform. It is defined in
@@ -1003,12 +1060,16 @@ of any coherency domain.
 
 The BL entrypoint code first invokes the `plat_reset_handler()` to allow
 the platform to perform any system initialization required and any system
-errata wrokarounds that needs to be applied. The `get_cpu_ops_ptr()` reads
+errata workarounds that needs to be applied. The `get_cpu_ops_ptr()` reads
 the current CPU midr, finds the matching `cpu_ops` entry in the `cpu_ops`
-array and returns it. Note that only the part number and implementator fields
+array and returns it. Note that only the part number and implementer fields
 in midr are used to find the matching `cpu_ops` entry. The `reset_func()` in
 the returned `cpu_ops` is then invoked which executes the required reset
 handling for that CPU and also any errata workarounds enabled by the platform.
+This function must preserve the values of general purpose registers x20 to x29.
+
+Refer to Section "Guidelines for Reset Handlers" for general guidelines
+regarding placement of code in a reset handler.
 
 ### CPU specific power down sequence
 
@@ -1040,7 +1101,7 @@ be reported and a pointer to the ASCII list of register names in a format
 expected by the crash reporting framework.
 
 
-8. Memory layout of BL images
+9. Memory layout of BL images
 -----------------------------
 
 Each bootloader image can be divided in 2 parts:
@@ -1123,9 +1184,10 @@ this purpose:
 * `__BSS_START__` This address must be aligned on a 16-byte boundary.
 * `__BSS_SIZE__`
 
-Similarly, the coherent memory section must be zero-initialised. Also, the MMU
-setup code needs to know the extents of this section to set the right memory
-attributes for it. The following linker symbols are defined for this purpose:
+Similarly, the coherent memory section (if enabled) must be zero-initialised.
+Also, the MMU setup code needs to know the extents of this section to set the
+right memory attributes for it. The following linker symbols are defined for
+this purpose:
 
 * `__COHERENT_RAM_START__` This address must be aligned on a page-size boundary.
 * `__COHERENT_RAM_END__` This address must be aligned on a page-size boundary.
@@ -1196,39 +1258,36 @@ sections must not overstep. The platform code must provide those.
 The following list describes the memory layout on the FVP:
 
 *   A 4KB page of shared memory is used to store the entrypoint mailboxes
-    and the parameters passed between bootloaders. The shared memory can be
-    allocated either at the top of Trusted SRAM or at the base of Trusted
-    DRAM at build time. When allocated in Trusted SRAM, the amount of Trusted
-    SRAM available to load the bootloader images will be reduced by the size
-    of the shared memory.
+    and the parameters passed between bootloaders. The shared memory is located
+    at the base of the Trusted SRAM. The amount of Trusted SRAM available to
+    load the bootloader images will be reduced by the size of the shared memory.
 
 *   BL1 is originally sitting in the Trusted ROM at address `0x0`. Its
     read-write data are relocated at the top of the Trusted SRAM at runtime.
-    If the shared memory is allocated in Trusted SRAM, the BL1 read-write data
-    is relocated just below the shared memory.
 
 *   BL3-1 is loaded at the top of the Trusted SRAM, such that its NOBITS
     sections will overwrite BL1 R/W data.
 
 *   BL2 is loaded below BL3-1.
 
-*   The TSP is loaded as the BL3-2 image at the base of either the Trusted
-    SRAM or Trusted DRAM. When loaded into Trusted SRAM, its NOBITS sections
-    are allowed to overlay BL2. When loaded into Trusted DRAM, an offset
-    corresponding to the size of the shared memory is applied to avoid
-    overlap.
+*   BL3-2 can be loaded in one of the following locations:
 
-This memory layout is designed to give the BL3-2 image as much memory as
-possible when it is loaded into Trusted SRAM. Depending on the location of the
-shared memory page and the TSP, it will result in different memory maps,
-illustrated by the following diagrams.
+    *   Trusted SRAM
+    *   Trusted DRAM
+    *   Secure region of DRAM (top 16MB of DRAM configured by the TrustZone
+        controller)
 
-**Shared data & TSP in Trusted SRAM (default option):**
+When BL3-2 is loaded into Trusted SRAM, its NOBITS sections are allowed to
+overlay BL2. This memory layout is designed to give the BL3-2 image as much
+memory as possible when it is loaded into Trusted SRAM.
+
+The location of the BL3-2 image will result in different memory maps. This is
+illustrated in the following diagrams using the TSP as an example.
+
+**TSP in Trusted SRAM (default option):**
 
                Trusted SRAM
-    0x04040000 +----------+
-               |  Shared  |
-    0x0403F000 +----------+  loaded by BL2  ------------------
+    0x04040000 +----------+  loaded by BL2  ------------------
                | BL1 (rw) |  <<<<<<<<<<<<<  |  BL3-1 NOBITS  |
                |----------|  <<<<<<<<<<<<<  |----------------|
                |          |  <<<<<<<<<<<<<  | BL3-1 PROGBITS |
@@ -1236,7 +1295,9 @@ illustrated by the following diagrams.
                |   BL2    |  <<<<<<<<<<<<<  |  BL3-2 NOBITS  |
                |----------|  <<<<<<<<<<<<<  |----------------|
                |          |  <<<<<<<<<<<<<  | BL3-2 PROGBITS |
-    0x04000000 +----------+                 ------------------
+    0x04001000 +----------+                 ------------------
+               |  Shared  |
+    0x04000000 +----------+
 
                Trusted ROM
     0x04000000 +----------+
@@ -1244,15 +1305,11 @@ illustrated by the following diagrams.
     0x00000000 +----------+
 
 
-**Shared data & TSP in Trusted DRAM:**
+**TSP in Trusted DRAM:**
 
                Trusted DRAM
     0x08000000 +----------+
-               |          |
                |  BL3-2   |
-               |          |
-    0x06001000 |----------|
-               |  Shared  |
     0x06000000 +----------+
 
                Trusted SRAM
@@ -1264,6 +1321,8 @@ illustrated by the following diagrams.
                |   BL2    |
                |----------|
                |          |
+    0x04001000 +----------+
+               |  Shared  |
     0x04000000 +----------+
 
                Trusted ROM
@@ -1271,16 +1330,16 @@ illustrated by the following diagrams.
                | BL1 (ro) |
     0x00000000 +----------+
 
-**Shared data in Trusted DRAM, TSP in Trusted SRAM:**
+**TSP in the TZC-Secured DRAM:**
 
-               Trusted DRAM
-    0x08000000 +----------+
+                   DRAM
+    0xffffffff +----------+
+               |  BL3-2   |  (secure)
+    0xff000000 +----------+
                |          |
+               :          :  (non-secure)
                |          |
-               |          |
-    0x06001000 |----------|
-               |  Shared  |
-    0x06000000 +----------+
+    0x80000000 +----------+
 
                Trusted SRAM
     0x04040000 +----------+  loaded by BL2  ------------------
@@ -1288,20 +1347,55 @@ illustrated by the following diagrams.
                |----------|  <<<<<<<<<<<<<  |----------------|
                |          |  <<<<<<<<<<<<<  | BL3-1 PROGBITS |
                |----------|                 ------------------
-               |   BL2    |  <<<<<<<<<<<<<  |  BL3-2 NOBITS  |
-               |----------|  <<<<<<<<<<<<<  |----------------|
-               |          |  <<<<<<<<<<<<<  | BL3-2 PROGBITS |
-    0x04000000 +----------+                 ------------------
+               |   BL2    |
+               |----------|
+               |          |
+    0x04001000 +----------+
+               |  Shared  |
+    0x04000000 +----------+
 
                Trusted ROM
     0x04000000 +----------+
                | BL1 (ro) |
     0x00000000 +----------+
 
-Loading the TSP image in Trusted DRAM doesn't change the memory layout of the
-other boot loader images in Trusted SRAM.
+Moving the TSP image out of the Trusted SRAM doesn't change the memory layout
+of the other boot loader images in Trusted SRAM.
+
 
 ####  Memory layout on Juno ARM development platform
+
+The following list describes the memory layout on Juno:
+
+*   Trusted SRAM at 0x04000000 contains the MHU page, BL1 r/w section, BL2
+    image, BL3-1 image and, optionally, the BL3-2 image.
+
+*   The MHU 4 KB page is used as communication channel between SCP and AP. It
+    also contains the entrypoint mailboxes for the AP. Mailboxes are stored in
+    the first 128 bytes of the MHU page.
+
+*   BL1 resides in flash memory at address `0x0BEC0000`. Its read-write data
+    section is relocated to the top of the Trusted SRAM at runtime.
+
+*   BL3-1 is loaded at the top of the Trusted SRAM, such that its NOBITS
+    sections will overwrite BL1 R/W data. This implies that BL1 global variables
+    will remain valid only until execution reaches the BL3-1 entry point during
+    a cold boot.
+
+*   BL2 is loaded below BL3-1.
+
+*   BL3-0 is loaded temporarily into the BL3-1 memory region and transfered to
+    the SCP before being overwritten by BL3-1.
+
+*   The BL3-2 image is optional and can be loaded into one of these two
+    locations: Trusted SRAM (right after the MHU page) or DRAM (14 MB starting
+    at 0xFF000000 and secured by the TrustZone controller). When loaded into
+    Trusted SRAM, its NOBITS sections are allowed to overlap BL2.
+
+Depending on the location of the BL3-2 image, it will result in different memory
+maps, illustrated by the following diagrams.
+
+**BL3-2 in Trusted SRAM (default option):**
 
                   Flash0
     0x0C000000 +----------+
@@ -1310,32 +1404,60 @@ other boot loader images in Trusted SRAM.
                | BL1 (ro) |
     0x0BEC0000 |----------|
                :          :
-               |  Bypass  |
-    0x08000000 +----------+
-
-               Trusted SRAM
-    0x04040000 +----------+
-               |   BL2    |                 BL3-1 is loaded
-    0x04033000 |----------|                 after BL3-0 has
-               |  BL3-2   |                 been sent to SCP
-    0x04023000 |----------|                 ------------------
-               |  BL3-0   |  <<<<<<<<<<<<<  |     BL3-1      |
-    0x04009000 |----------|                 ------------------
-               | BL1 (rw) |
-    0x04001000 |----------|
+    0x08000000 +----------+                  BL3-1 is loaded
+                                             after BL3-0 has
+               Trusted SRAM                  been sent to SCP
+    0x04040000 +----------+  loaded by BL2  ------------------
+               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL3-1 NOBITS  |
+               |----------|  <<<<<<<<<<<<<  |----------------|
+               |  BL3-0   |  <<<<<<<<<<<<<  | BL3-1 PROGBITS |
+               |----------|                 ------------------
+               |   BL2    |  <<<<<<<<<<<<<  |  BL3-2 NOBITS  |
+               |----------|  <<<<<<<<<<<<<  |----------------|
+               |          |  <<<<<<<<<<<<<  | BL3-2 PROGBITS |
+    0x04001000 +----------+                 ------------------
                |   MHU    |
     0x04000000 +----------+
 
-The Message Handling Unit (MHU) page contains the entrypoint mailboxes and a
-shared memory area. This shared memory is used as a communication channel
-between the AP and the SCP.
 
-BL1 code starts at `0x0BEC0000`. The BL1 data section is copied to trusted SRAM
-at `0x04001000`, right after the MHU page. Entrypoint mailboxes are stored in
-the first 128 bytes of the MHU page.
+**BL3-2 in the secure region of DRAM:**
+
+                   DRAM
+    0xFFE00000 +----------+
+               |  BL3-2   |  (secure)
+    0xFF000000 |----------|
+               |          |
+               :          :  (non-secure)
+               |          |
+    0x80000000 +----------+
+
+                  Flash0
+    0x0C000000 +----------+
+               :          :
+    0x0BED0000 |----------|
+               | BL1 (ro) |
+    0x0BEC0000 |----------|
+               :          :
+    0x08000000 +----------+                  BL3-1 is loaded
+                                             after BL3-0 has
+               Trusted SRAM                  been sent to SCP
+    0x04040000 +----------+  loaded by BL2  ------------------
+               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL3-1 NOBITS  |
+               |----------|  <<<<<<<<<<<<<  |----------------|
+               |  BL3-0   |  <<<<<<<<<<<<<  | BL3-1 PROGBITS |
+               |----------|                 ------------------
+               |   BL2    |
+               |----------|
+               |          |
+    0x04001000 +----------+
+               |   MHU    |
+    0x04000000 +----------+
+
+Loading the BL3-2 image in DRAM doesn't change the memory layout of the other
+images in Trusted SRAM.
 
 
-9.  Firmware Image Package (FIP)
+10.  Firmware Image Package (FIP)
 ---------------------------------
 
 Using a Firmware Image Package (FIP) allows for packing bootloader images (and
@@ -1413,7 +1535,208 @@ Currently the FVP's policy only allows loading of a known set of images. The
 platform policy can be modified to allow additional images.
 
 
-10.  Code Structure
+11. Use of coherent memory in Trusted Firmware
+----------------------------------------------
+
+There might be loss of coherency when physical memory with mismatched
+shareability, cacheability and memory attributes is accessed by multiple CPUs
+(refer to section B2.9 of [ARM ARM] for more details). This possibility occurs
+in Trusted Firmware during power up/down sequences when coherency, MMU and
+caches are turned on/off incrementally.
+
+Trusted Firmware defines coherent memory as a region of memory with Device
+nGnRE attributes in the translation tables. The translation granule size in
+Trusted Firmware is 4KB. This is the smallest possible size of the coherent
+memory region.
+
+By default, all data structures which are susceptible to accesses with
+mismatched attributes from various CPUs are allocated in a coherent memory
+region (refer to section 2.1 of [Porting Guide]). The coherent memory region
+accesses are Outer Shareable, non-cacheable and they can be accessed
+with the Device nGnRE attributes when the MMU is turned on. Hence, at the
+expense of at least an extra page of memory, Trusted Firmware is able to work
+around coherency issues due to mismatched memory attributes.
+
+The alternative to the above approach is to allocate the susceptible data
+structures in Normal WriteBack WriteAllocate Inner shareable memory. This
+approach requires the data structures to be designed so that it is possible to
+work around the issue of mismatched memory attributes by performing software
+cache maintenance on them.
+
+### Disabling the use of coherent memory in Trusted Firmware
+
+It might be desirable to avoid the cost of allocating coherent memory on
+platforms which are memory constrained. Trusted Firmware enables inclusion of
+coherent memory in firmware images through the build flag `USE_COHERENT_MEM`.
+This flag is enabled by default. It can be disabled to choose the second
+approach described above.
+
+The below sections analyze the data structures allocated in the coherent memory
+region and the changes required to allocate them in normal memory.
+
+### PSCI Affinity map nodes
+
+The `psci_aff_map` data structure stores the hierarchial node information for
+each affinity level in the system including the PSCI states associated with them.
+By default, this data structure is allocated in the coherent memory region in
+the Trusted Firmware because it can be accessed by multiple CPUs, either with
+their caches enabled or disabled.
+
+	typedef struct aff_map_node {
+		unsigned long mpidr;
+		unsigned char ref_count;
+		unsigned char state;
+		unsigned char level;
+	#if USE_COHERENT_MEM
+		bakery_lock_t lock;
+	#else
+		unsigned char aff_map_index;
+	#endif
+	} aff_map_node_t;
+
+In order to move this data structure to normal memory, the use of each of its
+fields must be analyzed. Fields like `mpidr` and `level` are only written once
+during cold boot. Hence removing them from coherent memory involves only doing
+a clean and invalidate of the cache lines after these fields are written.
+
+The fields `state` and `ref_count` can be concurrently accessed by multiple
+CPUs in different cache states. A Lamport's Bakery lock is used to ensure mutual
+exlusion to these fields. As a result, it is possible to move these fields out
+of coherent memory by performing software cache maintenance on them. The field
+`lock` is the bakery lock data structure when `USE_COHERENT_MEM` is enabled.
+The `aff_map_index` is used to identify the bakery lock when `USE_COHERENT_MEM`
+is disabled.
+
+### Bakery lock data
+
+The bakery lock data structure `bakery_lock_t` is allocated in coherent memory
+and is accessed by multiple CPUs with mismatched attributes. `bakery_lock_t` is
+defined as follows:
+
+    typedef struct bakery_lock {
+        int owner;
+        volatile char entering[BAKERY_LOCK_MAX_CPUS];
+        volatile unsigned number[BAKERY_LOCK_MAX_CPUS];
+    } bakery_lock_t;
+
+It is a characteristic of Lamport's Bakery algorithm that the volatile per-CPU
+fields can be read by all CPUs but only written to by the owning CPU.
+
+Depending upon the data cache line size, the per-CPU fields of the
+`bakery_lock_t` structure for multiple CPUs may exist on a single cache line.
+These per-CPU fields can be read and written during lock contention by multiple
+CPUs with mismatched memory attributes. Since these fields are a part of the
+lock implementation, they do not have access to any other locking primitive to
+safeguard against the resulting coherency issues. As a result, simple software
+cache maintenance is not enough to allocate them in coherent memory. Consider
+the following example.
+
+CPU0 updates its per-CPU field with data cache enabled. This write updates a
+local cache line which contains a copy of the fields for other CPUs as well. Now
+CPU1 updates its per-CPU field of the `bakery_lock_t` structure with data cache
+disabled. CPU1 then issues a DCIVAC operation to invalidate any stale copies of
+its field in any other cache line in the system. This operation will invalidate
+the update made by CPU0 as well.
+
+To use bakery locks when `USE_COHERENT_MEM` is disabled, the lock data structure
+has been redesigned. The changes utilise the characteristic of Lamport's Bakery
+algorithm mentioned earlier. The per-CPU fields of the new lock structure are
+aligned such that they are allocated on separate cache lines. The per-CPU data
+framework in Trusted Firmware is used to achieve this. This enables software to
+perform software cache maintenance on the lock data structure without running
+into coherency issues associated with mismatched attributes.
+
+The per-CPU data framework enables consolidation of data structures on the
+fewest cache lines possible. This saves memory as compared to the scenario where
+each data structure is separately aligned to the cache line boundary to achieve
+the same effect.
+
+The bakery lock data structure `bakery_info_t` is defined for use when
+`USE_COHERENT_MEM` is disabled as follows:
+
+    typedef struct bakery_info {
+        /*
+         * The lock_data is a bit-field of 2 members:
+         * Bit[0]       : choosing. This field is set when the CPU is
+         *                choosing its bakery number.
+         * Bits[1 - 15] : number. This is the bakery number allocated.
+         */
+         volatile uint16_t lock_data;
+    } bakery_info_t;
+
+The `bakery_info_t` represents a single per-CPU field of one lock and
+the combination of corresponding `bakery_info_t` structures for all CPUs in the
+system represents the complete bakery lock. It is embedded in the per-CPU
+data framework `cpu_data` as shown below:
+
+      CPU0 cpu_data
+    ------------------
+    | ....           |
+    |----------------|
+    | `bakery_info_t`| <-- Lock_0 per-CPU field
+    |    Lock_0      |     for CPU0
+    |----------------|
+    | `bakery_info_t`| <-- Lock_1 per-CPU field
+    |    Lock_1      |     for CPU0
+    |----------------|
+    | ....           |
+    |----------------|
+    | `bakery_info_t`| <-- Lock_N per-CPU field
+    |    Lock_N      |     for CPU0
+    ------------------
+
+
+      CPU1 cpu_data
+    ------------------
+    | ....           |
+    |----------------|
+    | `bakery_info_t`| <-- Lock_0 per-CPU field
+    |    Lock_0      |     for CPU1
+    |----------------|
+    | `bakery_info_t`| <-- Lock_1 per-CPU field
+    |    Lock_1      |     for CPU1
+    |----------------|
+    | ....           |
+    |----------------|
+    | `bakery_info_t`| <-- Lock_N per-CPU field
+    |    Lock_N      |     for CPU1
+    ------------------
+
+Consider a system of 2 CPUs with 'N' bakery locks as shown above.  For an
+operation on Lock_N, the corresponding `bakery_info_t` in both CPU0 and CPU1
+`cpu_data` need to be fetched and appropriate cache operations need to be
+performed for each access.
+
+For multiple bakery locks, an array of `bakery_info_t` is declared in `cpu_data`
+and each lock is given an `id` to identify it in the array.
+
+### Non Functional Impact of removing coherent memory
+
+Removal of the coherent memory region leads to the additional software overhead
+of performing cache maintenance for the affected data structures. However, since
+the memory where the data structures are allocated is cacheable, the overhead is
+mostly mitigated by an increase in performance.
+
+There is however a performance impact for bakery locks, due to:
+*   Additional cache maintenance operations, and
+*   Multiple cache line reads for each lock operation, since the bakery locks
+    for each CPU are distributed across different cache lines.
+
+The implementation has been optimized to mimimize this additional overhead.
+Measurements indicate that when bakery locks are allocated in Normal memory, the
+minimum latency of acquiring a lock is on an average 3-4 micro seconds whereas
+in Device memory the same is 2 micro seconds. The measurements were done on the
+Juno ARM development platform.
+
+As mentioned earlier, almost a page of memory can be saved by disabling
+`USE_COHERENT_MEM`. Each platform needs to consider these trade-offs to decide
+whether coherent memory should be used. If a platform disables
+`USE_COHERENT_MEM` and needs to use bakery locks in the porting layer, it should
+reserve memory in `cpu_data` by defining the macro `PLAT_PCPU_DATA_SIZE` (see
+the [Porting Guide]). Refer to the reference platform code for examples.
+
+
+12.  Code Structure
 -------------------
 
 Trusted Firmware code is logically divided between the three boot loader
@@ -1458,7 +1781,7 @@ FDTs provide a description of the hardware platform and are used by the Linux
 kernel at boot time. These can be found in the `fdts` directory.
 
 
-11.  References
+13.  References
 ---------------
 
 1.  Trusted Board Boot Requirements CLIENT PDD (ARM DEN 0006B-5). Available
@@ -1474,11 +1797,11 @@ kernel at boot time. These can be found in the `fdts` directory.
 
 _Copyright (c) 2013-2014, ARM Limited and Contributors. All rights reserved._
 
-
-[PSCI]:             http://infocenter.arm.com/help/topic/com.arm.doc.den0022b/index.html "Power State Coordination Interface PDD (ARM DEN 0022B.b)"
+[ARM ARM]:          http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0487a.e/index.html "ARMv8-A Reference Manual (ARM DDI0487A.E)"
+[PSCI]:             http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf "Power State Coordination Interface PDD (ARM DEN 0022C)"
 [SMCCC]:            http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html "SMC Calling Convention PDD (ARM DEN 0028A)"
 [UUID]:             https://tools.ietf.org/rfc/rfc4122.txt "A Universally Unique IDentifier (UUID) URN Namespace"
 [User Guide]:       ./user-guide.md
 [Porting Guide]:    ./porting-guide.md
 [INTRG]:            ./interrupt-framework-design.md
-[ERRW]:             ./cpu-errata-workarounds.md
+[CPUBM]:            ./cpu-specific-build-macros.md.md

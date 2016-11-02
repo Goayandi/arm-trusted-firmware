@@ -37,16 +37,18 @@
 #endif
 
  /* Reset fn is needed in BL at reset vector */
-#if IMAGE_BL1 || (IMAGE_BL31 && RESET_TO_BL31)
+#if IMAGE_BL1 || IMAGE_BL31
 	/*
 	 * The reset handler common to all platforms.  After a matching
 	 * cpu_ops structure entry is found, the correponding reset_handler
 	 * in the cpu_ops is invoked.
+	 * Clobbers: x0 - x19, x30
 	 */
 	.globl	reset_handler
 func reset_handler
-	mov	x10, x30
+	mov	x19, x30
 
+	/* The plat_reset_handler can clobber x0 - x18, x30 */
 	bl	plat_reset_handler
 
 	/* Get the matching cpu_ops pointer */
@@ -58,12 +60,15 @@ func reset_handler
 
 	/* Get the cpu_ops reset handler */
 	ldr	x2, [x0, #CPU_RESET_FUNC]
+	mov	x30, x19
 	cbz	x2, 1f
-	blr	x2
-1:
-	ret	x10
 
-#endif /* IMAGE_BL1 || (IMAGE_BL31 && RESET_TO_BL31) */
+	/* The cpu_ops reset handler can clobber x0 - x19, x30 */
+	br	x2
+1:
+	ret
+
+#endif /* IMAGE_BL1 || IMAGE_BL31 */
 
 #if IMAGE_BL31 /* The power down core and cluster is needed only in  BL31 */
 	/*
@@ -119,7 +124,19 @@ func init_cpu_ops
 	cmp	x0, #0
 	ASM_ASSERT(ne)
 #endif
-	str	x0, [x6, #CPU_DATA_CPU_OPS_PTR]
+	str	x0, [x6, #CPU_DATA_CPU_OPS_PTR]!
+
+	/*
+	 * Make sure that any pre-fetched cache copies are invalidated.
+	 * Ensure that we are running with cache disable else we
+	 * invalidate our own update.
+	 */
+#if ASM_ASSERTION
+	mrs	x1, sctlr_el3
+	tst	x1, #SCTLR_C_BIT
+	ASM_ASSERT(eq)
+#endif
+	dc	ivac, x6
 	mov x30, x10
 1:
 	ret
@@ -191,3 +208,29 @@ func get_cpu_ops_ptr
 	sub	x0, x4, #(CPU_OPS_SIZE + CPU_MIDR)
 error_exit:
 	ret
+
+#if DEBUG
+	/*
+	 * This function prints a warning message to the crash console
+	 * if the CPU revision/part number does not match the errata
+	 * workaround enabled in the build.
+	 * Clobber: x30, x0 - x5
+	 */
+.section .rodata.rev_warn_str, "aS"
+rev_warn_str:
+	.asciz "Warning: Skipping Errata workaround for non matching CPU revision number.\n"
+
+	.globl	print_revision_warning
+func print_revision_warning
+	mov	x5, x30
+	/* Ensure the console is initialized */
+	bl	plat_crash_console_init
+	/* Check if the console is initialized */
+	cbz	x0, 1f
+	/* The console is initialized */
+	adr	x4, rev_warn_str
+	bl	asm_print_str
+1:
+	ret	x5
+#endif
+

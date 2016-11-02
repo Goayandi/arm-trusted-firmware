@@ -4,20 +4,21 @@ ARM Trusted Firmware Porting Guide
 Contents
 --------
 
-1.  Introduction
-2.  Common Modifications
-    *   Common mandatory modifications
-    *   Handling reset
-    *   Common optional modifications
-3.  Boot Loader stage specific modifications
-    *   Boot Loader stage 1 (BL1)
-    *   Boot Loader stage 2 (BL2)
-    *   Boot Loader stage 3-1 (BL3-1)
-    *   PSCI implementation (in BL3-1)
-    *   Interrupt Management framework (in BL3-1)
-    *   Crash Reporting mechanism (in BL3-1)
-4.  C Library
-5.  Storage abstraction layer
+1.  [Introduction](#1--introduction)
+2.  [Common Modifications](#2--common-modifications)
+    *   [Common mandatory modifications](#21-common-mandatory-modifications)
+    *   [Handling reset](#22-handling-reset)
+    *   [Common optional modifications](#23-common-optional-modifications)
+3.  [Boot Loader stage specific modifications](#3--modifications-specific-to-a-boot-loader-stage)
+    *   [Boot Loader stage 1 (BL1)](#31-boot-loader-stage-1-bl1)
+    *   [Boot Loader stage 2 (BL2)](#32-boot-loader-stage-2-bl2)
+    *   [Boot Loader stage 3-1 (BL3-1)](#32-boot-loader-stage-3-1-bl3-1)
+    *   [PSCI implementation (in BL3-1)](#33-power-state-coordination-interface-in-bl3-1)
+    *   [Interrupt Management framework (in BL3-1)](#34--interrupt-management-framework-in-bl3-1)
+    *   [Crash Reporting mechanism (in BL3-1)](#35--crash-reporting-mechanism-in-bl3-1)
+4.  [Build flags](#4--build-flags)
+5.  [C Library](#5--c-library)
+6.  [Storage abstraction layer](#6--storage-abstraction-layer)
 
 - - - - - - - - - - - - - - - - - -
 
@@ -62,11 +63,11 @@ mapped page tables, and enable both the instruction and data caches for each BL
 stage. In the ARM FVP port, each BL stage configures the MMU in its platform-
 specific architecture setup function, for example `blX_plat_arch_setup()`.
 
-Each platform must allocate a block of identity mapped secure memory with
-Device-nGnRE attributes aligned to page boundary (4K) for each BL stage. This
-memory is identified by the section name `tzfw_coherent_mem` so that its
-possible for the firmware to place variables in it using the following C code
-directive:
+If the build option `USE_COHERENT_MEM` is enabled, each platform must allocate a
+block of identity mapped secure memory with Device-nGnRE attributes aligned to
+page boundary (4K) for each BL stage. This memory is identified by the section
+name `tzfw_coherent_mem` so that its possible for the firmware to place
+variables in it using the following C code directive:
 
     __attribute__ ((section("tzfw_coherent_mem")))
 
@@ -124,6 +125,36 @@ file is found in [plat/fvp/include/platform_def.h].
 
     Name of the BL3-3 binary image on the host file-system. This name is used by
     BL2 to load BL3-3 into non-secure memory from platform storage.
+
+*   **#define : BL2_CERT_NAME**
+
+    Name of the BL2 content certificate on the host file-system (mandatory when
+    Trusted Board Boot is enabled).
+
+*   **#define : TRUSTED_KEY_CERT_NAME**
+
+    Name of the Trusted Key certificate on the host file-system (mandatory when
+    Trusted Board Boot is enabled).
+
+*   **#define : BL31_KEY_CERT_NAME**
+
+    Name of the BL3-1 Key certificate on the host file-system (mandatory when
+    Trusted Board Boot is enabled).
+
+*   **#define : BL31_CERT_NAME**
+
+    Name of the BL3-1 Content certificate on the host file-system (mandatory
+    when Trusted Board Boot is enabled).
+
+*   **#define : BL33_KEY_CERT_NAME**
+
+    Name of the BL3-3 Key certificate on the host file-system (mandatory when
+    Trusted Board Boot is enabled).
+
+*   **#define : BL33_CERT_NAME**
+
+    Name of the BL3-3 Content certificate on the host file-system (mandatory
+    when Trusted Board Boot is enabled).
 
 *   **#define : PLATFORM_CACHE_LINE_SIZE**
 
@@ -193,6 +224,25 @@ file is found in [plat/fvp/include/platform_def.h].
     Defines the base address in non-secure DRAM where BL2 loads the BL3-3 binary
     image. Must be aligned on a page-size boundary.
 
+If a BL3-0 image is supported by the platform, the following constants must
+also be defined:
+
+*   **#define : BL30_IMAGE_NAME**
+
+    Name of the BL3-0 binary image on the host file-system. This name is used by
+    BL2 to load BL3-0 into secure memory from platform storage before being
+    transfered to the SCP.
+
+*   **#define : BL30_KEY_CERT_NAME**
+
+    Name of the BL3-0 Key certificate on the host file-system (mandatory when
+    Trusted Board Boot is enabled).
+
+*   **#define : BL30_CERT_NAME**
+
+    Name of the BL3-0 Content certificate on the host file-system (mandatory
+    when Trusted Board Boot is enabled).
+
 If a BL3-2 image is supported by the platform, the following constants must
 also be defined:
 
@@ -200,6 +250,16 @@ also be defined:
 
     Name of the BL3-2 binary image on the host file-system. This name is used by
     BL2 to load BL3-2 into secure memory from platform storage.
+
+*   **#define : BL32_KEY_CERT_NAME**
+
+    Name of the BL3-2 Key certificate on the host file-system (mandatory when
+    Trusted Board Boot is enabled).
+
+*   **#define : BL32_CERT_NAME**
+
+    Name of the BL3-2 Content certificate on the host file-system (mandatory
+    when Trusted Board Boot is enabled).
 
 *   **#define : BL32_BASE**
 
@@ -244,6 +304,17 @@ must also be defined:
     Defines the maximum number of open IO handles. Attempting to open more IO
     entities than this value using `io_open()` will fail with
     IO_RESOURCES_EXHAUSTED.
+
+If the platform needs to allocate data within the per-cpu data framework in
+BL3-1, it should define the following macro. Currently this is only required if
+the platform decides not to use the coherent memory section by undefining the
+USE_COHERENT_MEM build flag. In this case, the framework allocates the required
+memory within the the per-cpu data to minimize wastage.
+
+*   **#define : PLAT_PCPU_DATA_SIZE**
+
+    Defines the memory (in bytes) to be reserved within the per-cpu data
+    structure for use by the platform layer.
 
 The following constants are optional. They should be defined when the platform
 memory layout implies some image overlaying like on FVP.
@@ -380,6 +451,17 @@ The ARM FVP port uses this function to initialize the mailbox memory used for
 providing the warm-boot entry-point addresses.
 
 
+### Function: plat_match_rotpk()
+
+    Argument : const unsigned char *, unsigned int
+    Return   : int
+
+This function is mandatory when Trusted Board Boot is enabled. It receives a
+pointer to a buffer containing a signing key and its size as parameters and
+returns 0 (success) if that key matches the ROT (Root Of Trust) key stored in
+the platform. Any other return value means a mismatch.
+
+
 
 2.3 Common optional modifications
 ---------------------------------
@@ -468,10 +550,11 @@ are just an ARM Trusted Firmware convention.
 A platform may need to do additional initialization after reset. This function
 allows the platform to do the platform specific intializations. Platform
 specific errata workarounds could also be implemented here. The api should
-preserve the value in x10 register as it is used by the caller to store the
-return address.
+preserve the values of callee saved registers x19 to x29.
 
-The default implementation doesn't do anything.
+The default implementation doesn't do anything. If a platform needs to override
+the default implementation, refer to the [Firmware Design Guide] for general
+guidelines regarding placement of code in a reset handler.
 
 ### Function : plat_disable_acp()
 
@@ -1082,61 +1165,61 @@ the passed pointer with a pointer to BL3-1's private `plat_pm_ops` structure.
 
 A description of each member of this structure is given below. Please refer to
 the ARM FVP specific implementation of these handlers in [plat/fvp/fvp_pm.c]
-as an example. A platform port may choose not implement some of the power
-management operations.
+as an example. A platform port is expected to implement these handlers if the
+corresponding PSCI operation is to be supported and these handlers are expected
+to succeed if the return type is `void`.
 
 #### plat_pm_ops.affinst_standby()
 
 Perform the platform-specific setup to enter the standby state indicated by the
-passed argument.
+passed argument. The generic code expects the handler to succeed.
 
 #### plat_pm_ops.affinst_on()
 
 Perform the platform specific setup to power on an affinity instance, specified
-by the `MPIDR` (first argument) and `affinity level` (fourth argument). The
-`state` (fifth argument) contains the current state of that affinity instance
+by the `MPIDR` (first argument) and `affinity level` (third argument). The
+`state` (fourth argument) contains the current state of that affinity instance
 (ON or OFF). This is useful to determine whether any action must be taken. For
 example, while powering on a CPU, the cluster that contains this CPU might
 already be in the ON state. The platform decides what actions must be taken to
 transition from the current state to the target state (indicated by the power
-management operation).
+management operation). The generic code expects the platform to return
+E_SUCCESS on success or E_INTERN_FAIL for any failure.
 
 #### plat_pm_ops.affinst_off()
 
-Perform the platform specific setup to power off an affinity instance in the
-`MPIDR` of the calling CPU. It is called by the PSCI `CPU_OFF` API
-implementation.
+Perform the platform specific setup to power off an affinity instance of the
+calling CPU. It is called by the PSCI `CPU_OFF` API implementation.
 
-The `MPIDR` (first argument), `affinity level` (second argument) and `state`
-(third argument) have a similar meaning as described in the `affinst_on()`
-operation. They are used to identify the affinity instance on which the call
-is made and its current state. This gives the platform port an indication of the
+The `affinity level` (first argument) and `state` (second argument) have
+a similar meaning as described in the `affinst_on()` operation. They are
+used to identify the affinity instance on which the call is made and its
+current state. This gives the platform port an indication of the
 state transition it must make to perform the requested action. For example, if
 the calling CPU is the last powered on CPU in the cluster, after powering down
 affinity level 0 (CPU), the platform port should power down affinity level 1
-(the cluster) as well.
+(the cluster) as well. The generic code expects the handler to succeed.
 
 #### plat_pm_ops.affinst_suspend()
 
-Perform the platform specific setup to power off an affinity instance in the
-`MPIDR` of the calling CPU. It is called by the PSCI `CPU_SUSPEND` API
+Perform the platform specific setup to power off an affinity instance of the
+calling CPU. It is called by the PSCI `CPU_SUSPEND` API
 implementation.
 
-The `MPIDR` (first argument), `affinity level` (third argument) and `state`
-(fifth argument) have a similar meaning as described in the `affinst_on()`
-operation. They are used to identify the affinity instance on which the call
-is made and its current state. This gives the platform port an indication of the
-state transition it must make to perform the requested action. For example, if
-the calling CPU is the last powered on CPU in the cluster, after powering down
-affinity level 0 (CPU), the platform port should power down affinity level 1
-(the cluster) as well.
+The `affinity level` (second argument) and `state` (third argument) have a
+similar meaning as described in the `affinst_on()` operation. They are used to
+identify the affinity instance on which the call is made and its current state.
+This gives the platform port an indication of the state transition it must
+make to perform the requested action. For example, if the calling CPU is the
+last powered on CPU in the cluster, after powering down affinity level 0 (CPU),
+the platform port should power down affinity level 1 (the cluster) as well.
 
 The difference between turning an affinity instance off versus suspending it
 is that in the former case, the affinity instance is expected to re-initialize
 its state when its next powered on (see `affinst_on_finish()`). In the latter
 case, the affinity instance is expected to save enough state so that it can
 resume execution by restoring this state when its powered on (see
-`affinst_suspend_finish()`).
+`affinst_suspend_finish()`).The generic code expects the handler to succeed.
 
 #### plat_pm_ops.affinst_on_finish()
 
@@ -1146,8 +1229,9 @@ It performs the platform-specific setup required to initialize enough state for
 this CPU to enter the normal world and also provide secure runtime firmware
 services.
 
-The `MPIDR` (first argument), `affinity level` (second argument) and `state`
-(third argument) have a similar meaning as described in the previous operations.
+The `affinity level` (first argument) and `state` (second argument) have a
+similar meaning as described in the previous operations. The generic code
+expects the handler to succeed.
 
 #### plat_pm_ops.affinst_on_suspend()
 
@@ -1158,8 +1242,25 @@ event, for example a timer interrupt that was programmed by the CPU during the
 restore the saved state for this CPU to resume execution in the normal world
 and also provide secure runtime firmware services.
 
-The `MPIDR` (first argument), `affinity level` (second argument) and `state`
-(third argument) have a similar meaning as described in the previous operations.
+The `affinity level` (first argument) and `state` (second argument) have a
+similar meaning as described in the previous operations. The generic code
+expects the platform to succeed.
+
+#### plat_pm_ops.validate_power_state()
+
+This function is called by the PSCI implementation during the `CPU_SUSPEND`
+call to validate the `power_state` parameter of the PSCI API. If the
+`power_state` is known to be invalid, the platform must return
+PSCI_E_INVALID_PARAMS as error, which is propagated back to the normal
+world PSCI client.
+
+#### plat_pm_ops.validate_ns_entrypoint()
+
+This function is called by the PSCI implementation during the `CPU_SUSPEND`
+and `CPU_ON` calls to validate the non-secure `entry_point` parameter passed
+by the normal world. If the `entry_point` is known to be invalid, the platform
+must return PSCI_E_INVALID_PARAMS as error, which is propagated back to the
+normal world PSCI client.
 
 BL3-1 platform initialization code must also detect the system topology and
 the state of each affinity instance in the topology. This information is
@@ -1332,7 +1433,26 @@ register x0.
 The FVP port designates the `PL011_UART0` as the crash console and calls the
 console_core_putc() to print the character on the console.
 
-4.  C Library
+4.  Build flags
+---------------
+
+There are some build flags which can be defined by the platform to control
+inclusion or exclusion of certain BL stages from the FIP image. These flags
+need to be defined in the platform makefile which will get included by the
+build system.
+
+*   **NEED_BL30**
+    This flag if defined by the platform mandates that a BL3-0 binary should
+    be included in the FIP image. The path to the BL3-0 binary can be specified
+    by the `BL30` build option (see build options in the [User Guide]).
+
+*   **NEED_BL33**
+    By default, this flag is defined `yes` by the build system and `BL33`
+    build option should be supplied as a build option. The platform has the option
+    of excluding the BL3-3 image in the `fip` image by defining this flag to
+    `no`.
+
+5.  C Library
 -------------
 
 To avoid subtle toolchain behavioral dependencies, the header files provided
@@ -1369,7 +1489,7 @@ A copy of the [FreeBSD] sources can be downloaded with `git`.
     git clone git://github.com/freebsd/freebsd.git -b origin/release/9.2.0
 
 
-5.  Storage abstraction layer
+6.  Storage abstraction layer
 -----------------------------
 
 In order to improve platform independence and portability an storage abstraction
@@ -1384,9 +1504,10 @@ function uses the storage layer to access non-volatile platform storage.
 It is mandatory to implement at least one storage driver. For the FVP the
 Firmware Image Package(FIP) driver is provided as the default means to load data
 from storage (see the "Firmware Image Package" section in the [User Guide]).
-The storage layer is described in the header file `include/io_storage.h`.  The
-implementation of the common library is in `lib/io_storage.c` and the driver
-files are located in `drivers/io/`.
+The storage layer is described in the header file
+`include/drivers/io/io_storage.h`.  The implementation of the common library
+is in `drivers/io/io_storage.c` and the driver files are located in
+`drivers/io/`.
 
 Each IO driver must provide `io_dev_*` structures, as described in
 `drivers/io/io_driver.h`.  These are returned via a mandatory registration
@@ -1427,6 +1548,7 @@ _Copyright (c) 2013-2014, ARM Limited and Contributors. All rights reserved._
 [IMF Design Guide]:                   interrupt-framework-design.md
 [User Guide]:                         user-guide.md
 [FreeBSD]:                            http://www.freebsd.org
+[Firmware Design Guide]:              firmware-design.md
 
 [plat/common/aarch64/platform_mp_stack.S]: ../plat/common/aarch64/platform_mp_stack.S
 [plat/common/aarch64/platform_up_stack.S]: ../plat/common/aarch64/platform_up_stack.S

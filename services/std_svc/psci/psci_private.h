@@ -33,15 +33,44 @@
 
 #include <arch.h>
 #include <bakery_lock.h>
-#include <platform_def.h>	/* for PLATFORM_NUM_AFFS */
+#include <bl_common.h>
 #include <psci.h>
 
-/* Number of affinity instances whose state this psci imp. can track */
-#ifdef PLATFORM_NUM_AFFS
-#define PSCI_NUM_AFFS		PLATFORM_NUM_AFFS
+/*
+ * The following helper macros abstract the interface to the Bakery
+ * Lock API.
+ */
+#if USE_COHERENT_MEM
+#define psci_lock_init(aff_map, idx)	bakery_lock_init(&(aff_map)[(idx)].lock)
+#define psci_lock_get(node)		bakery_lock_get(&((node)->lock))
+#define psci_lock_release(node)		bakery_lock_release(&((node)->lock))
 #else
-#define PSCI_NUM_AFFS		(2 * PLATFORM_CORE_COUNT)
+#define psci_lock_init(aff_map, idx)	((aff_map)[(idx)].aff_map_index = (idx))
+#define psci_lock_get(node)		bakery_lock_get((node)->aff_map_index,	  \
+						CPU_DATA_PSCI_LOCK_OFFSET)
+#define psci_lock_release(node)		bakery_lock_release((node)->aff_map_index,\
+						CPU_DATA_PSCI_LOCK_OFFSET)
 #endif
+
+/*
+ * The PSCI capability which are provided by the generic code but does not
+ * depend on the platform or spd capabilities.
+ */
+#define PSCI_GENERIC_CAP	\
+			(define_psci_cap(PSCI_VERSION) |		\
+			define_psci_cap(PSCI_AFFINITY_INFO_AARCH64) |	\
+			define_psci_cap(PSCI_FEATURES))
+
+/*
+ * The PSCI capabilities mask for 64 bit functions.
+ */
+#define PSCI_CAP_64BIT_MASK	\
+			(define_psci_cap(PSCI_CPU_SUSPEND_AARCH64) |	\
+			define_psci_cap(PSCI_CPU_ON_AARCH64) |		\
+			define_psci_cap(PSCI_AFFINITY_INFO_AARCH64) |	\
+			define_psci_cap(PSCI_MIG_AARCH64) |		\
+			define_psci_cap(PSCI_MIG_INFO_UP_CPU_AARCH64))
+
 
 /*******************************************************************************
  * The following two data structures hold the topology tree which in turn tracks
@@ -49,10 +78,15 @@
  ******************************************************************************/
 typedef struct aff_map_node {
 	unsigned long mpidr;
-	unsigned short ref_count;
+	unsigned char ref_count;
 	unsigned char state;
 	unsigned char level;
+#if USE_COHERENT_MEM
 	bakery_lock_t lock;
+#else
+	/* For indexing the bakery_info array in per CPU data */
+	unsigned char aff_map_index;
+#endif
 } aff_map_node_t;
 
 typedef struct aff_limits_node {
@@ -60,14 +94,15 @@ typedef struct aff_limits_node {
 	int max;
 } aff_limits_node_t;
 
-typedef aff_map_node_t (*mpidr_aff_map_nodes_t[MPIDR_MAX_AFFLVL]);
-typedef unsigned int (*afflvl_power_on_finisher_t)(aff_map_node_t *);
+typedef aff_map_node_t (*mpidr_aff_map_nodes_t[MPIDR_MAX_AFFLVL + 1]);
+typedef void (*afflvl_power_on_finisher_t)(aff_map_node_t *);
 
 /*******************************************************************************
  * Data prototypes
  ******************************************************************************/
 extern const plat_pm_ops_t *psci_plat_pm_ops;
 extern aff_map_node_t psci_aff_map[PSCI_NUM_AFFS];
+extern uint32_t psci_caps;
 
 /*******************************************************************************
  * SPD's power management hooks registered with PSCI
@@ -88,9 +123,8 @@ int get_power_on_target_afflvl(void);
 void psci_afflvl_power_on_finish(int,
 				int,
 				afflvl_power_on_finisher_t *);
-int psci_save_ns_entry(uint64_t mpidr,
-		       uint64_t entrypoint, uint64_t context_id,
-		       uint32_t caller_scr_el3, uint32_t caller_sctlr_el1);
+int psci_get_ns_ep_info(entry_point_info_t *ep,
+		       uint64_t entrypoint, uint64_t context_id);
 int psci_check_afflvl_range(int start_afflvl, int end_afflvl);
 void psci_do_afflvl_state_mgmt(uint32_t start_afflvl,
 			       uint32_t end_afflvl,
@@ -107,6 +141,7 @@ void psci_set_max_phys_off_afflvl(uint32_t afflvl);
 uint32_t psci_find_max_phys_off_afflvl(uint32_t start_afflvl,
 				       uint32_t end_afflvl,
 				       aff_map_node_t *mpidr_nodes[]);
+int psci_spd_migrate_info(uint64_t *mpidr);
 
 /* Private exported functions from psci_setup.c */
 int psci_get_aff_map_nodes(unsigned long mpidr,
@@ -116,21 +151,19 @@ int psci_get_aff_map_nodes(unsigned long mpidr,
 aff_map_node_t *psci_get_aff_map_node(unsigned long, int);
 
 /* Private exported functions from psci_affinity_on.c */
-int psci_afflvl_on(unsigned long,
-			unsigned long,
-			unsigned long,
-			int,
-			int);
+int psci_afflvl_on(unsigned long target_cpu,
+		   entry_point_info_t *ep,
+		   int start_afflvl,
+		   int end_afflvl);
 
 /* Private exported functions from psci_affinity_off.c */
 int psci_afflvl_off(int, int);
 
 /* Private exported functions from psci_affinity_suspend.c */
-int psci_afflvl_suspend(unsigned long,
-			unsigned long,
-			unsigned int,
-			int,
-			int);
+void psci_afflvl_suspend(entry_point_info_t *ep,
+			int start_afflvl,
+			int end_afflvl);
+
 unsigned int psci_afflvl_suspend_finish(int, int);
 void psci_set_suspend_power_state(unsigned int power_state);
 

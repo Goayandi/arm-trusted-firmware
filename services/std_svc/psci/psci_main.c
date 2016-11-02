@@ -32,6 +32,7 @@
 #include <arch_helpers.h>
 #include <assert.h>
 #include <runtime_svc.h>
+#include <std_svc.h>
 #include <debug.h>
 #include "psci_private.h"
 #if defined(MACH_TYPE_MT6797)
@@ -49,12 +50,32 @@ int psci_cpu_on(unsigned long target_cpu,
 {
 	int rc;
 	unsigned int start_afflvl, end_afflvl;
+	entry_point_info_t ep;
 
 	/* Determine if the cpu exists of not */
 	rc = psci_validate_mpidr(target_cpu, MPIDR_AFFLVL0);
 	if (rc != PSCI_E_SUCCESS) {
-		goto exit;
+		return PSCI_E_INVALID_PARAMS;
 	}
+
+	/* Validate the entrypoint using platform pm_ops */
+	if (psci_plat_pm_ops->validate_ns_entrypoint) {
+		rc = psci_plat_pm_ops->validate_ns_entrypoint(entrypoint);
+		if (rc != PSCI_E_SUCCESS) {
+			assert(rc == PSCI_E_INVALID_PARAMS);
+			return PSCI_E_INVALID_PARAMS;
+		}
+	}
+
+	/*
+	 * Verify and derive the re-entry information for
+	 * the non-secure world from the non-secure state from
+	 * where this call originated.
+	 */
+	rc = psci_get_ns_ep_info(&ep, entrypoint, context_id);
+	if (rc != PSCI_E_SUCCESS)
+		return rc;
+
 
 	/*
 	 * To turn this cpu on, specify which affinity
@@ -63,12 +84,10 @@ int psci_cpu_on(unsigned long target_cpu,
 	start_afflvl = MPIDR_AFFLVL0;
 	end_afflvl = get_max_afflvl();
 	rc = psci_afflvl_on(target_cpu,
-			    entrypoint,
-			    context_id,
+			    &ep,
 			    start_afflvl,
 			    end_afflvl);
 
-exit:
 	return rc;
 }
 
@@ -83,6 +102,7 @@ int psci_cpu_suspend(unsigned int power_state,
 {
 	int rc;
 	unsigned int target_afflvl, pstate_type;
+	entry_point_info_t ep;
 
 	/* Check SBZ bits in power state are zero */
 	if (psci_validate_power_state(power_state))
@@ -90,8 +110,26 @@ int psci_cpu_suspend(unsigned int power_state,
 
 	/* Sanity check the requested state */
 	target_afflvl = psci_get_pstate_afflvl(power_state);
-	if (target_afflvl > MPIDR_MAX_AFFLVL)
+	if (target_afflvl > get_max_afflvl())
 		return PSCI_E_INVALID_PARAMS;
+
+	/* Validate the power_state using platform pm_ops */
+	if (psci_plat_pm_ops->validate_power_state) {
+		rc = psci_plat_pm_ops->validate_power_state(power_state);
+		if (rc != PSCI_E_SUCCESS) {
+			assert(rc == PSCI_E_INVALID_PARAMS);
+			return PSCI_E_INVALID_PARAMS;
+		}
+	}
+
+	/* Validate the entrypoint using platform pm_ops */
+	if (psci_plat_pm_ops->validate_ns_entrypoint) {
+		rc = psci_plat_pm_ops->validate_ns_entrypoint(entrypoint);
+		if (rc != PSCI_E_SUCCESS) {
+			assert(rc == PSCI_E_INVALID_PARAMS);
+			return PSCI_E_INVALID_PARAMS;
+		}
+	}
 
 	/* Determine the 'state type' in the 'power_state' parameter */
 	pstate_type = psci_get_pstate_type(power_state);
@@ -104,25 +142,33 @@ int psci_cpu_suspend(unsigned int power_state,
 		if  (!psci_plat_pm_ops->affinst_standby)
 			return PSCI_E_INVALID_PARAMS;
 
-		rc = psci_plat_pm_ops->affinst_standby(power_state);
-		assert(rc == PSCI_E_INVALID_PARAMS || rc == PSCI_E_SUCCESS);
-		return rc;
+		psci_plat_pm_ops->affinst_standby(power_state);
+		return PSCI_E_SUCCESS;
 	}
 
 	/*
-	 * Do what is needed to enter the power down state. Upon success,
-	 * enter the final wfi which will power down this cpu else return
-	 * an error.
+	 * Verify and derive the re-entry information for
+	 * the non-secure world from the non-secure state from
+	 * where this call originated.
 	 */
-	rc = psci_afflvl_suspend(entrypoint,
-				 context_id,
-				 power_state,
-				 MPIDR_AFFLVL0,
-				 target_afflvl);
-	if (rc == PSCI_E_SUCCESS)
-		psci_power_down_wfi();
-	assert(rc == PSCI_E_INVALID_PARAMS);
-	return rc;
+	rc = psci_get_ns_ep_info(&ep, entrypoint, context_id);
+	if (rc != PSCI_E_SUCCESS)
+		return rc;
+
+	/* Save PSCI power state parameter for the core in suspend context */
+	psci_set_suspend_power_state(power_state);
+
+	/*
+	 * Do what is needed to enter the power down state. Upon success,
+	 * enter the final wfi which will power down this CPU.
+	 */
+	psci_afflvl_suspend(&ep,
+			    MPIDR_AFFLVL0,
+			    target_afflvl);
+
+	/* Reset PSCI power state parameter for the core. */
+	psci_set_suspend_power_state(PSCI_INVALID_DATA);
+	return PSCI_E_SUCCESS;
 }
 
 int psci_cpu_off(void)
@@ -137,14 +183,6 @@ int psci_cpu_off(void)
 	 * ..target_afflvl specific actions as this function unwinds back.
 	 */
 	rc = psci_afflvl_off(MPIDR_AFFLVL0, target_afflvl);
-
-	/*
-	 * Check if all actions needed to safely power down this cpu have
-	 * successfully completed. Enter a wfi loop which will allow the
-	 * power controller to physically power down this cpu.
-	 */
-	if (rc == PSCI_E_SUCCESS)
-		psci_power_down_wfi();
 
 	/*
 	 * The only error cpu_off can return is E_DENIED. So check if that's
@@ -203,24 +241,89 @@ int psci_affinity_info(unsigned long target_affinity,
 	return rc;
 }
 
-/* Unimplemented */
-int psci_migrate(unsigned int target_cpu)
+int psci_migrate(unsigned long target_cpu)
 {
-	return PSCI_E_NOT_SUPPORTED;
-}
+	int rc;
+	unsigned long resident_cpu_mpidr;
 
-/* Unimplemented */
-unsigned int psci_migrate_info_type(void)
-{
-	return PSCI_TOS_NOT_PRESENT_MP;
-}
+	rc = psci_spd_migrate_info(&resident_cpu_mpidr);
+	if (rc != PSCI_TOS_UP_MIG_CAP)
+		return (rc == PSCI_TOS_NOT_UP_MIG_CAP) ?
+			  PSCI_E_DENIED : PSCI_E_NOT_SUPPORTED;
 
-unsigned long psci_migrate_info_up_cpu(void)
-{
 	/*
-	 * Return value of this currently unsupported call depends upon
-	 * what psci_migrate_info_type() returns.
+	 * Migrate should only be invoked on the CPU where
+	 * the Secure OS is resident.
 	 */
+	if (resident_cpu_mpidr != read_mpidr_el1())
+		return PSCI_E_NOT_PRESENT;
+
+	/* Check the validity of the specified target cpu */
+	rc = psci_validate_mpidr(target_cpu, MPIDR_AFFLVL0);
+	if (rc != PSCI_E_SUCCESS)
+		return PSCI_E_INVALID_PARAMS;
+
+	assert(psci_spd_pm && psci_spd_pm->svc_migrate);
+
+	rc = psci_spd_pm->svc_migrate(read_mpidr_el1(), target_cpu);
+	assert(rc == PSCI_E_SUCCESS || rc == PSCI_E_INTERN_FAIL);
+
+	return rc;
+}
+
+int psci_migrate_info_type(void)
+{
+	unsigned long resident_cpu_mpidr;
+
+	return psci_spd_migrate_info(&resident_cpu_mpidr);
+}
+
+long psci_migrate_info_up_cpu(void)
+{
+	unsigned long resident_cpu_mpidr;
+	int rc;
+
+	/*
+	 * Return value of this depends upon what
+	 * psci_spd_migrate_info() returns.
+	 */
+	rc = psci_spd_migrate_info(&resident_cpu_mpidr);
+	if (rc != PSCI_TOS_NOT_UP_MIG_CAP && rc != PSCI_TOS_UP_MIG_CAP)
+		return PSCI_E_INVALID_PARAMS;
+
+	return resident_cpu_mpidr;
+}
+
+int psci_features(unsigned int psci_fid)
+{
+	uint32_t local_caps = psci_caps;
+
+	/* Check if it is a 64 bit function */
+	if (((psci_fid >> FUNCID_CC_SHIFT) & FUNCID_CC_MASK) == SMC_64)
+		local_caps &= PSCI_CAP_64BIT_MASK;
+
+	/* Check for invalid fid */
+	if (!(is_std_svc_call(psci_fid) && is_valid_fast_smc(psci_fid)
+			&& is_psci_fid(psci_fid)))
+		return PSCI_E_NOT_SUPPORTED;
+
+
+	/* Check if the psci fid is supported or not */
+	if (!(local_caps & define_psci_cap(psci_fid)))
+		return PSCI_E_NOT_SUPPORTED;
+
+	/* Format the feature flags */
+	if (psci_fid == PSCI_CPU_SUSPEND_AARCH32 ||
+			psci_fid == PSCI_CPU_SUSPEND_AARCH64) {
+		/*
+		 * The trusted firmware uses the original power state format
+		 * and does not support OS Initiated Mode.
+		 */
+		return (FF_PSTATE_ORIG << FF_PSTATE_SHIFT) |
+			((!FF_SUPPORTS_OS_INIT_MODE) << FF_MODE_SUPPORT_SHIFT);
+	}
+
+	/* Return 0 for all other fid's */
 	return PSCI_E_SUCCESS;
 }
 
@@ -237,6 +340,10 @@ uint64_t psci_smc_handler(uint32_t smc_fid,
 			  uint64_t flags)
 {
 	if (is_caller_secure(flags))
+		SMC_RET1(handle, SMC_UNK);
+
+	/* Check the fid against the capabilities */
+	if (!(psci_caps & define_psci_cap(smc_fid)))
 		SMC_RET1(handle, SMC_UNK);
 
 	if (((smc_fid >> FUNCID_CC_SHIFT) & FUNCID_CC_MASK) == SMC_32) {
@@ -278,6 +385,9 @@ uint64_t psci_smc_handler(uint32_t smc_fid,
 		case PSCI_SYSTEM_RESET:
 			psci_system_reset();
 			/* We should never return from psci_system_reset() */
+
+		case PSCI_FEATURES:
+			SMC_RET1(handle, psci_features(x1));
 
 		default:
 			break;

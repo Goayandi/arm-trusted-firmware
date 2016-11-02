@@ -49,9 +49,17 @@
 #if DEBUG_XLAT_TABLE
 #define PLATFORM_STACK_SIZE 0x800
 #elif IMAGE_BL1
+#if TRUSTED_BOARD_BOOT
+#define PLATFORM_STACK_SIZE 0x1000
+#else
 #define PLATFORM_STACK_SIZE 0x440
+#endif
 #elif IMAGE_BL2
+#if TRUSTED_BOARD_BOOT
+#define PLATFORM_STACK_SIZE 0x1000
+#else
 #define PLATFORM_STACK_SIZE 0x400
+#endif
 #elif IMAGE_BL31
 #define PLATFORM_STACK_SIZE 0x400
 #elif IMAGE_BL32
@@ -71,6 +79,22 @@
 
 /* Non-Trusted Firmware BL33 */
 #define BL33_IMAGE_NAME			"bl33.bin" /* e.g. UEFI */
+
+#if TRUSTED_BOARD_BOOT
+/* Certificates */
+# define BL2_CERT_NAME			"bl2.crt"
+# define TRUSTED_KEY_CERT_NAME		"trusted_key.crt"
+
+# define BL30_KEY_CERT_NAME		"bl30_key.crt"
+# define BL31_KEY_CERT_NAME		"bl31_key.crt"
+# define BL32_KEY_CERT_NAME		"bl32_key.crt"
+# define BL33_KEY_CERT_NAME		"bl33_key.crt"
+
+# define BL30_CERT_NAME			"bl30.crt"
+# define BL31_CERT_NAME			"bl31.crt"
+# define BL32_CERT_NAME			"bl32.crt"
+# define BL33_CERT_NAME			"bl33.crt"
+#endif /* TRUSTED_BOARD_BOOT */
 
 #define PLATFORM_CACHE_LINE_SIZE	64
 #define PLATFORM_CLUSTER_COUNT		2ull
@@ -93,12 +117,18 @@
 #define BL1_RO_LIMIT			(FVP_TRUSTED_ROM_BASE \
 					+ FVP_TRUSTED_ROM_SIZE)
 /*
- * Put BL1 RW at the top of the Trusted SRAM (just below the shared memory, if
- * present). BL1_RW_BASE is calculated using the current BL1 RW debug size plus
- * a little space for growth.
+ * Put BL1 RW at the top of the Trusted SRAM. BL1_RW_BASE is calculated using
+ * the current BL1 RW debug size plus a little space for growth.
  */
-#define BL1_RW_BASE			(FVP_TRUSTED_SRAM_LIMIT - 0x6000)
-#define BL1_RW_LIMIT			FVP_TRUSTED_SRAM_LIMIT
+#if TRUSTED_BOARD_BOOT
+#define BL1_RW_BASE			(FVP_TRUSTED_SRAM_BASE \
+					+ FVP_TRUSTED_SRAM_SIZE - 0x8000)
+#else
+#define BL1_RW_BASE			(FVP_TRUSTED_SRAM_BASE \
+					+ FVP_TRUSTED_SRAM_SIZE - 0x6000)
+#endif
+#define BL1_RW_LIMIT			(FVP_TRUSTED_SRAM_BASE \
+					+ FVP_TRUSTED_SRAM_SIZE)
 
 /*******************************************************************************
  * BL2 specific defines.
@@ -107,39 +137,49 @@
  * Put BL2 just below BL3-1. BL2_BASE is calculated using the current BL2 debug
  * size plus a little space for growth.
  */
+#if TRUSTED_BOARD_BOOT
+#define BL2_BASE			(BL31_BASE - 0x1C000)
+#else
 #define BL2_BASE			(BL31_BASE - 0xC000)
+#endif
 #define BL2_LIMIT			BL31_BASE
 
 /*******************************************************************************
  * BL31 specific defines.
  ******************************************************************************/
 /*
- * Put BL3-1 at the top of the Trusted SRAM (just below the shared memory, if
- * present). BL31_BASE is calculated using the current BL3-1 debug size plus a
- * little space for growth.
+ * Put BL3-1 at the top of the Trusted SRAM. BL31_BASE is calculated using the
+ * current BL3-1 debug size plus a little space for growth.
  */
-#define BL31_BASE			(FVP_TRUSTED_SRAM_LIMIT - 0x1D000)
+#define BL31_BASE			(FVP_TRUSTED_SRAM_BASE \
+					+ FVP_TRUSTED_SRAM_SIZE - 0x1D000)
 #define BL31_PROGBITS_LIMIT		BL1_RW_BASE
-#define BL31_LIMIT			FVP_TRUSTED_SRAM_LIMIT
+#define BL31_LIMIT			(FVP_TRUSTED_SRAM_BASE \
+					+ FVP_TRUSTED_SRAM_SIZE)
 
 /*******************************************************************************
  * BL32 specific defines.
  ******************************************************************************/
 /*
- * On FVP, the TSP can execute either from Trusted SRAM or Trusted DRAM.
+ * On FVP, the TSP can execute from Trusted SRAM, Trusted DRAM or the DRAM
+ * region secured by the TrustZone controller.
  */
-#if FVP_TSP_RAM_LOCATION_ID == FVP_IN_TRUSTED_SRAM
+#if FVP_TSP_RAM_LOCATION_ID == FVP_TRUSTED_SRAM_ID
 # define TSP_SEC_MEM_BASE		FVP_TRUSTED_SRAM_BASE
 # define TSP_SEC_MEM_SIZE		FVP_TRUSTED_SRAM_SIZE
 # define TSP_PROGBITS_LIMIT		BL2_BASE
 # define BL32_BASE			FVP_TRUSTED_SRAM_BASE
 # define BL32_LIMIT			BL31_BASE
-#elif FVP_TSP_RAM_LOCATION_ID == FVP_IN_TRUSTED_DRAM
+#elif FVP_TSP_RAM_LOCATION_ID == FVP_TRUSTED_DRAM_ID
 # define TSP_SEC_MEM_BASE		FVP_TRUSTED_DRAM_BASE
 # define TSP_SEC_MEM_SIZE		FVP_TRUSTED_DRAM_SIZE
-# define BL32_BASE			(FVP_TRUSTED_DRAM_BASE \
-					+ FVP_SHARED_RAM_SIZE)
+# define BL32_BASE			FVP_TRUSTED_DRAM_BASE
 # define BL32_LIMIT			(FVP_TRUSTED_DRAM_BASE + (1 << 21))
+#elif FVP_TSP_RAM_LOCATION_ID == FVP_DRAM_ID
+# define TSP_SEC_MEM_BASE		DRAM1_SEC_BASE
+# define TSP_SEC_MEM_SIZE		DRAM1_SEC_SIZE
+# define BL32_BASE			DRAM1_SEC_BASE
+# define BL32_LIMIT			(DRAM1_SEC_BASE + DRAM1_SEC_SIZE)
 #else
 # error "Unsupported FVP_TSP_RAM_LOCATION_ID value"
 #endif
@@ -153,7 +193,21 @@
  * Platform specific page table and MMU setup constants
  ******************************************************************************/
 #define ADDR_SPACE_SIZE			(1ull << 32)
-#define MAX_XLAT_TABLES			2
+
+#if IMAGE_BL1
+# define MAX_XLAT_TABLES		2
+#elif IMAGE_BL2
+# define MAX_XLAT_TABLES		3
+#elif IMAGE_BL31
+# define MAX_XLAT_TABLES		2
+#elif IMAGE_BL32
+# if FVP_TSP_RAM_LOCATION_ID == FVP_DRAM_ID
+#  define MAX_XLAT_TABLES		3
+# else
+#  define MAX_XLAT_TABLES		2
+# endif
+#endif
+
 #define MAX_MMAP_REGIONS		16
 
 /*******************************************************************************
@@ -168,5 +222,12 @@
 #define CACHE_WRITEBACK_SHIFT   6
 #define CACHE_WRITEBACK_GRANULE (1 << CACHE_WRITEBACK_SHIFT)
 
+#if !USE_COHERENT_MEM
+/*******************************************************************************
+ * Size of the per-cpu data in bytes that should be reserved in the generic
+ * per-cpu data structure for the FVP port.
+ ******************************************************************************/
+#define PLAT_PCPU_DATA_SIZE	2
+#endif
 
 #endif /* __PLATFORM_DEF_H__ */
