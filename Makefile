@@ -182,13 +182,13 @@ include plat/${PLAT}/platform.mk
 include lib/cpus/cpu-errata.mk
 
 ifdef BL1_SOURCES
-NEED_BL1 := no
-#include bl1/bl1.mk
+NEED_BL1 := yes
+include bl1/bl1.mk
 endif
 
 ifdef BL2_SOURCES
-NEED_BL2 := no
-#include bl2/bl2.mk
+NEED_BL2 := yes
+include bl2/bl2.mk
 endif
 
 ifdef BL31_SOURCES

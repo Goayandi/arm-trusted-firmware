@@ -84,22 +84,6 @@ PLAT_BL_COMMON_SOURCES	:=	drivers/io/io_fip.c				\
 				plat/common/cache/plat_cache.c			\
 				plat/common/cache/plat_cache_ops.S
 
-BL1_SOURCES		+=	drivers/arm/cci400/cci400.c			\
-				lib/cpus/aarch64/aem_generic.S			\
-				lib/cpus/aarch64/cortex_a53.S			\
-				lib/cpus/aarch64/cortex_a57.S			\
-				lib/cpus/aarch64/cortex_a72.S			\
-				plat/common/aarch64/platform_up_stack.S		\
-				plat/${PLAT}/bl1_plat_setup.c			\
-				plat/${PLAT}/aarch64/plat_common.c			\
-				plat/${PLAT}/aarch64/plat_helpers.S
-
-BL2_SOURCES		+=	drivers/arm/tzc400/tzc400.c			\
-				plat/common/aarch64/platform_up_stack.S		\
-				plat/${PLAT}/bl2_plat_setup.c			\
-				plat/${PLAT}/plat_security.c				\
-				plat/${PLAT}/aarch64/plat_common.c
-
 BL31_SOURCES		+=	drivers/arm/cci400/cci400.c			\
 				drivers/arm/gic/arm_gic.c			\
 				drivers/arm/gic/gic_v2.c			\

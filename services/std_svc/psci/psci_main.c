@@ -39,8 +39,6 @@
 #include "../../../../plat/mt6797/power.h"
 #endif
 
-extern void dormant_log(int tag);
-
 /*******************************************************************************
  * PSCI frontend api for servicing SMCs. Described in the PSCI spec.
  ******************************************************************************/
@@ -121,11 +119,8 @@ int psci_cpu_suspend(unsigned int power_state,
 				 power_state,
 				 MPIDR_AFFLVL0,
 				 target_afflvl);
-	if (rc == PSCI_E_SUCCESS) {
-		dormant_log(0xA7F00301);
+	if (rc == PSCI_E_SUCCESS)
 		psci_power_down_wfi();
-	}
-	dormant_log(0xA7F00302);
 	assert(rc == PSCI_E_INVALID_PARAMS);
 	return rc;
 }
@@ -148,10 +143,8 @@ int psci_cpu_off(void)
 	 * successfully completed. Enter a wfi loop which will allow the
 	 * power controller to physically power down this cpu.
 	 */
-	if (rc == PSCI_E_SUCCESS) {
-		printf("%s: call psci_power_down_wfi()\n", __FUNCTION__);
+	if (rc == PSCI_E_SUCCESS)
 		psci_power_down_wfi();
-	}
 
 	/*
 	 * The only error cpu_off can return is E_DENIED. So check if that's
