@@ -105,5 +105,39 @@
 	.space ((\_count) * (\_size)), 0
 	.endm
 
+	/* ---------------------------------------------
+	 * Find the type of reset and jump to handler
+	 * if present. If the handler is null then it is
+	 * a cold boot. The primary cpu will set up the
+	 * platform while the secondaries wait for
+	 * their turn to be woken up
+	 * ---------------------------------------------
+	 */
+	.macro wait_for_entrypoint
+wait_for_entrypoint:
+	mrs	x0, mpidr_el1
+	bl	platform_get_entrypoint
+	cbnz	x0, do_warm_boot
+	mrs	x0, mpidr_el1
+	bl	platform_is_primary_cpu
+	cbnz	x0, do_cold_boot
+
+	/* ---------------------------------------------
+	 * Perform any platform specific secondary cpu
+	 * actions
+	 * ---------------------------------------------
+	 */
+	bl	plat_secondary_cold_boot_setup
+	b	wait_for_entrypoint
+
+	do_warm_boot:
+	/* ---------------------------------------------
+	 * Jump to BL31 for all warm boot init.
+	 * ---------------------------------------------
+	 */
+	blr	x0
+
+	do_cold_boot:
+	.endm
 
 #endif /* __ASM_MACROS_COMMON_S__ */

@@ -39,6 +39,8 @@
 #include <runtime_svc.h>
 #include <string.h>
 
+#include <plat_private.h>
+
 /*******************************************************************************
  * This function pointer is used to initialise the BL32 image. It's initialized
  * by SPD calling bl31_register_bl32_init after setting up all things necessary
@@ -76,6 +78,8 @@ void bl31_lib_init(void)
 	cm_init();
 }
 
+void mt_log_setup(unsigned int start, unsigned int size, unsigned int aee_buf_size);
+
 /*******************************************************************************
  * BL31 is responsible for setting up the runtime services for the primary cpu
  * before passing control to the bootloader or an Operating System. This
@@ -86,18 +90,43 @@ void bl31_lib_init(void)
  ******************************************************************************/
 void bl31_main(void)
 {
-	NOTICE("BL31: %s\n", version_string);
-	NOTICE("BL31: %s\n", build_message);
+	/* Show Only to UART */
+	NOTICE("BL3-1: %s\n", version_string);
+	NOTICE("BL3-1: %s\n", build_message);
 
-	/* Perform platform setup in BL31 */
+	/* compatible to the earlier chipset */
+	atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
+
+	/* Initialize for ATF log buffer */
+	if (teearg->atf_log_buf_size != 0) {
+		teearg->atf_aee_debug_buf_size = ATF_AEE_BUFFER_SIZE;
+		teearg->atf_aee_debug_buf_start = teearg->atf_log_buf_start + teearg->atf_log_buf_size - ATF_AEE_BUFFER_SIZE;
+		// mt_log_setup(teearg->atf_log_buf_start, teearg->atf_log_buf_size, teearg->atf_aee_debug_buf_size);
+		printf("ATF log service is registered (0x%x, aee:0x%x)\n", teearg->atf_log_buf_start, teearg->atf_aee_debug_buf_start);
+	} else {
+		teearg->atf_aee_debug_buf_size = 0;
+		teearg->atf_aee_debug_buf_start = 0;
+	}
+
+	/* Show to ATF log buffer & UART */
+	printf("BL3-1: %s\n", version_string);
+	printf("BL3-1: %s\n", build_message);
+
+	/* Perform remaining generic architectural setup from EL3 */
+	// bl31_arch_setup();
+
+	/* Perform platform setup in BL1 */
 	bl31_platform_setup();
 
 	/* Initialise helper libraries */
 	bl31_lib_init();
 
-	/* Initialize the runtime services e.g. psci. */
-	INFO("BL31: Initializing runtime services\n");
+	/* Initialize the runtime services e.g. psci */
+	INFO("BL3-1: Initializing runtime services\n");
 	runtime_svc_init();
+
+	/* Clean caches before re-entering normal world */
+	dcsw_op_all(DCCSW);
 
 	/*
 	 * All the cold boot actions on the primary cpu are done. We now need to
@@ -112,21 +141,64 @@ void bl31_main(void)
 	/*
 	 * If SPD had registerd an init hook, invoke it.
 	 */
-	if (bl32_init) {
-		INFO("BL31: Initializing BL32\n");
-		(*bl32_init)();
+	if(teearg->tee_support) {
+		printf("[BL31] Jump to secure OS for initialization!\n\r");
+		if (bl32_init) {
+			(*bl32_init)();
+		} else {
+			printf("[ERROR] Secure OS is not initialized!\n\r");
+		}
+	} else {
+		printf("[BL31] Jump to FIQD for initialization!\n\r");
+		if (bl32_init) {
+			(*bl32_init)();
+		}
 	}
+
 	/*
 	 * We are ready to enter the next EL. Prepare entry into the image
 	 * corresponding to the desired security state after the next ERET.
 	 */
+#ifndef SVP3_ENABLE
 	bl31_prepare_next_image_entry();
+#else
+	bl31_prepare_kernel_entry(1);	// prepare 64 bits kernel directly
+#endif
 
-	/*
-	 * Perform any platform specific runtime setup prior to cold boot exit
-	 * from BL31
-	 */
-	bl31_plat_runtime_setup();
+	printf("[BL31] Final dump!\n\r");
+
+	clear_uart_flag();
+
+	printf("[BL31] SHOULD not dump in UART but in log buffer!\n\r");
+}
+
+extern entry_point_info_t *bl31_plat_get_next_kernel64_ep_info(uint32_t type);
+extern entry_point_info_t *bl31_plat_get_next_kernel32_ep_info(uint32_t type);
+
+void bl31_prepare_kernel_entry(uint64_t k32_64)
+{
+	entry_point_info_t *next_image_info;
+	uint32_t image_type;
+
+	/* Determine which image to execute next */
+	image_type = NON_SECURE; //bl31_get_next_image_type();
+
+	/* Program EL3 registers to enable entry into the next EL */
+	if (0 == k32_64) {
+		next_image_info = bl31_plat_get_next_kernel32_ep_info(image_type);
+	} else {
+		next_image_info = bl31_plat_get_next_kernel64_ep_info(image_type);
+	}
+	assert(next_image_info);
+	assert(image_type == GET_SECURITY_STATE(next_image_info->h.attr));
+
+	INFO("BL3-1: Preparing for EL3 exit to %s world, Kernel\n",
+		(image_type == SECURE) ? "secure" : "normal");
+	INFO("BL3-1: Next image address = 0x%llx\n",
+		(unsigned long long) next_image_info->pc);
+	INFO("BL3-1: Next image spsr = 0x%x\n", next_image_info->spsr);
+	cm_init_context(read_mpidr_el1(), next_image_info);
+	cm_prepare_el3_exit(image_type);
 }
 
 /*******************************************************************************
