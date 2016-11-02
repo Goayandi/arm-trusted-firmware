@@ -280,7 +280,7 @@ uint32_t plat_get_spsr_for_bl33_entry(void)
 	unsigned int mode;
 	uint32_t spsr;
 
-    mode = MODE32_svc;
+	mode = MODE32_svc;
 	/*
 	 * TODO: Consider the possibility of specifying the SPSR in
 	 * the FIP ToC and allowing the platform to have a say as
@@ -288,7 +288,7 @@ uint32_t plat_get_spsr_for_bl33_entry(void)
 	 */
 //	spsr = SPSR_64(mode, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
 	spsr = SPSR_MODE32 (mode, SPSR_T_ARM, SPSR_E_LITTLE,
-	            (DAIF_FIQ_BIT | DAIF_IRQ_BIT | DAIF_ABT_BIT));
+		(DAIF_FIQ_BIT | DAIF_IRQ_BIT | DAIF_ABT_BIT));
 
 	return spsr;
 }
@@ -297,7 +297,7 @@ extern uint32_t get_devinfo_with_index(uint32_t i);
 
 int is_mp0_off(void)
 {
-    	/* cluster 0 disabled or not? */
+	/* cluster 0 disabled or not? */
 	if (get_devinfo_with_index(2) & 0x4) {
 		return 1;
 	} else {

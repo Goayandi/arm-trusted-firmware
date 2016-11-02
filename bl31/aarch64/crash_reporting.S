@@ -266,8 +266,8 @@ func plat_print_dormant_log
 	mrs	x0,	mpidr_el1
 	bl	platform_get_core_pos
 
-    /* x0 will get the address of  g_dormant_log_base[cpuid]
-    	unsigned long g_dormant_log_base = 0;  */
+	/* x0 will get the address of  g_dormant_log_base[cpuid]
+	   unsigned long g_dormant_log_base = 0;  */
 	ldr	x1,	=DORMANT_LOG_BASE
 	ldr	x1,	[x1]
 	ldr	x1,	[x1]
@@ -492,4 +492,3 @@ func crash_panic
 	bl plat_print_dormant_log
 #endif
 	b	crash_panic
-

@@ -286,7 +286,7 @@ void cm_fpregs_context_save(uint32_t security_state)
 
 #if !defined(MACH_TYPE_MT6797)
 	fpregs_context_save(get_fpregs_ctx(ctx));
-#endif	
+#endif
 }
 
 void cm_fpregs_context_restore(uint32_t security_state)
@@ -295,7 +295,7 @@ void cm_fpregs_context_restore(uint32_t security_state)
 
 	ctx = cm_get_context(security_state);
 	assert(ctx);
-	
+
 #if !defined(MACH_TYPE_MT6797)
 	fpregs_context_restore(get_fpregs_ctx(ctx));
 #endif

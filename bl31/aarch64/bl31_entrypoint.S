@@ -127,7 +127,7 @@ cl0:
 	b.ne	cl0
 	ldr	x0, =0x0
 	str	x0, [x1]		/* restore 0 */
-        
+
 cl1:
 	/* wfe */
 	ldr	x1, =0x10208008		/* CPU_RELEASE_ADDR */

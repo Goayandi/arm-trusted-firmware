@@ -57,7 +57,7 @@ uint64_t oem_smc_handler(uint32_t smc_fid,
 			  void *handle,
 			  uint64_t flags)
 {
-	uint64_t rc;    
+	uint64_t rc;
 	uint32_t ns;
     
 	/* Determine which security state this SMC originated from */
@@ -65,9 +65,9 @@ uint64_t oem_smc_handler(uint32_t smc_fid,
 
 	switch (smc_fid) {
 	case OEM_SMC_CALL_1_AARCH32:
-	case OEM_SMC_CALL_1_AARCH64:		
-        /* Don't allow the SMC call from non-secure world */
-        if (ns)
+	case OEM_SMC_CALL_1_AARCH64:
+		/* Don't allow the SMC call from non-secure world */
+        	if (ns)
 			SMC_RET1(handle, SMC_UNK);
 		rc = OEM_SVC_E_NOT_SUPPORTED;
 		break;    
