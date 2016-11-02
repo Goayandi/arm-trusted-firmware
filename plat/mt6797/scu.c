@@ -6,7 +6,7 @@
 #include <assert.h>
 
 void disable_scu(unsigned long mpidr) {
-	uint32_t axi_config;
+	uint32_t axi_config = 0;
 
 	//printf("disable_scu(0x%x)\n", mpidr);
 	switch (mpidr & MPIDR_CLUSTER_MASK) {
@@ -28,7 +28,7 @@ void disable_scu(unsigned long mpidr) {
 }
 
 void enable_scu(unsigned long mpidr) {
-	uint32_t axi_config;
+	uint32_t axi_config = 0;
 
 	//printf("enable_scu(0x%x)\n", mpidr);
 	switch (mpidr & MPIDR_CLUSTER_MASK) {
