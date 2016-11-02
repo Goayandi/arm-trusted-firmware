@@ -487,7 +487,9 @@ report_unhandled_interrupt:
 func crash_panic
 
 	mov_imm x2, ATF_LOW_LEVEL_LOG_F
-	bl plat_print_dormant_log
 
+#if CRASH_REPORTING
+	bl plat_print_dormant_log
+#endif
 	b	crash_panic
 
