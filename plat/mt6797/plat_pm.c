@@ -674,11 +674,18 @@ static void __dead2 plat_system_off(void)
 
 static void __dead2 plat_system_reset(void)
 {
+
 	/* Write the System Configuration Control Register */
-	mmio_write_32(VE_SYSREGS_BASE + V2M_SYS_CFGCTRL,
-		CFGCTRL_START | CFGCTRL_RW | CFGCTRL_FUNC(FUNC_REBOOT));
+	INFO("MT6797 System Reset\n");
+	mmio_clrsetbits_32(MTK_WDT_BASE,
+		(MTK_WDT_MODE_DUAL_MODE | MTK_WDT_MODE_IRQ),
+		MTK_WDT_MODE_KEY);
+
+	mmio_setbits_32(MTK_WDT_BASE, (MTK_WDT_MODE_KEY | MTK_WDT_MODE_EXTEN));
+	mmio_setbits_32(MTK_WDT_SWRST, MTK_WDT_SWRST_KEY);
+
 	wfi();
-	ERROR("FVP System Reset: operation not handled.\n");
+	ERROR("MT6797 System Reset: operation not handled.\n");
 	panic();
 }
 
