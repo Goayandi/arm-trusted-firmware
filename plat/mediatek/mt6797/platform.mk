@@ -55,8 +55,7 @@ PLAT_BL_COMMON_SOURCES	:=	drivers/io/io_fip.c				\
 				plat/${MTK_PLAT}/plat_cache.c			\
 				plat/${MTK_PLAT}/plat_cache_ops.S
 
-BL31_SOURCES		+=	drivers/arm/cci400/cci400.c			\
-				drivers/arm/gic/arm_gic.c			\
+BL31_SOURCES		+=	drivers/arm/gic/arm_gic.c			\
 				drivers/arm/gic/gic_v2.c			\
 				drivers/arm/gic/gic_v3.c			\
 				drivers/arm/tzc400/tzc400.c			\

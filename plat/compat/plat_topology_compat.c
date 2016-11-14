@@ -33,6 +33,7 @@
 #include <platform.h>
 #include <platform_def.h>
 #include <psci.h>
+#include <stdio.h>
 
 /* The power domain tree descriptor */
 static unsigned char power_domain_tree_desc
@@ -174,6 +175,11 @@ const unsigned char *plat_get_power_domain_tree_desc(void)
 					       PLATFORM_MAX_AFFLVL,
 					       afflvl);
 	}
+	printf("PLATFORM_MAX_AFFLVL = %d\n", PLATFORM_MAX_AFFLVL);
+	printf("MPIDR_AFFLVL0 = %d\n", MPIDR_AFFLVL0);
+	printf("affmap_idx = %d\n", affmap_idx);
+	printf("PLATFORM_NUM_AFFS = %lld\n", PLATFORM_NUM_AFFS);
+	printf("PLATFORM_CORE_COUNT = %d\n", PLATFORM_CORE_COUNT);
 
 	assert(affmap_idx == (PLATFORM_NUM_AFFS - PLATFORM_CORE_COUNT + 1));
 

@@ -37,12 +37,22 @@ ENTRY(bl31_entrypoint)
 
 MEMORY {
     RAM (rwx): ORIGIN = BL31_BASE, LENGTH = BL31_LIMIT - BL31_BASE
+    RAM2 (rwx): ORIGIN = TZRAM2_BASE, LENGTH = TZRAM2_SIZE
 }
 
 
 SECTIONS
 {
     . = BL31_BASE;
+
+    ASSERT(. == ALIGN(2048),
+           "vector base is not aligned on a 2K boundary.")
+
+    __RO_START__ = .;
+    vector . : {
+        *(.vectors)
+    } >RAM
+
     ASSERT(. == ALIGN(4096),
            "BL31_BASE address is not aligned on a page boundary.")
 
@@ -210,7 +220,7 @@ SECTIONS
      */
     xlat_table (NOLOAD) : {
         *(xlat_table)
-    } >RAM
+    } >RAM2
 
 #if USE_COHERENT_MEM
     /*

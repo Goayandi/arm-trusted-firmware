@@ -166,9 +166,7 @@ void bl31_main(void)
 #endif
 
 	printf("[BL31] Final dump!\n\r");
-
-	clear_uart_flag();
-
+	// clear_uart_flag();
 	printf("[BL31] SHOULD not dump in UART but in log buffer!\n\r");
 }
 

@@ -56,11 +56,11 @@ extern void power_off_little_cl(unsigned int cl_idx);
 
 extern void dfd_setup(void);
 
-extern unsigned long __RO_START__;
-extern unsigned long __RO_END__;
+unsigned long __RO_START__;
+unsigned long __RO_END__;
 
-extern unsigned long __COHERENT_RAM_START__;
-extern unsigned long __COHERENT_RAM_END__;
+unsigned long __COHERENT_RAM_START__;
+unsigned long __COHERENT_RAM_END__;
 
 /*
  * The next 2 constants identify the extents of the code & RO data region.
@@ -130,19 +130,18 @@ entry_point_info_t *bl31_plat_get_next_image_ep_info(uint32_t type)
 entry_point_info_t *bl31_plat_get_next_kernel64_ep_info(uint32_t type)
 {
 	entry_point_info_t *next_image_info;
-    unsigned long el_status;
-    unsigned int mode;
+	unsigned long el_status;
+	unsigned int mode;
 
-    el_status = 0;
-    mode = 0;
+	el_status = 0;
+	mode = 0;
 
 	assert(sec_state_is_valid(type));
 
-    next_image_info = (type == NON_SECURE) ?
-		&bl33_image_ep_info :
-		&bl32_image_ep_info;
+	next_image_info = (type == NON_SECURE) ?
+		&bl33_image_ep_info : &bl32_image_ep_info;
 
-    /* Figure out what mode we enter the non-secure world in */
+ 	/* Figure out what mode we enter the non-secure world in */
 	el_status = read_id_aa64pfr0_el1() >> ID_AA64PFR0_EL2_SHIFT;
 	el_status &= ID_AA64PFR0_ELX_MASK;
 
@@ -231,6 +230,8 @@ typedef enum {
 unsigned int mt_get_chip_hw_code(void);
 CHIP_SW_VER mt_get_chip_sw_ver(void);
 
+extern void mtk_console_init(unsigned long base_addr);
+
 /*******************************************************************************
  * Perform any BL31 specific platform actions. Here is an opportunity to copy
  * parameters passed by the calling EL (S-EL1 in BL2 & S-EL3 in BL1) before they
@@ -246,51 +247,52 @@ CHIP_SW_VER mt_get_chip_sw_ver(void);
 void bl31_early_platform_setup(bl31_params_t *from_bl2,
 				void *plat_params_from_bl2)
 {
-    unsigned long long normal_base;
-    unsigned long long atf_base;
+	unsigned long long normal_base;
+	unsigned long long atf_base;
 
-    config_L2_size();
+	config_L2_size();
 
-    /* copy tee boot argument into ATF structure */
-    memcpy((void *)&gteearg, (void *)(uintptr_t)TEE_BOOT_INFO_ADDR, sizeof(atf_arg_t));
-    atf_arg_t_ptr teearg = &gteearg;
+	/* copy tee boot argument into ATF structure */
+	memcpy((void *)&gteearg, (void *)(uintptr_t)TEE_BOOT_INFO_ADDR, sizeof(atf_arg_t));
+	atf_arg_t_ptr teearg = &gteearg;
 
-    // overwrite core0 reset address, to avoid overwrite tee boot argument
-    mmio_write_32(MP0_MISC_CONFIG_BOOT_ADDR(0), (unsigned long)bl31_on_entrypoint);
+	// overwrite core0 reset address, to avoid overwrite tee boot argument
+	mmio_write_32(MP0_MISC_CONFIG_BOOT_ADDR(0), (unsigned long)bl31_on_entrypoint);
 
-    normal_base = 0;
-    /* in ATF boot time, tiemr for cntpct_el0 is not initialized
-     * so it will not count now.
-     */
-    atf_base = read_cntpct_el0();
-    atf_sched_clock_init(normal_base, atf_base);
+	normal_base = 0;
+
+	/* in ATF boot time, tiemr for cntpct_el0 is not initialized
+	 * so it will not count now.
+	 */
+	atf_base = read_cntpct_el0();
+	atf_sched_clock_init(normal_base, atf_base);
 
 	/* Initialize the console to provide early debug support */
-//    console_init(UART2_BASE); // without boot argument
-	// console_init(teearg->atf_log_port);
+	// console_init(UART2_BASE); // without boot argument
+	mtk_console_init(teearg->atf_log_port);
 
 	/*init system counter in ATF but in Kernel*/
 	setup_syscnt();
 
-    printf("BL33 boot argument location=0x%x\n\r", BOOT_ARGUMENT_LOCATION);
-    printf("BL33 boot argument size=0x%x\n\r", BOOT_ARGUMENT_SIZE);
-    printf("BL33 start addr=0x%x\n\r", BL33_START_ADDRESS);
-    printf("teearg addr=0x%x\n\r", TEE_BOOT_INFO_ADDR);
-    printf("atf_magic=0x%x\n\r", teearg->atf_magic);
-    printf("tee_support=0x%x\n\r", teearg->tee_support);
-    printf("tee_entry=0x%x\n\r", teearg->tee_entry);
-    printf("tee_boot_arg_addr=0x%x\n\r", teearg->tee_boot_arg_addr);
-    printf("atf_log_port=0x%x\n\r", teearg->atf_log_port);
-    printf("atf_log_baudrate=0x%x\n\r", teearg->atf_log_baudrate);
-    printf("atf_log_buf_start=0x%x\n\r", teearg->atf_log_buf_start);
-    printf("atf_log_buf_size=0x%x\n\r", teearg->atf_log_buf_size);
-    printf("atf_aee_debug_buf_start=0x%x\n\r", teearg->atf_aee_debug_buf_start);
-    printf("atf_aee_debug_buf_size=0x%x\n\r", teearg->atf_aee_debug_buf_size);
-    printf("atf_irq_num=%d\n\r", teearg->atf_irq_num);
-    printf("BL33_START_ADDRESS=0x%x\n\r", BL33_START_ADDRESS);
+	printf("BL33 boot argument location=0x%x\n\r", BOOT_ARGUMENT_LOCATION);
+	printf("BL33 boot argument size=0x%x\n\r", BOOT_ARGUMENT_SIZE);
+	printf("BL33 start addr=0x%x\n\r", BL33_START_ADDRESS);
+	printf("teearg addr=0x%x\n\r", TEE_BOOT_INFO_ADDR);
+	printf("atf_magic=0x%x\n\r", teearg->atf_magic);
+	printf("tee_support=0x%x\n\r", teearg->tee_support);
+	printf("tee_entry=0x%x\n\r", teearg->tee_entry);
+	printf("tee_boot_arg_addr=0x%x\n\r", teearg->tee_boot_arg_addr);
+	printf("atf_log_port=0x%x\n\r", teearg->atf_log_port);
+	printf("atf_log_baudrate=0x%x\n\r", teearg->atf_log_baudrate);
+	printf("atf_log_buf_start=0x%x\n\r", teearg->atf_log_buf_start);
+	printf("atf_log_buf_size=0x%x\n\r", teearg->atf_log_buf_size);
+	printf("atf_aee_debug_buf_start=0x%x\n\r", teearg->atf_aee_debug_buf_start);
+	printf("atf_aee_debug_buf_size=0x%x\n\r", teearg->atf_aee_debug_buf_size);
+	printf("atf_irq_num=%d\n\r", teearg->atf_irq_num);
+	printf("BL33_START_ADDRESS=0x%x\n\r", BL33_START_ADDRESS);
 
-    printf("atf chip_code[%x]\n", mt_get_chip_hw_code());
-    printf("atf chip_ver[%x]\n", mt_get_chip_sw_ver());
+	printf("atf chip_code[%x]\n", mt_get_chip_hw_code());
+	printf("atf chip_ver[%x]\n", mt_get_chip_sw_ver());
 
 	/* Initialize the platform config for future decision making */
 	plat_config_setup();
@@ -328,21 +330,20 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	bl33_image_ep_info.pc = plat_get_ns_image_entrypoint();
 	bl33_image_ep_info.spsr = plat_get_spsr_for_bl33_entry();
 
-    /*
-     * Pass boot argument to LK
-     * ldr     w4, =pl_boot_argument
-     * ldr     w5, =BOOT_ARGUMENT_SIZE
-     */
-    bl33_image_ep_info.args.arg4=(unsigned long)(uintptr_t)BOOT_ARGUMENT_LOCATION;
-    bl33_image_ep_info.args.arg5=(unsigned long)(uintptr_t)BOOT_ARGUMENT_SIZE;
+	/*
+	 * Pass boot argument to LK
+	 * ldr     w4, =pl_boot_argument
+	 * ldr     w5, =BOOT_ARGUMENT_SIZE
+	 */
+	bl33_image_ep_info.args.arg4=(unsigned long)(uintptr_t)BOOT_ARGUMENT_LOCATION;
+	bl33_image_ep_info.args.arg5=(unsigned long)(uintptr_t)BOOT_ARGUMENT_SIZE;
 	SET_SECURITY_STATE(bl33_image_ep_info.h.attr, NON_SECURE);
-
 #else
 	/* Check params passed from BL2 should not be NULL,
 	 * We are not checking plat_params_from_bl2 as NULL as we are not
 	 * using it on MTK_platform
 	 */
-    printf("not RESET_TO_BL31\n");
+	printf("not RESET_TO_BL31\n");
 
 	assert(from_bl2 != NULL);
 	assert(from_bl2->h.type == PARAM_BL31);
@@ -414,32 +415,34 @@ void bl31_platform_setup(void)
  ******************************************************************************/
 void bl31_plat_arch_setup(void)
 {
-    unsigned long mpidr = read_mpidr();
+	unsigned long mpidr = read_mpidr();
 
-    // 32 bit only is set in preloader
-    // ATF project is set in ATF, DTAH bit is cleared by warm reset
-    // Only Core0 set DATH bit here,
-    // L2ACTLR must be written before MMU on and any ACE, CHI or ACP traffic
+	// 32 bit only is set in preloader
+	// ATF project is set in ATF, DTAH bit is cleared by warm reset
+	// Only Core0 set DATH bit here,
+	// L2ACTLR must be written before MMU on and any ACE, CHI or ACP traffic
 #if ERRATA_A53_836870
-    workaround_836870(mpidr);
+	workaround_836870(mpidr);
 #endif
 
-    /*
-     * clear CNTVOFF for core 0
-     */
-    clear_cntvoff(mpidr);
+	/*
+	 * clear CNTVOFF for core 0
+	 */
+
+	clear_cntvoff(mpidr);
 
 	plat_cci_init();
 
 #if RESET_TO_BL31
 	plat_cci_enable();
 #endif
-    /* Enable non-secure access to CCI-400 registers */
-    mmio_write_32(CCI400_BASE + CCI_SEC_ACCESS_OFFSET , 0x1);
-    /* set secondary CPUs to AArch64 */
-    printf("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
-    mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | 0x0000E000);
-    printf("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
+	/* Enable non-secure access to CCI-400 registers */
+	mmio_write_32(CCI400_BASE + CCI_SEC_ACCESS_OFFSET , 0x1);
+	/* set secondary CPUs to AArch64 */
+
+	printf("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
+	mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | 0x0000E000);
+	printf("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
 
     {
         atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
