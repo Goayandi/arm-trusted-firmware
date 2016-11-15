@@ -56,11 +56,11 @@ extern void power_off_little_cl(unsigned int cl_idx);
 
 extern void dfd_setup(void);
 
-unsigned long __RO_START__;
-unsigned long __RO_END__;
+extern unsigned long __RO_START__;
+extern unsigned long __RO_END__;
 
-unsigned long __COHERENT_RAM_START__;
-unsigned long __COHERENT_RAM_END__;
+extern unsigned long __COHERENT_RAM_START__;
+extern unsigned long __COHERENT_RAM_END__;
 
 /*
  * The next 2 constants identify the extents of the code & RO data region.
