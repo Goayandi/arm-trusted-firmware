@@ -114,6 +114,8 @@ void bl31_main(void)
 
 	/* Perform remaining generic architectural setup from EL3 */
 	// bl31_arch_setup();
+	write_scr_el3(SCR_RES1_BITS);
+	write_cntfrq_el0(plat_get_syscnt_freq());
 
 	/* Perform platform setup in BL1 */
 	bl31_platform_setup();
@@ -248,7 +250,7 @@ void bl31_prepare_next_image_entry(void)
 	assert(next_image_info);
 	assert(image_type == GET_SECURITY_STATE(next_image_info->h.attr));
 
-	INFO("BL31: Preparing for EL3 exit to %s world\n",
+	INFO("BL31: Preparing for EL3 exit to %s world, LK\n",
 		(image_type == SECURE) ? "secure" : "normal");
 	print_entry_point_info(next_image_info);
 	cm_init_my_context(next_image_info);

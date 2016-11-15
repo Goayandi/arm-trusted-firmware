@@ -32,7 +32,6 @@
 #include <platform_def.h>
 /* TODO: Reusing psci error codes & state information. Get our own! */
 #include <psci.h>
-#include <stdio.h>
 #include "drivers/pwrc/plat_pwrc.h"
 
 /* We treat '255' as an invalid affinity instance */
@@ -82,9 +81,6 @@ unsigned int plat_get_aff_count(unsigned int aff_lvl,
 	unsigned char parent_aff_id;
 
 	assert(topology_setup_done == 1);
-	printf("aff_lvl = %u\n", aff_lvl);
-	printf("mpidr = %lx\n", mpidr);
-
 	switch (aff_lvl) {
 	case 3:
 	case 2:
@@ -129,8 +125,6 @@ unsigned int plat_get_aff_count(unsigned int aff_lvl,
 	default:
 		assert(0);
 	}
-
-	printf("aff_count = %u\n", aff_count);
 	return aff_count;
 }
 

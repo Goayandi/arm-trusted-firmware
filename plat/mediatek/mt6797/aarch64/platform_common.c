@@ -246,12 +246,10 @@ void plat_cci_init(void)
 			CCI400_SL_IFACE3_CLUSTER_IX,
 			CCI400_SL_IFACE4_CLUSTER_IX,
 			CCI400_SL_IFACE5_CLUSTER_IX);
-	printf("leaving plat_cci_init\n");
 }
 
 void plat_cci_enable(void)
 {
-	printf("into plat_cci_enable\n");
 	/*
 	 * Enable CCI-400 coherency for this cluster. No need
 	 * for locks as no other cpu is active at the
@@ -261,7 +259,6 @@ void plat_cci_enable(void)
 		mcsi_a_enable_cluster_dcm(read_mpidr());
 		cci_enable_cluster_coherency(read_mpidr());
 	}
-	printf("leaving plat_cci_enable\n");
 }
 
 /*******************************************************************************
