@@ -230,8 +230,6 @@ typedef enum {
 unsigned int mt_get_chip_hw_code(void);
 CHIP_SW_VER mt_get_chip_sw_ver(void);
 
-extern void mtk_console_init(unsigned long base_addr);
-
 /*******************************************************************************
  * Perform any BL31 specific platform actions. Here is an opportunity to copy
  * parameters passed by the calling EL (S-EL1 in BL2 & S-EL3 in BL1) before they
@@ -268,8 +266,7 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	atf_sched_clock_init(normal_base, atf_base);
 
 	/* Initialize the console to provide early debug support */
-	// console_init(UART2_BASE); // without boot argument
-	mtk_console_init(teearg->atf_log_port);
+	console_init(teearg->atf_log_port, UART_CLOCK, UART_BAUDRATE);
 
 	/*init system counter in ATF but in Kernel*/
 	setup_syscnt();
@@ -444,50 +441,41 @@ void bl31_plat_arch_setup(void)
 	mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | 0x0000E000);
 	printf("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
 
-    {
-        atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
-        if(teearg->atf_log_buf_size !=0 ) {
-            printf("mmap atf buffer : 0x%x, 0x%x\n\r", teearg->atf_log_buf_start,
-                teearg->atf_log_buf_size);
-            mmap_add_region((teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)),
-                            (teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)),
-                            PAGE_SIZE_2MB,
-                            MT_DEVICE | MT_RW | MT_NS);
-            printf("mmap atf buffer (force 2MB aligned): 0x%x, 0x%x\n\r",
-                (teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), PAGE_SIZE_2MB);
-        }
-    }
+	{
+		atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
+		if (teearg->atf_log_buf_size !=0 ) {
+			printf("mmap atf buffer : 0x%x, 0x%x\n\r", teearg->atf_log_buf_start, teearg->atf_log_buf_size);
+			mmap_add_region((teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), (teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), PAGE_SIZE_2MB, MT_DEVICE | MT_RW | MT_NS);
+			printf("mmap atf buffer (force 2MB aligned): 0x%x, 0x%x\n\r", (teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), PAGE_SIZE_2MB);
+		}
+	}
 
-    printf("###@@@ CPUSYS1 OFF @@@###\n");
-    power_off_little_cl(1);
+	printf("###@@@ CPUSYS1 OFF @@@###\n");
+	power_off_little_cl(1);
 
-    // add TZRAM2_BASE to memory map
-    mmap_add_region(TZRAM2_BASE & ~(PAGE_SIZE_2MB_MASK),
-                    TZRAM2_BASE & ~(PAGE_SIZE_2MB_MASK),
-                    PAGE_SIZE_2MB,
-                    MT_MEMORY | MT_RW | MT_SECURE);
+	// add TZRAM2_BASE to memory map
+	mmap_add_region(TZRAM2_BASE & ~(PAGE_SIZE_2MB_MASK),
+		TZRAM2_BASE & ~(PAGE_SIZE_2MB_MASK),
+		PAGE_SIZE_2MB, MT_MEMORY | MT_RW | MT_SECURE);
 
-    // add RAM_CONSOLE_BASE to memory map
-    mmap_add_region(RAM_CONSOLE_BASE & ~(PAGE_SIZE_MASK),
-                    RAM_CONSOLE_BASE & ~(PAGE_SIZE_MASK),
-                    RAM_CONSOLE_SIZE,
-                    MT_DEVICE | MT_RW | MT_NS);
+	// add RAM_CONSOLE_BASE to memory map
+	mmap_add_region(RAM_CONSOLE_BASE & ~(PAGE_SIZE_MASK),
+		RAM_CONSOLE_BASE & ~(PAGE_SIZE_MASK),
+		RAM_CONSOLE_SIZE, MT_DEVICE | MT_RW | MT_NS);
 
-    // add TZRAM_BASE to memory map
-    // then set RO and COHERENT to different attribute
-    plat_configure_mmu_el3(TZRAM_BASE,
-                            ((TZRAM_SIZE & ~(PAGE_SIZE_MASK)) + PAGE_SIZE),
-                            (BL31_RO_BASE & ~(PAGE_SIZE_MASK)),
-                            BL31_RO_LIMIT,
-                            BL31_COHERENT_RAM_BASE,
-                            BL31_COHERENT_RAM_LIMIT);
+	// add TZRAM_BASE to memory map
+	// then set RO and COHERENT to different attribute
+	plat_configure_mmu_el3(TZRAM_BASE,
+		((TZRAM_SIZE & ~(PAGE_SIZE_MASK)) + PAGE_SIZE),
+		(BL31_RO_BASE & ~(PAGE_SIZE_MASK)),
+		BL31_RO_LIMIT, BL31_COHERENT_RAM_BASE,
+		BL31_COHERENT_RAM_LIMIT);
 
-    /*
-     * Without this, access to CPUECTRL from NS EL1
-     * will cause trap into EL3
-     */
-    enable_ns_access_to_cpuectlr();
-
+	/*
+	 * Without this, access to CPUECTRL from NS EL1
+	 * will cause trap into EL3
+	 */
+	enable_ns_access_to_cpuectlr();
 }
 
 

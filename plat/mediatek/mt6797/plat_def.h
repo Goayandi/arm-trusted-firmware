@@ -279,11 +279,13 @@
 #define IO_PHYS             (0x10000000)
 #define PAGE_ADDR_MASK          (0xFFF00000)
 
-#define UART0_BASE          (IO_PHYS + 0x01002000)
-#define UART1_BASE          (IO_PHYS + 0x01003000)
-#define UART2_BASE          (IO_PHYS + 0x01004000)
-#define UART3_BASE          (IO_PHYS + 0x01005000)
-#define PERICFG_BASE        (IO_PHYS + 0x2000)
+#define UART0_BASE		(IO_PHYS + 0x01002000)
+#define UART1_BASE		(IO_PHYS + 0x01003000)
+#define UART2_BASE		(IO_PHYS + 0x01004000)
+#define UART3_BASE		(IO_PHYS + 0x01005000)
+#define UART_BAUDRATE		(921600)
+#define UART_CLOCK		(26000000)
+#define PERICFG_BASE		(IO_PHYS + 0x2000)
 
 /*******************************************************************************
  * TrustZone address space controller related constants

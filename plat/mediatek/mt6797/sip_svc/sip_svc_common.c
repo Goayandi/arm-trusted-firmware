@@ -192,12 +192,10 @@ uint64_t sip_smc_handler(uint32_t smc_fid,
         break;
     case MTK_SIP_KERNEL_BOOT_AARCH32:
         wdt_kernel_cb_addr = 0;
-        set_uart_flag();
         printf("save kernel info\n");
         save_kernel_info(x1, x2, x3, x4);
         bl31_prepare_kernel_entry(x4);
         printf("el3_exit\n");
-        clear_uart_flag();
         SMC_RET0(handle);
         break;
     case MTK_SIP_LK_MD_REG_WRITE_AARCH32:

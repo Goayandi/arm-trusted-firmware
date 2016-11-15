@@ -28,18 +28,19 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-MTK_PLAT		:=	mediatek/${PLAT}
+MTK_PLAT		:=	mediatek/
 MTK_PLAT_SOC		:=	${MTK_PLAT}/${PLAT}
 
-PLAT_INCLUDES		:=	-Iplat/${MTK_PLAT}/include/        \
-				-Iplat/${MTK_PLAT}/                \
-				-Iplat/${MTK_PLAT}/drivers/log     \
-				-Iplat/${MTK_PLAT}/drivers/timer/  \
-				-Iplat/${MTK_PLAT}/drivers/l2c/ \
-				-Iplat/${MTK_PLAT}/drivers/emi/ \
-				-Iplat/${MTK_PLAT}/drivers/idvfs \
-				-Iplat/${MTK_PLAT}/drivers/ocp \
-				-Iplat/${MTK_PLAT}/drivers/scp/ \
+PLAT_INCLUDES		:=	-Iplat/${MTK_PLAT_SOC}/include/			\
+				-Iplat/${MTK_PLAT_SOC}/				\
+				-Iplat/${MTK_PLAT_SOC}/drivers/log		\
+				-Iplat/${MTK_PLAT_SOC}/drivers/timer/		\
+				-Iplat/${MTK_PLAT_SOC}/drivers/l2c/		\
+				-Iplat/${MTK_PLAT_SOC}/drivers/emi/		\
+				-Iplat/${MTK_PLAT_SOC}/drivers/idvfs		\
+				-Iplat/${MTK_PLAT_SOC}/drivers/ocp		\
+				-Iplat/${MTK_PLAT_SOC}/drivers/scp/		\
+				-Iplat/${MTK_PLAT}/common/drivers/uart/		\
 				-Iplat/common
 
 PLAT_BL_COMMON_SOURCES	:=	drivers/io/io_fip.c				\
@@ -50,52 +51,53 @@ PLAT_BL_COMMON_SOURCES	:=	drivers/io/io_fip.c				\
 				lib/semihosting/semihosting.c			\
 				lib/semihosting/aarch64/semihosting_call.S	\
 				plat/common/aarch64/plat_common.c		\
-				plat/${MTK_PLAT}/plat_io_storage.c			\
-				plat/${MTK_PLAT}/fiq_smp_call.c                      \
-				plat/${MTK_PLAT}/plat_cache.c			\
-				plat/${MTK_PLAT}/plat_cache_ops.S
+				plat/${MTK_PLAT_SOC}/plat_io_storage.c			\
+				plat/${MTK_PLAT_SOC}/fiq_smp_call.c                      \
+				plat/${MTK_PLAT_SOC}/plat_cache.c			\
+				plat/${MTK_PLAT_SOC}/plat_cache_ops.S
 
 BL31_SOURCES		+=	drivers/arm/gic/arm_gic.c			\
 				drivers/arm/gic/gic_v2.c			\
 				drivers/arm/gic/gic_v3.c			\
 				drivers/arm/tzc400/tzc400.c			\
+				drivers/console/console.S			\
 				lib/cpus/aarch64/aem_generic.S			\
 				lib/cpus/aarch64/cortex_a53.S			\
 				lib/cpus/aarch64/cortex_a57.S			\
 				lib/cpus/aarch64/cortex_a72.S			\
 				plat/common/aarch64/platform_mp_stack.S		\
-				plat/${MTK_PLAT}/bl31_plat_setup.c			\
-				plat/${MTK_PLAT}/plat_gic.c				\
-				plat/${MTK_PLAT}/plat_dfd.c				\
-				plat/${MTK_PLAT}/plat_pm.c				\
-				plat/${MTK_PLAT}/power.c				\
-				plat/${MTK_PLAT}/plat_security.c				\
-				plat/${MTK_PLAT}/plat_topology.c				\
-				plat/${MTK_PLAT}/scu.c				\
-				plat/${MTK_PLAT}/mailbox.c				\
-				plat/${MTK_PLAT}/aarch64/plat_helpers.S			\
-				plat/${MTK_PLAT}/aarch64/platform_common.c			\
-				plat/${MTK_PLAT}/drivers/uart/uart.c			\
-				plat/${MTK_PLAT}/drivers/timer/mt_cpuxgpt.c              \
-				plat/${MTK_PLAT}/drivers/pwrc/plat_pwrc.c \
-				plat/${MTK_PLAT}/drivers/md/md.c		\
-				plat/${MTK_PLAT}/drivers/l2c/l2c.c                  \
-				plat/${MTK_PLAT}/drivers/emi/emi_mpu.c\
-				plat/${MTK_PLAT}/drivers/idvfs/mt_idvfs_api.c \
-				plat/${MTK_PLAT}/drivers/ocp/mt_ocp_api.c \
-				plat/${MTK_PLAT}/drivers/mcsi/mcsi_a.c \
-				plat/${MTK_PLAT}/drivers/scp/scp.c
+				plat/${MTK_PLAT_SOC}/bl31_plat_setup.c		\
+				plat/${MTK_PLAT_SOC}/plat_gic.c			\
+				plat/${MTK_PLAT_SOC}/plat_dfd.c			\
+				plat/${MTK_PLAT_SOC}/plat_pm.c			\
+				plat/${MTK_PLAT_SOC}/power.c			\
+				plat/${MTK_PLAT_SOC}/plat_security.c		\
+				plat/${MTK_PLAT_SOC}/plat_topology.c		\
+				plat/${MTK_PLAT_SOC}/scu.c			\
+				plat/${MTK_PLAT_SOC}/mailbox.c			\
+				plat/${MTK_PLAT_SOC}/aarch64/plat_helpers.S	\
+				plat/${MTK_PLAT_SOC}/aarch64/platform_common.c	\
+				plat/${MTK_PLAT}/common/drivers/uart/8250_console.S			\
+				plat/${MTK_PLAT_SOC}/drivers/timer/mt_cpuxgpt.c              \
+				plat/${MTK_PLAT_SOC}/drivers/pwrc/plat_pwrc.c \
+				plat/${MTK_PLAT_SOC}/drivers/md/md.c		\
+				plat/${MTK_PLAT_SOC}/drivers/l2c/l2c.c                  \
+				plat/${MTK_PLAT_SOC}/drivers/emi/emi_mpu.c\
+				plat/${MTK_PLAT_SOC}/drivers/idvfs/mt_idvfs_api.c \
+				plat/${MTK_PLAT_SOC}/drivers/ocp/mt_ocp_api.c \
+				plat/${MTK_PLAT_SOC}/drivers/mcsi/mcsi_a.c \
+				plat/${MTK_PLAT_SOC}/drivers/scp/scp.c
 
-BL31_SOURCES		+=	plat/${MTK_PLAT}/sip_svc/sip_svc_common.c		\
-				plat/${MTK_PLAT}/sip_svc/sip_svc_setup.c		\
-				plat/${MTK_PLAT}/drivers/log/log.c
+BL31_SOURCES		+=	plat/${MTK_PLAT_SOC}/sip_svc/sip_svc_common.c		\
+				plat/${MTK_PLAT_SOC}/sip_svc/sip_svc_setup.c		\
+				plat/${MTK_PLAT_SOC}/drivers/log/log.c
 
 ifeq (${SPD}, tbase)
-BL31_SOURCES		+=	plat/${MTK_PLAT}/plat_tbase.c
+BL31_SOURCES		+=	plat/${MTK_PLAT_SOC}/plat_tbase.c
 endif
 
 ifeq (${SPD}, teeid)
-BL31_SOURCES           +=      plat/${MTK_PLAT}/plat_teei.c
+BL31_SOURCES           +=      plat/${MTK_PLAT_SOC}/plat_teei.c
 endif
 
 # Flag used by the MTK_platform port to determine the version of ARM GIC architecture

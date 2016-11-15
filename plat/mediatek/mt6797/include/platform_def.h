@@ -199,8 +199,8 @@
 #define VER_BASE            (0x08000000)
 
 #define INFRACFG_AO_BASE	(IO_PHYS + 0x00001000)
-#define MCUCFG_BASE         (IO_PHYS + 0x00220000)
-#define EMI_MPU_BASE            (IO_PHYS + 0x00200000)
+#define MCUCFG_BASE		(IO_PHYS + 0x00220000)
+#define EMI_MPU_BASE		(IO_PHYS + 0x00200000)
 
 /*******************************************************************************
  * BOOTROM Related Registers
