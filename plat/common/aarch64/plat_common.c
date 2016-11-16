@@ -151,7 +151,6 @@ void aee_wdt_dump()
 #endif
 
 	/* Log starts here... */
-	set_uart_flag();
 	printf("aee_wdt_dump(dis-IRQ),CPU%d\n", (int)linear_id);
 
 	ns_cpu_context = cm_get_context_by_mpidr(mpidr, NON_SECURE);
