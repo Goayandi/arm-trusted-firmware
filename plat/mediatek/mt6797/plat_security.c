@@ -35,6 +35,7 @@
 #include "plat_config.h"
 #include "plat_def.h"
 #include "plat_private.h"
+#include <mtk_plat_common.h>
 
 /* Used to improve readability for configuring regions. */
 #define FILTER_SHIFT(filter)	(1 << filter)
@@ -135,7 +136,7 @@ void plat_security_setup(void)
 
 uint32_t get_devinfo_with_index(uint32_t i)
 {
-    atf_arg_t_ptr teearg = &gteearg;;
+    struct atf_arg_t *teearg = &gteearg;;
 
     if (i < DEVINFO_SIZE) {
         return teearg->devinfo[i];

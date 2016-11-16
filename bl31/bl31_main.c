@@ -40,6 +40,7 @@
 #include <string.h>
 
 #include <plat_private.h>
+#include <mtk_plat_common.h>
 
 /*******************************************************************************
  * This function pointer is used to initialise the BL32 image. It's initialized
@@ -95,14 +96,12 @@ void bl31_main(void)
 	NOTICE("BL3-1: %s\n", build_message);
 
 	/* compatible to the earlier chipset */
-	atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
+	struct atf_arg_t *teearg = (struct atf_arg_t *)(uintptr_t)TEE_BOOT_INFO_ADDR;
 
 	/* Initialize for ATF log buffer */
 	if (teearg->atf_log_buf_size != 0) {
 		teearg->atf_aee_debug_buf_size = ATF_AEE_BUFFER_SIZE;
 		teearg->atf_aee_debug_buf_start = teearg->atf_log_buf_start + teearg->atf_log_buf_size - ATF_AEE_BUFFER_SIZE;
-		// mt_log_setup(teearg->atf_log_buf_start, teearg->atf_log_buf_size, teearg->atf_aee_debug_buf_size);
-		printf("ATF log service is registered (0x%x, aee:0x%x)\n", teearg->atf_log_buf_start, teearg->atf_aee_debug_buf_start);
 	} else {
 		teearg->atf_aee_debug_buf_size = 0;
 		teearg->atf_aee_debug_buf_start = 0;
@@ -114,8 +113,8 @@ void bl31_main(void)
 
 	/* Perform remaining generic architectural setup from EL3 */
 	// bl31_arch_setup();
-	write_scr_el3(SCR_RES1_BITS);
-	write_cntfrq_el0(plat_get_syscnt_freq());
+	// write_scr_el3(SCR_RES1_BITS);
+	// write_cntfrq_el0(plat_get_syscnt_freq());
 
 	/* Perform platform setup in BL1 */
 	bl31_platform_setup();

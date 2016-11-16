@@ -56,6 +56,7 @@
 #include <xlat_tables.h>
 #include <emi_drv.h>
 #include <log.h>
+#include <mtk_plat_common.h>
 #define ATF_OCP_DREQ 1  // PTP3 OCP + DREQ function
 
 extern void dfd_disable(void);
@@ -164,7 +165,7 @@ uint64_t sip_smc_handler(uint32_t smc_fid,
 {
     uint64_t rc = 0;
     uint32_t ns;
-    atf_arg_t_ptr teearg = &gteearg;
+    struct atf_arg_t *teearg = &gteearg;
 
     /* Determine which security state this SMC originated from */
     ns = is_caller_non_secure(flags);

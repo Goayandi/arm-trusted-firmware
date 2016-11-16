@@ -46,6 +46,7 @@
 #include "l2c.h"
 #include "mt_cpuxgpt.h" // for atf_sched_clock_init(normal_base, atf_base);
 #include "power.h"
+#include <mtk_plat_common.h>
 
 /*******************************************************************************
  * Declarations of linker defined symbols which will help us find the layout
@@ -93,7 +94,7 @@ static entry_point_info_t bl33_image_ep_info;
 static bl31_params_t *bl2_to_bl31_params;
 #endif
 
-atf_arg_t gteearg;
+struct atf_arg_t gteearg;
 
 /*******************************************************************************
  * Return a pointer to the 'entry_point_info' structure of the next image for the
@@ -230,6 +231,7 @@ typedef enum {
 unsigned int mt_get_chip_hw_code(void);
 CHIP_SW_VER mt_get_chip_sw_ver(void);
 
+typedef struct atf_arg_t atf_arg_t;
 /*******************************************************************************
  * Perform any BL31 specific platform actions. Here is an opportunity to copy
  * parameters passed by the calling EL (S-EL1 in BL2 & S-EL3 in BL1) before they
@@ -245,14 +247,28 @@ CHIP_SW_VER mt_get_chip_sw_ver(void);
 void bl31_early_platform_setup(bl31_params_t *from_bl2,
 				void *plat_params_from_bl2)
 {
+#if 0
+	struct mtk_bl_param_t *pmtk_bl_param =
+        (struct mtk_bl_param_t *)from_bl2;
+#endif
 	unsigned long long normal_base;
 	unsigned long long atf_base;
 
 	config_L2_size();
+#if 0
+	assert(from_bl2 != NULL);
+	pmtk_bl_param =
+        (struct mtk_bl_param_t *)((uint64_t)pmtk_bl_param & 0x00000000ffffffff);
+        plat_params_from_bl2 =
+        (void *)((uint64_t)plat_params_from_bl2 & 0x00000000ffffffff);
+#endif
 
 	/* copy tee boot argument into ATF structure */
 	memcpy((void *)&gteearg, (void *)(uintptr_t)TEE_BOOT_INFO_ADDR, sizeof(atf_arg_t));
-	atf_arg_t_ptr teearg = &gteearg;
+	struct atf_arg_t *teearg = &gteearg;
+#if 0
+        teearg  = (struct atf_arg_t *)pmtk_bl_param->tee_info_addr;
+#endif
 
 	// overwrite core0 reset address, to avoid overwrite tee boot argument
 	mmio_write_32(MP0_MISC_CONFIG_BOOT_ADDR(0), (unsigned long)bl31_on_entrypoint);
@@ -267,6 +283,10 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 
 	/* Initialize the console to provide early debug support */
 	console_init(teearg->atf_log_port, UART_CLOCK, UART_BAUDRATE);
+	if (from_bl2)
+		printf("bl2 = %p\n", (void *)from_bl2);
+	else
+		printf("bl2 = NULL\n");
 
 	/*init system counter in ATF but in Kernel*/
 	setup_syscnt();
@@ -442,7 +462,7 @@ void bl31_plat_arch_setup(void)
 	printf("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
 
 	{
-		atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
+		atf_arg_t *teearg = (atf_arg_t *)(uintptr_t)TEE_BOOT_INFO_ADDR;
 		if (teearg->atf_log_buf_size !=0 ) {
 			printf("mmap atf buffer : 0x%x, 0x%x\n\r", teearg->atf_log_buf_start, teearg->atf_log_buf_size);
 			mmap_add_region((teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), (teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), PAGE_SIZE_2MB, MT_DEVICE | MT_RW | MT_NS);

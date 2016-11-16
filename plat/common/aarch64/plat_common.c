@@ -37,7 +37,8 @@
 #include <debug.h>
 #include <arch_helpers.h>
 #include <smcc_helpers.h>
-#include "plat_private.h"   //for atf_arg_t_ptr
+#include <mtk_plat_common.h>
+#include <plat_private.h>
 
 /*
  * The following platform setup functions are weakly defined. They
@@ -157,9 +158,9 @@ void aee_wdt_dump()
 	/* compatible to the earlier chipset */
 #if (defined(MACH_TYPE_MT6735) || defined(MACH_TYPE_MT6735M) || \
 	defined(MACH_TYPE_MT6753) || defined(MACH_TYPE_MT8173))
-	atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
+	struct atf_arg_t *teearg = (atf_arg_t *)(uintptr_t)TEE_BOOT_INFO_ADDR;
 #else
-	atf_arg_t_ptr teearg = &gteearg;;
+	struct atf_arg_t *teearg = &gteearg;;
 #endif
 	regs = (void *)(teearg->atf_aee_debug_buf_start + (linear_id * sizeof(struct atf_aee_regs)));
 

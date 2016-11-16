@@ -44,6 +44,7 @@
 #include <platform_def.h>
 #include <stdio.h>
 #include <mt_gic_v3.h>
+#include <mtk_plat_common.h>
 
 //#define GIC_DEBUG
 
@@ -516,8 +517,8 @@ void ack_sgi(unsigned int irq)
 
 void mt_atf_trigger_irq()
 {
-    atf_arg_t_ptr teearg = &gteearg;
-    gicd_set_ispendr(get_plat_config()->gicd_base, teearg->atf_irq_num);
+	struct atf_arg_t *teearg = &gteearg;
+	gicd_set_ispendr(get_plat_config()->gicd_base, teearg->atf_irq_num);
 }
 
 void mask_wdt_fiq()

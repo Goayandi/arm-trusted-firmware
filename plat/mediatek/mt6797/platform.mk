@@ -40,6 +40,7 @@ PLAT_INCLUDES		:=	-Iplat/${MTK_PLAT_SOC}/include/			\
 				-Iplat/${MTK_PLAT_SOC}/drivers/idvfs		\
 				-Iplat/${MTK_PLAT_SOC}/drivers/ocp		\
 				-Iplat/${MTK_PLAT_SOC}/drivers/scp/		\
+				-Iplat/${MTK_PLAT}/common/			\
 				-Iplat/${MTK_PLAT}/common/drivers/uart/		\
 				-Iplat/common
 
