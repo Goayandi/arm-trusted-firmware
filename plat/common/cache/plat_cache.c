@@ -230,7 +230,7 @@ int mt_icache_dump(unsigned long addr, unsigned long size)
 		/* re-fill translation table */
 		init_xlat_tables();
 		region_added = 1;
-		printf("mmap cache dump buffer (force 2MB aligned): 0x%lx, 0x%lx\n\r",
+		printf("mmap cache dump buffer (force 2MB aligned): 0x%lx, 0x%x\n\r",
 		       addr & ~(PAGE_SIZE_2MB_MASK), PAGE_SIZE_2MB);
 	}
 

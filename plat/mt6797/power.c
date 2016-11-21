@@ -1225,7 +1225,7 @@ void power_on_little(unsigned int id){
         return;
     }
     if(little_on & (1<<id)){
-	PRINTF_SPMC("Little core:%d was turned on already\n");
+	PRINTF_SPMC("Little core:%d was turned on already\n", id);
 	return;
     }
     unsigned int reg_offset = 0x220 + (id<<2);
@@ -1273,7 +1273,7 @@ void power_on_little(unsigned int id){
 }
 
 void power_off_little(unsigned int id){
-    PRINTF_SPMC("[%x] %s linear_id:%d\n",read_mpidr_el1(),__FUNCTION__,id);
+    PRINTF_SPMC("[%lx] %s linear_id:%d\n",read_mpidr_el1(),__FUNCTION__,id);
 
     if(id>7){
         PRINTF_SPMC("%s : wrong CPUID :%d\n",__FUNCTION__,id);

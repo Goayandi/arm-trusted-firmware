@@ -139,7 +139,7 @@ void aee_wdt_dump()
 	/* dump debug infos */
 	printf("CPU%d: PState=%lx, PC=%lx, SP=%lx, LR=%lx\n", (int)linear_id, regs->pstate, regs->pc, regs->sp, regs->regs[30]);
 	for(i=1; i<32; i++)
-		printf("regs[%02d] = %lx\n", (i-1), regs->regs[i-1]);
+		printf("regs[%02lu] = %lx\n", (i-1), regs->regs[i-1]);
 
 	if(0 == wdt_kernel_cb_addr) {
 
@@ -148,7 +148,7 @@ void aee_wdt_dump()
 		/* Dump regs */
 		printf("CPU%d: PState=%lx, PC=%lx, SP=%lx, LR=%lx\n", (int)linear_id, regs->pstate, regs->pc, regs->sp, regs->regs[30]);
 		for(i=1; i<32; i++)
-			printf("regs[%02d] = %lx\n", (i-1), regs->regs[i-1]);
+			printf("regs[%02lu] = %lx\n", (i-1), regs->regs[i-1]);
 
 		if (0 == regs->sp) {
 
@@ -180,7 +180,7 @@ void aee_wdt_dump()
 
 			printf("dump sp content with 16K boundry count = %ld ,mask with 0x3fff...\n",count);
 			for(i=0; i< count ; i++,pp++)
-				printf("%16lx:%16lx\n",pp,*pp);
+				printf("%16p:%16lx\n",(void *)pp,*pp);
 
 		}
 		mt_log_set_crash_flag();

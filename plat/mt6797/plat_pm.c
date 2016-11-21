@@ -339,7 +339,7 @@ int32_t plat_affinst_on(uint64_t mpidr,
 	}
 
 	/* control CPU power */
-	printf("... power on CPU%d ...\n", linear_id);
+	printf("... power on CPU%ld ...\n", linear_id);
 	power_on_little(linear_id);
 
 	return rc;

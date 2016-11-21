@@ -164,9 +164,9 @@ entry_point_info_t *bl31_plat_get_next_kernel64_ep_info(uint32_t type)
     next_image_info->args.arg1=get_kernel_info_r1();
 
     printf("pc=0x%llx, r0=0x%llx, r1=0x%llx\n",
-            next_image_info->pc,
-            next_image_info->args.arg0,
-            next_image_info->args.arg1);
+            (long long unsigned int)next_image_info->pc,
+            (long long unsigned int)next_image_info->args.arg0,
+            (long long unsigned int)next_image_info->args.arg1);
 
 
     SET_SECURITY_STATE(next_image_info->h.attr, NON_SECURE);
@@ -208,10 +208,10 @@ entry_point_info_t *bl31_plat_get_next_kernel32_ep_info(uint32_t type)
     next_image_info->args.arg2=get_kernel_info_r2();
 
     printf("pc=0x%llx, r0=0x%llx, r1=0x%llx, r2=0x%llx\n",
-           next_image_info->pc,
-           next_image_info->args.arg0,
-           next_image_info->args.arg1,
-           next_image_info->args.arg2);
+           (long long unsigned int)next_image_info->pc,
+           (long long unsigned int)next_image_info->args.arg0,
+           (long long unsigned int)next_image_info->args.arg1,
+           (long long unsigned int)next_image_info->args.arg2);
 
 
     SET_SECURITY_STATE(next_image_info->h.attr, NON_SECURE);
