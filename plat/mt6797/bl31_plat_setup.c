@@ -346,6 +346,20 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 
 }
 
+void platform_cpu_setup()
+{
+	int i;
+
+	for (i = 1; i < 8; i++)
+		power_off_little(i);
+	for (i = 8; i < 9; i++)
+#if SPMC_SW_MODE
+		big_spmc_sw_pwr_off(i-7);
+#else
+		power_off_big(i);
+#endif
+}
+
 /*******************************************************************************
  * Initialize the gic, configure the CLCD and zero out variables needed by the
  * secondaries to boot up correctly.
@@ -353,6 +367,8 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 void bl31_platform_setup(void)
 {
 //	unsigned int reg_val;
+
+	platform_cpu_setup();
 
 	/* Initialize the gic cpu and distributor interfaces */
 	dfd_setup();
