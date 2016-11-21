@@ -114,10 +114,14 @@ endif
 endif
 
 # Checkpatch ignores
-CHECK_IGNORE		=	--ignore COMPLEX_MACRO
+CHECK_IGNORE		=	--ignore COMPLEX_MACRO \
+				--ignore GERRIT_CHANGE_ID \
+				--ignore GIT_COMMIT_ID
 
 CHECKPATCH_ARGS		=	--no-tree --no-signoff ${CHECK_IGNORE}
 CHECKCODE_ARGS		=	--no-patch --no-tree --no-signoff ${CHECK_IGNORE}
+# Do not check the coding style on C library files
+CHECK_PATHS		=	$(shell ls -I include -I lib) $(shell ls -I stdlib include) $(shell ls -I stdlib lib)
 
 ifeq (${V},0)
 	Q=@
@@ -451,7 +455,7 @@ checkcodebase:		locate-checkpatch
 
 checkpatch:		locate-checkpatch
 			@echo "  CHECKING STYLE"
-			@git format-patch --stdout ${BASE_COMMIT} | ${CHECKPATCH} ${CHECKPATCH_ARGS} - || true
+			@git log -p ${BASE_COMMIT}..HEAD -- ${CHECK_PATHS} | ${CHECKPATCH} ${CHECKPATCH_ARGS} - || true
 
 .PHONY: ${CRTTOOL}
 ${CRTTOOL}:
