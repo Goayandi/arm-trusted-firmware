@@ -35,10 +35,8 @@
 #include <std_svc.h>
 #include <debug.h>
 #include "psci_private.h"
-#if defined(MACH_TYPE_MT6797)
 #include <platform.h>
-#include "../../../../plat/mt6797/power.h"
-#endif
+#include <power.h>
 
 /*******************************************************************************
  * PSCI frontend api for servicing SMCs. Described in the PSCI spec.
@@ -199,19 +197,14 @@ int psci_affinity_info(unsigned long target_affinity,
 	int rc = PSCI_E_INVALID_PARAMS;
 	unsigned int aff_state;
 	aff_map_node_t *node;
-#if defined(MACH_TYPE_MT6797)
 	unsigned int linear_id;
-#endif
 
 	if (lowest_affinity_level > PLATFORM_MAX_AFFLVL)
 		return rc;
 
 	node = psci_get_aff_map_node(target_affinity, lowest_affinity_level);
-#if defined(MACH_TYPE_MT6797)
 	linear_id = platform_get_core_pos(node->mpidr);
-#endif
 	if (node && (node->state & PSCI_AFF_PRESENT)) {
-#if defined(MACH_TYPE_MT6797)
 		if(linear_id < 8) {
 			power_off_little(linear_id);
 		} else {
@@ -221,7 +214,6 @@ int psci_affinity_info(unsigned long target_affinity,
 			power_off_big(linear_id);
 #endif
 		}
-#endif
 
 		/*
 		 * TODO: For affinity levels higher than 0 i.e. cpu, the
