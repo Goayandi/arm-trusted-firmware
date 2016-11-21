@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013-2014, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -42,42 +42,19 @@ VERSION_MINOR		:= 1
 V			:= 0
 # Debug build
 DEBUG			:= 0
-# Build architecture
-ARCH 			:= aarch64
 # Build platform
 DEFAULT_PLAT		:= fvp
 PLAT			:= ${DEFAULT_PLAT}
-# Secure OS Support
-SECURE_OS		:= no
-$(info secure OS support : ${SECURE_OS})
 # SPD choice
-SPD			:= fiqd
-ifeq (${SECURE_OS},tbase)
-SPD			:= tbase
-endif
-ifeq (${SECURE_OS},mtee)
-SPD			:= mtee
-endif
-ifeq (${SECURE_OS},trusty)
-SPD			:= trusty
-endif
-ifeq (${SECURE_OS},teeid)
-SPD			:= teeid
-endif
-# OEM choice
-OEMS			:= oems
+SPD			:= none
 # Base commit to perform code check on
 BASE_COMMIT		:= origin/master
 # NS timer register save and restore
 NS_TIMER_SWITCH		:= 0
 # By default, Bl1 acts as the reset handler, not BL31
 RESET_TO_BL31		:= 0
-ifeq (${SECURE_OS},teeid)
 # Include FP registers in cpu context
-CTX_INCLUDE_FPREGS		:= 1
-else
 CTX_INCLUDE_FPREGS		:= 0
-endif
 # Determine the version of ARM GIC architecture to use for interrupt management
 # in EL3. The platform port can change this value if needed.
 ARM_GIC_ARCH		:=	2
@@ -99,22 +76,6 @@ CREATE_KEYS		:= 1
 # Flags to build TF with Trusted Boot support
 TRUSTED_BOARD_BOOT	:= 0
 AUTH_MOD		:= none
-
-# MACH_TYPE build
-MACH_TYPE			:= MTXXXX
-$(info MACH_TYPE support : ${MACH_TYPE})
-
-ifneq ($(filter mt6752 mt6795,$(MACH_TYPE)),)
-  $(error "Error: Invalid platform, the MACH type is not supported with ATF 1.0 : ${MACH_TYPE}")
-endif
-
-# Temp solution for code size of MT6797 TEEI
-ifeq (${SECURE_OS},teeid)
-ifneq ($(filter mt6797,$(MACH_TYPE)),)
-  $(warning "Temp solution for code size of MT6797 TEEI")
-  CTX_INCLUDE_FPREGS		:= 0
-endif
-endif
 
 # Checkpatch ignores
 CHECK_IGNORE		=	--ignore COMPLEX_MACRO \
@@ -166,10 +127,14 @@ BUILD_BASE		:=	./build
 #BUILD_PLAT		:=	${BUILD_BASE}/${PLAT}/${BUILD_TYPE}
 BUILD_PLAT		:=	${BUILD_BASE}/${BUILD_TYPE}
 
-#PLATFORMS		:=	$(shell ls -I common plat/)
-PLATFORMS		:=	$(PLAT)
-SPDS			:=	$(filter-out none,$(shell ls services/spd))
-HELP_PLATFORMS		:=	$(shell echo ${PLATFORMS} | sed 's/ /|/g')
+PLAT_MAKEFILE		:=	platform.mk
+# Generate the platforms list by recursively searching for all directories
+# under /plat containing a PLAT_MAKEFILE. Append each platform with a `|`
+# char and strip out the final '|'.
+PLATFORMS		:=	$(shell find plat/ -name '${PLAT_MAKEFILE}' -print0 |			\
+					sed -r 's%[^\x00]*\/([^/]*)\/${PLAT_MAKEFILE}\x00%\1|%g' |	\
+					sed -r 's/\|$$//')
+SPDS			:=	$(shell ls -I none services/spd)
 
 # Convenience function for adding build definitions
 # $(eval $(call add_define,FOO)) will have:
@@ -185,9 +150,10 @@ $(and $(patsubst 0,,$(value $(1))),$(patsubst 1,,$(value $(1))),$(error $(1) mus
 endef
 
 ifeq (${PLAT},)
-  $(error "Error: Unknown platform. Please use PLAT=<platform name> to specify the platform.")
+  $(error "Error: Unknown platform. Please use PLAT=<platform name> to specify the platform")
 endif
-ifeq ($(findstring ${PLAT},${PLATFORMS}),)
+PLAT_MAKEFILE_FULL	:=	$(shell find plat/ -wholename '*/${PLAT}/${PLAT_MAKEFILE}')
+ifeq ($(PLAT_MAKEFILE_FULL),)
   $(error "Error: Invalid platform. The following platforms are available: ${PLATFORMS}")
 endif
 
@@ -196,7 +162,7 @@ all: msg_start
 msg_start:
 	@echo "Building ${PLAT}"
 
-include plat/${PLAT}/platform.mk
+include ${PLAT_MAKEFILE_FULL}
 
 # Include the CPU specific operations makefile. By default all CPU errata
 # workarounds and CPU specifc optimisations are disabled. This can be
@@ -238,18 +204,6 @@ ifneq (${SPD},none)
   # fip, then the NEED_BL32 needs to be set and BL3-2 would need to point to the bin.
 endif
 
-# Include OEM Makefile if one has been specified
-ifneq (${OEMS},none)
-  # We expect to locate an oems.mk under the specified OEMS directory
-  OEMS_MAKE		:=	$(shell m="custom/${OEMS}.mk"; [ -f "$$m" ] && echo "$$m")
-
-  ifeq (${OEMS_MAKE},)
-    $(error Error: No custom/${OEMS}.mk located)
-  endif
-  $(info Including ${OEMS_MAKE})
-  include ${OEMS_MAKE}
-endif
-
 .PHONY:			all msg_start clean realclean distclean cscope locate-checkpatch checkcodebase checkpatch fiptool fip certtool
 .SUFFIXES:
 
@@ -266,7 +220,6 @@ INCLUDES		+=	-Iinclude/bl31			\
 				-Iinclude/stdlib		\
 				-Iinclude/stdlib/sys		\
 				${PLAT_INCLUDES}		\
-				${OEMS_INCLUDES}		\
 				${SPD_INCLUDES}
 
 # Process DEBUG flag
@@ -275,13 +228,12 @@ $(eval $(call add_define,DEBUG))
 ifeq (${DEBUG},0)
   $(eval $(call add_define,NDEBUG))
 else
-CFLAGS			+= 	-g -gdwarf-2 -O0
+CFLAGS			+= 	-g
 ASFLAGS			+= 	-g -Wa,--gdwarf-2
 endif
 
-# Process MACH_TYPE flag
-# Transfer all letters to upper case
-$(eval $(call add_define,MACH_TYPE_$(shell echo $(MACH_TYPE) | tr '[a-z]' '[A-Z]')))
+# Process PLAT flag
+$(eval $(call add_define,PLAT_${PLAT}))
 
 # Process NS_TIMER_SWITCH flag
 $(eval $(call assert_boolean,NS_TIMER_SWITCH))
@@ -308,9 +260,6 @@ $(eval $(call add_define,ASM_ASSERTION))
 # Process LOG_LEVEL flag
 $(eval $(call add_define,LOG_LEVEL))
 
-# Process SPD flag
-$(eval $(call add_define,SPD_${SECURE_OS}))
-
 # Process USE_COHERENT_MEM flag
 $(eval $(call assert_boolean,USE_COHERENT_MEM))
 $(eval $(call add_define,USE_COHERENT_MEM))
@@ -332,37 +281,6 @@ CFLAGS			+= 	-nostdinc -ffreestanding -Wall			\
 				-mgeneral-regs-only -std=c99 -c -Os		\
 				${DEFINES} ${INCLUDES}
 CFLAGS			+=	-ffunction-sections -fdata-sections
-
-ifneq (${SECURE_OS},teeid)
-ASFLAGS += -Werror
-CFLAGS += -Werror
-endif
-
-ifeq (${SECURE_OS},teeid)
-CFLAGS += -DCFG_MICROTRUST_TEE_SUPPORT=1
-endif
-
-ifeq (${SECURE_DEINT_SUPPORT},yes)
-CFLAGS += -DSECURE_DEINT_SUPPORT=1
-endif
-
-#stack protector
-ifeq (${MTK_STACK_PROTECTOR},yes)
-CFLAGS += -fstack-protector-all
-CFLAGS += -DMTK_STACK_PROTECTOR
-endif
-
-#Full ATF ram dump
-ifeq (${MTK_ATF_RAM_DUMP},yes)
-CFLAGS += -DMTK_ATF_RAM_DUMP
-ASFLAGS += -DMTK_ATF_RAM_DUMP
-endif
-
-#SMC ID logging
-ifeq (${DEBUG_SMC_ID_LOG},yes)
-CFLAGS += -DDEBUG_SMC_ID_LOG
-ASFLAGS += -DDEBUG_SMC_ID_LOG
-endif
 
 LDFLAGS			+=	--fatal-warnings -O1
 LDFLAGS			+=	--gc-sections
@@ -487,15 +405,6 @@ BUILD_TARGETS := all bl1 bl2 bl31 bl32 fip
 ifneq ($(call match_goals,${BUILD_TARGETS}),)
 IS_ANYTHING_TO_BUILD := 1
 endif
-
-
-# For incremental build
-define MAKE_DEPS
-$(eval DEPS_PREREQUISITES := $(filter-out %.d,$(MAKEFILE_LIST)) $(ATF_ADDITIONAL_DEPENDENCIES))
-$(eval DEPS_TARGETS := $(OBJS) $(OEM_OBJS) $(patsubst %.o,%.d,$(OBJS) $(OEM_OBJS)) $(LINKERFILE) $(LINKERFILE).d)
-$(DEPS_TARGETS) : $(DEPS_PREREQUISITES)
-endef
-
 
 define MAKE_C
 
@@ -626,19 +535,17 @@ define MAKE_BL
 
 	$(eval $(call MAKE_OBJS,$(BUILD_DIR),$(SOURCES),$(1)))
 	$(eval $(call MAKE_LD,$(LINKERFILE),$(BL$(1)_LINKERFILE)))
-	$(eval $(call MAKE_DEPS))
 
 $(BUILD_DIR) :
 	$$(Q)mkdir -p "$$@"
 
 $(ELF) : $(OBJS) $(LINKERFILE)
-	@echo "BL31_LINKERFILE: ${BL31_LINKERFILE}"
 	@echo "  LD      $$@"
 	@echo 'const char build_message[] = "Built : "__TIME__", "__DATE__; \
 	       const char version_string[] = "${VERSION_STRING}";' | \
 		$$(CC) $$(CFLAGS) -xc - -o $(BUILD_DIR)/build_message.o
 	$$(Q)$$(LD) -o $$@ $$(LDFLAGS) -Map=$(MAPFILE) --script $(LINKERFILE) \
-					$(BUILD_DIR)/build_message.o $(OBJS) $(STATIC_LIBS)
+					$(BUILD_DIR)/build_message.o $(OBJS)
 
 $(DUMP) : $(ELF)
 	@echo "  OD      $$@"
@@ -736,7 +643,7 @@ cscope:
 	${Q}cscope -b -q -k
 
 help:
-	@echo "usage: ${MAKE} PLAT=<${HELP_PLATFORMS}> [OPTIONS] [TARGET]"
+	@echo "usage: ${MAKE} PLAT=<${PLATFORMS}> [OPTIONS] [TARGET]"
 	@echo ""
 	@echo "PLAT is used to specify which platform you wish to build."
 	@echo "If no platform is specified, PLAT defaults to: ${DEFAULT_PLAT}"
