@@ -41,9 +41,9 @@
 /*******************************************************************************
  * PSCI frontend api for servicing SMCs. Described in the PSCI spec.
  ******************************************************************************/
-int psci_cpu_on(unsigned long target_cpu,
-		unsigned long entrypoint,
-		unsigned long context_id)
+int psci_cpu_on(u_register_t target_cpu,
+		uintptr_t entrypoint,
+		u_register_t context_id)
 
 {
 	int rc;
@@ -55,21 +55,8 @@ int psci_cpu_on(unsigned long target_cpu,
 	if (rc != PSCI_E_SUCCESS)
 		return PSCI_E_INVALID_PARAMS;
 
-	/* Validate the entrypoint using platform pm_ops */
-	if (psci_plat_pm_ops->validate_ns_entrypoint) {
-		rc = psci_plat_pm_ops->validate_ns_entrypoint(entrypoint);
-		if (rc != PSCI_E_SUCCESS) {
-			assert(rc == PSCI_E_INVALID_PARAMS);
-			return PSCI_E_INVALID_PARAMS;
-		}
-	}
-
-	/*
-	 * Verify and derive the re-entry information for
-	 * the non-secure world from the non-secure state from
-	 * where this call originated.
-	 */
-	rc = psci_get_ns_ep_info(&ep, entrypoint, context_id);
+	/* Validate the entry point and get the entry_point_info */
+	rc = psci_validate_entry_point(&ep, entrypoint, context_id);
 	if (rc != PSCI_E_SUCCESS)
 		return rc;
 
@@ -90,8 +77,8 @@ unsigned int psci_version(void)
 }
 
 int psci_cpu_suspend(unsigned int power_state,
-		     unsigned long entrypoint,
-		     unsigned long context_id)
+		     uintptr_t entrypoint,
+		     u_register_t context_id)
 {
 	int rc;
 	unsigned int target_pwrlvl, is_power_down_state;
@@ -141,20 +128,7 @@ int psci_cpu_suspend(unsigned int power_state,
 	 * point and program entry information.
 	 */
 	if (is_power_down_state) {
-		if (psci_plat_pm_ops->validate_ns_entrypoint) {
-			rc = psci_plat_pm_ops->validate_ns_entrypoint(entrypoint);
-			if (rc != PSCI_E_SUCCESS) {
-				assert(rc == PSCI_E_INVALID_PARAMS);
-				return rc;
-			}
-		}
-
-		/*
-		 * Verify and derive the re-entry information for
-		 * the non-secure world from the non-secure state from
-		 * where this call originated.
-		 */
-		rc = psci_get_ns_ep_info(&ep, entrypoint, context_id);
+		rc = psci_validate_entry_point(&ep, entrypoint, context_id);
 		if (rc != PSCI_E_SUCCESS)
 			return rc;
 	}
@@ -173,32 +147,19 @@ int psci_cpu_suspend(unsigned int power_state,
 	return PSCI_E_SUCCESS;
 }
 
-int psci_system_suspend(unsigned long entrypoint,
-			unsigned long context_id)
+
+int psci_system_suspend(uintptr_t entrypoint, u_register_t context_id)
 {
 	int rc;
 	psci_power_state_t state_info;
 	entry_point_info_t ep;
 
-	/* Validate the entrypoint using platform pm_ops */
-	if (psci_plat_pm_ops->validate_ns_entrypoint) {
-		rc = psci_plat_pm_ops->validate_ns_entrypoint(entrypoint);
-		if (rc != PSCI_E_SUCCESS) {
-			assert(rc == PSCI_E_INVALID_PARAMS);
-			return rc;
-		}
-	}
-
 	/* Check if the current CPU is the last ON CPU in the system */
 	if (!psci_is_last_on_cpu())
 		return PSCI_E_DENIED;
 
-	/*
-	 * Verify and derive the re-entry information for
-	 * the non-secure world from the non-secure state from
-	 * where this call originated.
-	 */
-	rc = psci_get_ns_ep_info(&ep, entrypoint, context_id);
+	/* Validate the entry point and get the entry_point_info */
+	rc = psci_validate_entry_point(&ep, entrypoint, context_id);
 	if (rc != PSCI_E_SUCCESS)
 		return rc;
 
@@ -227,7 +188,7 @@ int psci_system_suspend(unsigned long entrypoint,
 int psci_cpu_off(void)
 {
 	int rc;
-	int target_pwrlvl = PLAT_MAX_PWR_LVL;
+	unsigned int target_pwrlvl = PLAT_MAX_PWR_LVL;
 
 	/*
 	 * Do what is needed to power off this CPU and possible higher power
@@ -245,7 +206,7 @@ int psci_cpu_off(void)
 	return rc;
 }
 
-int psci_affinity_info(unsigned long target_affinity,
+int psci_affinity_info(u_register_t target_affinity,
 		       unsigned int lowest_affinity_level)
 {
 	unsigned int target_idx;
@@ -262,10 +223,10 @@ int psci_affinity_info(unsigned long target_affinity,
 	return psci_get_aff_info_state_by_idx(target_idx);
 }
 
-int psci_migrate(unsigned long target_cpu)
+int psci_migrate(u_register_t target_cpu)
 {
 	int rc;
-	unsigned long resident_cpu_mpidr;
+	u_register_t resident_cpu_mpidr;
 
 	rc = psci_spd_migrate_info(&resident_cpu_mpidr);
 	if (rc != PSCI_TOS_UP_MIG_CAP)
@@ -294,14 +255,14 @@ int psci_migrate(unsigned long target_cpu)
 
 int psci_migrate_info_type(void)
 {
-	unsigned long resident_cpu_mpidr;
+	u_register_t resident_cpu_mpidr;
 
 	return psci_spd_migrate_info(&resident_cpu_mpidr);
 }
 
 long psci_migrate_info_up_cpu(void)
 {
-	unsigned long resident_cpu_mpidr;
+	u_register_t resident_cpu_mpidr;
 	int rc;
 
 	/*
@@ -317,7 +278,7 @@ long psci_migrate_info_up_cpu(void)
 
 int psci_features(unsigned int psci_fid)
 {
-	uint32_t local_caps = psci_caps;
+	unsigned int local_caps = psci_caps;
 
 	/* Check if it is a 64 bit function */
 	if (((psci_fid >> FUNCID_CC_SHIFT) & FUNCID_CC_MASK) == SMC_64)

@@ -134,6 +134,29 @@ wait_for_entrypoint:
 	do_cold_boot:
 	.endm
 	/*
+	 * Theses macros are used to create function labels for deprecated
+	 * APIs. If WARN_DEPRECATED is non zero, the callers of these APIs
+	 * will fail to link and cause build failure.
+	 */
+#if WARN_DEPRECATED
+	.macro func_deprecated _name
+	func deprecated\_name
+	.endm
+
+	.macro endfunc_deprecated _name
+	endfunc deprecated\_name
+	.endm
+#else
+	.macro func_deprecated _name
+	func \_name
+	.endm
+
+	.macro endfunc_deprecated _name
+	endfunc \_name
+	.endm
+#endif
+
+	/*
 	 * This macro declares an array of 1 or more stacks, properly
 	 * aligned and in the requested section
 	 */
