@@ -44,13 +44,18 @@ struct entry_point_info;
 struct bl31_params;
 
 /*******************************************************************************
+ * plat_get_rotpk_info() flags
+ ******************************************************************************/
+#define ROTPK_IS_HASH			(1 << 0)
+
+/*******************************************************************************
  * Function declarations
  ******************************************************************************/
 /*******************************************************************************
  * Mandatory common functions
  ******************************************************************************/
 uint64_t plat_get_syscnt_freq(void);
-int plat_get_image_source(const char *image_name,
+int plat_get_image_source(unsigned int image_id,
 			uintptr_t *dev_handle,
 			uintptr_t *image_spec);
 unsigned long plat_get_ns_image_entrypoint(void);
@@ -232,8 +237,9 @@ CHIP_SW_VER mt_get_chip_sw_ver(void);
 void dump_wfi_spill(void);
 
 /*******************************************************************************
- * Trusted Boot functions
+ * Trusted Board Boot functions
  ******************************************************************************/
-int plat_match_rotpk(const unsigned char *, unsigned int);
+int plat_get_rotpk_info(void *cookie, void **key_ptr, unsigned int *key_len,
+			unsigned int *flags);
 
 #endif /* __PLATFORM_H__ */

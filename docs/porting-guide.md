@@ -134,51 +134,6 @@ platform port to define additional platform porting constants in
     Defines the character string printed by BL1 upon entry into the `bl1_main()`
     function.
 
-*   **#define : BL2_IMAGE_NAME**
-
-    Name of the BL2 binary image on the host file-system. This name is used by
-    BL1 to load BL2 into secure memory from non-volatile storage.
-
-*   **#define : BL31_IMAGE_NAME**
-
-    Name of the BL3-1 binary image on the host file-system. This name is used by
-    BL2 to load BL3-1 into secure memory from platform storage.
-
-*   **#define : BL33_IMAGE_NAME**
-
-    Name of the BL3-3 binary image on the host file-system. This name is used by
-    BL2 to load BL3-3 into non-secure memory from platform storage.
-
-*   **#define : BL2_CERT_NAME**
-
-    Name of the BL2 content certificate on the host file-system (mandatory when
-    Trusted Board Boot is enabled).
-
-*   **#define : TRUSTED_KEY_CERT_NAME**
-
-    Name of the Trusted Key certificate on the host file-system (mandatory when
-    Trusted Board Boot is enabled).
-
-*   **#define : BL31_KEY_CERT_NAME**
-
-    Name of the BL3-1 Key certificate on the host file-system (mandatory when
-    Trusted Board Boot is enabled).
-
-*   **#define : BL31_CERT_NAME**
-
-    Name of the BL3-1 Content certificate on the host file-system (mandatory
-    when Trusted Board Boot is enabled).
-
-*   **#define : BL33_KEY_CERT_NAME**
-
-    Name of the BL3-3 Key certificate on the host file-system (mandatory when
-    Trusted Board Boot is enabled).
-
-*   **#define : BL33_CERT_NAME**
-
-    Name of the BL3-3 Content certificate on the host file-system (mandatory
-    when Trusted Board Boot is enabled).
-
 *   **#define : PLATFORM_CORE_COUNT**
 
     Defines the total number of CPUs implemented by the platform across all
@@ -243,42 +198,93 @@ platform port to define additional platform porting constants in
     Defines the base address in non-secure DRAM where BL2 loads the BL3-3 binary
     image. Must be aligned on a page-size boundary.
 
+For every image, the platform must define individual identifiers that will be
+used by BL1 or BL2 to load the corresponding image into memory from non-volatile
+storage. For the sake of performance, integer numbers will be used as
+identifiers. The platform will use those identifiers to return the relevant
+information about the image to be loaded (file handler, load address,
+authentication information, etc.). The following image identifiers are
+mandatory:
+
+*   **#define : BL2_IMAGE_ID**
+
+    BL2 image identifier, used by BL1 to load BL2.
+
+*   **#define : BL31_IMAGE_ID**
+
+    BL3-1 image identifier, used by BL2 to load BL3-1.
+
+*   **#define : BL33_IMAGE_ID**
+
+    BL3-3 image identifier, used by BL2 to load BL3-3.
+
+If Trusted Board Boot is enabled, the following certificate identifiers must
+also be defined:
+
+*   **#define : BL2_CERT_ID**
+
+    BL2 content certificate identifier, used by BL1 to load the BL2 content
+    certificate.
+
+*   **#define : TRUSTED_KEY_CERT_ID**
+
+    Trusted key certificate identifier, used by BL2 to load the trusted key
+    certificate.
+
+*   **#define : BL31_KEY_CERT_ID**
+
+    BL3-1 key certificate identifier, used by BL2 to load the BL3-1 key
+    certificate.
+
+*   **#define : BL31_CERT_ID**
+
+    BL3-1 content certificate identifier, used by BL2 to load the BL3-1 content
+    certificate.
+
+*   **#define : BL33_KEY_CERT_ID**
+
+    BL3-3 key certificate identifier, used by BL2 to load the BL3-3 key
+    certificate.
+
+*   **#define : BL33_CERT_ID**
+
+    BL3-3 content certificate identifier, used by BL2 to load the BL3-3 content
+    certificate.
+
 If a BL3-0 image is supported by the platform, the following constants must
 also be defined:
 
-*   **#define : BL30_IMAGE_NAME**
+*   **#define : BL30_IMAGE_ID**
 
-    Name of the BL3-0 binary image on the host file-system. This name is used by
-    BL2 to load BL3-0 into secure memory from platform storage before being
-    transfered to the SCP.
+    BL3-0 image identifier, used by BL2 to load BL3-0 into secure memory from
+    platform storage before being transfered to the SCP.
 
-*   **#define : BL30_KEY_CERT_NAME**
+*   **#define : BL30_KEY_CERT_ID**
 
-    Name of the BL3-0 Key certificate on the host file-system (mandatory when
-    Trusted Board Boot is enabled).
+    BL3-0 key certificate identifier, used by BL2 to load the BL3-0 key
+    certificate (mandatory when Trusted Board Boot is enabled).
 
-*   **#define : BL30_CERT_NAME**
+*   **#define : BL30_CERT_ID**
 
-    Name of the BL3-0 Content certificate on the host file-system (mandatory
-    when Trusted Board Boot is enabled).
+    BL3-0 content certificate identifier, used by BL2 to load the BL3-0 content
+    certificate (mandatory when Trusted Board Boot is enabled).
 
 If a BL3-2 image is supported by the platform, the following constants must
 also be defined:
 
-*   **#define : BL32_IMAGE_NAME**
+*   **#define : BL32_IMAGE_ID**
 
-    Name of the BL3-2 binary image on the host file-system. This name is used by
-    BL2 to load BL3-2 into secure memory from platform storage.
+    BL3-2 image identifier, used by BL2 to load BL3-2.
 
-*   **#define : BL32_KEY_CERT_NAME**
+*   **#define : BL32_KEY_CERT_ID**
 
-    Name of the BL3-2 Key certificate on the host file-system (mandatory when
-    Trusted Board Boot is enabled).
+    BL3-2 key certificate identifier, used by BL2 to load the BL3-2 key
+    certificate (mandatory when Trusted Board Boot is enabled).
 
-*   **#define : BL32_CERT_NAME**
+*   **#define : BL32_CERT_ID**
 
-    Name of the BL3-2 Content certificate on the host file-system (mandatory
-    when Trusted Board Boot is enabled).
+    BL3-2 content certificate identifier, used by BL2 to load the BL3-2 content
+    certificate (mandatory when Trusted Board Boot is enabled).
 
 *   **#define : BL32_BASE**
 
@@ -434,7 +440,7 @@ This function fulfills requirement 1 and 3 listed above.
 This function is called with the MMU and data caches disabled. It is responsible
 for placing the executing secondary CPU in a platform-specific state until the
 primary CPU performs the necessary actions to bring it out of that state and
-allow entry into the OS.
+allow entry into the OS. This function must not return.
 
 In the ARM FVP port, each secondary CPU powers itself off. The primary CPU is
 responsible for powering up the secondary CPU when normal world software
@@ -466,15 +472,36 @@ The ARM FVP port uses this function to initialize the mailbox memory used for
 providing the warm-boot entry-point addresses.
 
 
-### Function: plat_match_rotpk()
+### Function: plat_get_rotpk_info()
 
-    Argument : const unsigned char *, unsigned int
+    Argument : void *, void **, unsigned int *, unsigned int *
     Return   : int
 
-This function is mandatory when Trusted Board Boot is enabled. It receives a
-pointer to a buffer containing a signing key and its size as parameters and
-returns 0 (success) if that key matches the ROT (Root Of Trust) key stored in
-the platform. Any other return value means a mismatch.
+This function is mandatory when Trusted Board Boot is enabled. It returns a
+pointer to the ROTPK stored in the platform (or a hash of it) and its length.
+The ROTPK must be encoded in DER format according to the following ASN.1
+structure:
+
+    AlgorithmIdentifier  ::=  SEQUENCE  {
+        algorithm         OBJECT IDENTIFIER,
+        parameters        ANY DEFINED BY algorithm OPTIONAL
+    }
+
+    SubjectPublicKeyInfo  ::=  SEQUENCE  {
+        algorithm         AlgorithmIdentifier,
+        subjectPublicKey  BIT STRING
+    }
+
+In case the function returns a hash of the key:
+
+    DigestInfo ::= SEQUENCE {
+        digestAlgorithm   AlgorithmIdentifier,
+        digest            OCTET STRING
+    }
+
+The function returns 0 on success. Any other value means the ROTPK could not be
+retrieved from the platform. The function also reports extra information related
+to the ROTPK in the flags parameter.
 
 
 
@@ -569,7 +596,7 @@ preserve the values of callee saved registers x19 to x29.
 
 The default implementation doesn't do anything. If a platform needs to override
 the default implementation, refer to the [Firmware Design] for general
-guidelines regarding placement of code in a reset handler.
+guidelines.
 
 ### Function : plat_disable_acp()
 
@@ -1211,8 +1238,8 @@ affinity level 0 (CPU), the platform port should power down affinity level 1
 #### plat_pm_ops.affinst_suspend()
 
 Perform the platform specific setup to power off an affinity instance of the
-calling CPU. It is called by the PSCI `CPU_SUSPEND` API
-implementation.
+calling CPU. It is called by the PSCI `CPU_SUSPEND` API and `SYSTEM_SUSPEND`
+API implementation
 
 The `affinity level` (second argument) and `state` (third argument) have a
 similar meaning as described in the `affinst_on()` operation. They are used to
@@ -1241,14 +1268,14 @@ The `affinity level` (first argument) and `state` (second argument) have a
 similar meaning as described in the previous operations. The generic code
 expects the handler to succeed.
 
-#### plat_pm_ops.affinst_on_suspend()
+#### plat_pm_ops.affinst_suspend_finish()
 
 This function is called by the PSCI implementation after the calling CPU is
 powered on and released from reset in response to an asynchronous wakeup
 event, for example a timer interrupt that was programmed by the CPU during the
-`CPU_SUSPEND` call. It performs the platform-specific setup required to
-restore the saved state for this CPU to resume execution in the normal world
-and also provide secure runtime firmware services.
+`CPU_SUSPEND` call or `SYSTEM_SUSPEND` call. It performs the platform-specific
+setup required to restore the saved state for this CPU to resume execution
+in the normal world and also provide secure runtime firmware services.
 
 The `affinity level` (first argument) and `state` (second argument) have a
 similar meaning as described in the previous operations. The generic code
@@ -1264,11 +1291,20 @@ world PSCI client.
 
 #### plat_pm_ops.validate_ns_entrypoint()
 
-This function is called by the PSCI implementation during the `CPU_SUSPEND`
-and `CPU_ON` calls to validate the non-secure `entry_point` parameter passed
-by the normal world. If the `entry_point` is known to be invalid, the platform
-must return PSCI_E_INVALID_PARAMS as error, which is propagated back to the
-normal world PSCI client.
+This function is called by the PSCI implementation during the `CPU_SUSPEND`,
+`SYSTEM_SUSPEND` and `CPU_ON` calls to validate the non-secure `entry_point`
+parameter passed by the normal world. If the `entry_point` is known to be
+invalid, the platform must return PSCI_E_INVALID_PARAMS as error, which is
+propagated back to the normal world PSCI client.
+
+#### plat_pm_ops.get_sys_suspend_power_state()
+
+This function is called by the PSCI implementation during the `SYSTEM_SUSPEND`
+call to return the `power_state` parameter. This allows the platform to encode
+the appropriate State-ID field within the `power_state` parameter which can be
+utilized in `affinst_suspend()` to suspend to system affinity level. The
+`power_state` parameter should be in the same format as specified by the
+PSCI specification for the CPU_SUSPEND API.
 
 BL3-1 platform initialization code must also detect the system topology and
 the state of each affinity instance in the topology. This information is
@@ -1528,10 +1564,11 @@ provide at least one driver for a device capable of supporting generic
 operations such as loading a bootloader image.
 
 The current implementation only allows for known images to be loaded by the
-firmware.  These images are specified by using their names, as defined in
-[include/plat/common/platform.h]. The platform layer (`plat_get_image_source()`)
-then returns a reference to a device and a driver-specific `spec` which will be
-understood by the driver to allow access to the image data.
+firmware. These images are specified by using their identifiers, as defined in
+[include/plat/common/platform_def.h] (or a separate header file included from
+there). The platform layer (`plat_get_image_source()`) then returns a reference
+to a device and a driver-specific `spec` which will be understood by the driver
+to allow access to the image data.
 
 The layer is designed in such a way that is it possible to chain drivers with
 other drivers.  For example, file-system drivers may be implemented on top of
