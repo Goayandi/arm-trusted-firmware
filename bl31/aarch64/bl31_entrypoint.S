@@ -377,3 +377,4 @@ DORMANT_LOG_BASE:
 DORMANT_LOG_T0:
 	.word 0xA7F00401
 
+endfunc bl31_entrypoint

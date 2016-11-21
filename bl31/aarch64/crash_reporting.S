@@ -91,6 +91,7 @@ dump_last_lr_msg:
 func print_newline
 	mov	x0, '\n'
 	b	plat_crash_console_putc
+endfunc print_newline
 
 	/*
 	 * Helper function to print from crash buf.
@@ -128,6 +129,7 @@ test_size_list:
 exit_size_print:
 	mov	x30, sp
 	ret
+endfunc size_controlled_print
 
 	/*
 	 * Helper function to store x8 - x15 registers to
@@ -146,6 +148,7 @@ func str_in_crash_buf_print
 	stp	x12, x13, [x0, #REG_SIZE * 4]
 	stp	x14, x15, [x0, #REG_SIZE * 6]
 	b	size_controlled_print
+endfunc str_in_crash_buf_print
 
 	/* ------------------------------------------------------
 	 * This macro calculates the offset to crash buf from
@@ -276,6 +279,7 @@ func plat_print_dormant_log
 	str	w2,	[x0]
 
 	ret	x3
+endfunc plat_print_dormant_log
 
 	/* -----------------------------------------------------
 	 * This function allows to report a crash (if crash
@@ -291,6 +295,7 @@ func report_unhandled_exception
 	mov	sp, x0
 	/* This call will not return */
 	b	do_crash_reporting
+endfunc report_unhandled_exception
 
 
 	/* -----------------------------------------------------
@@ -307,6 +312,7 @@ func report_unhandled_interrupt
 	mov	sp, x0
 	/* This call will not return */
 	b	do_crash_reporting
+endfunc report_unhandled_interrupt
 
 	/* -----------------------------------------------------
 	 * This function allows to report a crash (if crash
@@ -323,6 +329,7 @@ func el3_panic
 	mov	sp, x0
 	/* This call will not return */
 	b	do_crash_reporting
+endfunc el3_panic
 
 	/* ------------------------------------------------------------
 	 * The common crash reporting functionality. It requires x0
@@ -476,11 +483,13 @@ func do_crash_reporting
 #endif
 	/* Done reporting */
 	b	crash_panic
+endfunc do_crash_reporting
 
 #else	/* CRASH_REPORTING */
 func report_unhandled_exception
 report_unhandled_interrupt:
 	b	crash_panic
+endfunc report_unhandled_exception
 #endif	/* CRASH_REPORING */
 
 
@@ -492,3 +501,4 @@ func crash_panic
 	bl plat_print_dormant_log
 #endif
 	b	crash_panic
+endfunc crash_panic

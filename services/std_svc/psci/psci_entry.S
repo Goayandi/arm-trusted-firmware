@@ -148,6 +148,7 @@ psci_aff_common_finish_entry:
 	bl	psci_afflvl_power_on_finish
 
 	b	el3_exit
+endfunc psci_aff_on_finish_entry
 
 	/* --------------------------------------------
 	 * This function is called to indicate to the
@@ -166,4 +167,5 @@ wfi_spill:
 	bl	dump_wfi_spill
 	bl	report_unhandled_exception
 	b	wfi_spill
+endfunc psci_power_down_wfi
 
