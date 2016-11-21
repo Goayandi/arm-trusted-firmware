@@ -133,7 +133,6 @@ wait_for_entrypoint:
 
 	do_cold_boot:
 	.endm
-
 	/*
 	 * This macro declares an array of 1 or more stacks, properly
 	 * aligned and in the requested section
