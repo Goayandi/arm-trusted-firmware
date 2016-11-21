@@ -46,13 +46,6 @@
 #include <string.h>
 #include <ctype.h>
 
-typedef unsigned char u_char;
-typedef unsigned int u_int;
-typedef int64_t quad_t;
-typedef uint64_t u_quad_t;
-typedef unsigned long u_long;
-typedef unsigned short u_short;
-
 static inline int imax(int a, int b) { return (a > b ? a : b); }
 
 /*

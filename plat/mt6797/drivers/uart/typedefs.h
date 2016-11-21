@@ -45,7 +45,6 @@
 //#define __SRAM__  __NOBITS_SECTION__(.secbuf)
 typedef unsigned long ulong;
 typedef unsigned char uchar;
-typedef unsigned int uint;
 typedef signed char int8;
 typedef signed short int16;
 typedef signed long int32;
