@@ -97,6 +97,7 @@ func plat_secondary_cold_boot_setup
 	wfi
 cb_panic:
 	b	cb_panic
+endfunc plat_secondary_cold_boot_setup
 
 
 	/* -----------------------------------------------------
@@ -167,6 +168,7 @@ warm_reset:
 exit:
 	ret	x9
 _panic:	b	_panic
+endfunc platform_get_entrypoint
 
 
 	/* -----------------------------------------------------
@@ -189,6 +191,7 @@ loop:
 	subs	w1, w1, #1
 	b.gt	loop
 	ret
+endfunc platform_mem_init
 
 	/* ---------------------------------------------
 	 * void plat_report_exception(unsigned int type)
@@ -210,6 +213,7 @@ func plat_report_exception
 	add	x1, x1, #V2M_SYS_LED
 	str	w0, [x1]
 	ret
+endfunc plat_report_exception
 
         .globl read_l2actlr
 func read_l2actlr
@@ -218,6 +222,7 @@ func read_l2actlr
         dsb sy
         isb
 	ret
+endfunc read_l2actlr
 
         .globl write_l2actlr
 func write_l2actlr
@@ -226,6 +231,7 @@ func write_l2actlr
         isb
         dsb sy
 	ret
+endfunc write_l2actlr
 
         .globl read_l2ectlr
 func read_l2ectlr
@@ -233,6 +239,7 @@ func read_l2ectlr
         dsb sy
         isb
 	ret
+endfunc read_l2ectlr
 
         .globl write_l2ectlr
 func write_l2ectlr
@@ -241,6 +248,7 @@ func write_l2ectlr
         isb
         dsb sy
 	ret
+endfunc write_l2ectlr
 
         .globl read_cpuactlr
 func read_cpuactlr
@@ -249,6 +257,7 @@ func read_cpuactlr
         dsb sy
         isb
 	ret
+endfunc read_cpuactlr
 
         .globl write_cpuactlr
 func write_cpuactlr
@@ -257,16 +266,19 @@ func write_cpuactlr
         isb
         dsb sy
 	ret
+endfunc write_cpuactlr
 
 	.globl	read_cpuectlr
 func read_cpuectlr
 	MRS	x0, S3_1_C15_C2_1
 	ret
+endfunc read_cpuectlr
 
 	.globl	write_cpuectlr
 func write_cpuectlr
 	MSR	S3_1_C15_C2_1, x0
 	ret
+endfunc write_cpuectlr
 
 
 func platform_is_primary_cpu
@@ -274,6 +286,7 @@ func platform_is_primary_cpu
 	cmp	x0, #FVP_PRIMARY_CPU
 	cset	x0, eq
 	ret
+endfunc platform_is_primary_cpu
 
 	/* Define a crash console for the plaform */
 #define FVP_CRASH_CONSOLE_BASE		PL011_UART0_BASE
@@ -291,6 +304,7 @@ func plat_crash_console_init
 	mov_imm	x2, PL011_BAUDRATE
 /*	b	console_core_init   */
 	ret
+endfunc plat_crash_console_init
 
 	/* ---------------------------------------------
 	 * int plat_crash_console_putc(int c)
@@ -301,6 +315,7 @@ func plat_crash_console_init
 	 */
 func plat_crash_console_putc
 	b	mt_console_core_putc
+endfunc plat_crash_console_putc
 
 	/* --------------------------------------------------------
 	 * int mt_console_core_putc(int c, unsigned int base_addr)
@@ -355,6 +370,7 @@ func mt_console_core_putc
 	str	x1, [x2]			/* p_atf_log_ctrl->atf_except_write_pos_per_cpu[cpu_id] = w1 */
 exit_putc:
 	ret
+endfunc mt_console_core_putc
 
 
 	.data
