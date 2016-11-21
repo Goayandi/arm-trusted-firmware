@@ -365,7 +365,7 @@ int GetUARTBytes(u8 *buf, u32 size, u32 tmo_ms)
 #endif
 }
 
-void console_init(unsigned long base_addr)
+void mtk_console_init(unsigned long base_addr)
 {
 	/* TODO: assert() internally calls printf() and will result in
 	 * an infinite loop. This needs to be fixed with some kind of

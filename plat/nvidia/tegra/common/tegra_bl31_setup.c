@@ -85,7 +85,7 @@ extern uint64_t tegra_bl31_phys_base;
 
 static entry_point_info_t bl33_image_ep_info, bl32_image_ep_info;
 static plat_params_from_bl2_t plat_bl31_params_from_bl2 = {
-	(uint64_t)TZDRAM_SIZE, (uintptr_t)NULL
+	.tzdram_size = (uint64_t)TZDRAM_SIZE
 };
 
 /*******************************************************************************
@@ -145,13 +145,10 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	bl32_image_ep_info = *from_bl2->bl32_ep_info;
 
 	/*
-	 * Parse platform specific parameters - TZDRAM aperture size and
-	 * pointer to BL32 params.
+	 * Parse platform specific parameters - TZDRAM aperture size
 	 */
-	if (plat_params) {
+	if (plat_params)
 		plat_bl31_params_from_bl2.tzdram_size = plat_params->tzdram_size;
-		plat_bl31_params_from_bl2.bl32_params = plat_params->bl32_params;
-	}
 }
 
 /*******************************************************************************
@@ -160,6 +157,11 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 void bl31_platform_setup(void)
 {
 	uint32_t tmp_reg;
+
+	/*
+	 * Initialize delay timer
+	 */
+	tegra_delay_timer_init();
 
 	/*
 	 * Setup secondary CPU POR infrastructure.
@@ -193,16 +195,12 @@ void bl31_plat_arch_setup(void)
 {
 	unsigned long bl31_base_pa = tegra_bl31_phys_base;
 	unsigned long total_base = bl31_base_pa;
-	unsigned long total_size = TZDRAM_END - BL31_RO_BASE;
+	unsigned long total_size = BL32_BASE - BL31_RO_BASE;
 	unsigned long ro_start = bl31_base_pa;
 	unsigned long ro_size = BL31_RO_LIMIT - BL31_RO_BASE;
-	unsigned long coh_start = 0;
-	unsigned long coh_size = 0;
 	const mmap_region_t *plat_mmio_map = NULL;
-
 #if USE_COHERENT_MEM
-	coh_start = total_base + (BL31_COHERENT_RAM_BASE - BL31_RO_BASE);
-	coh_size = BL31_COHERENT_RAM_LIMIT - BL31_COHERENT_RAM_BASE;
+	unsigned long coh_start, coh_size;
 #endif
 
 	/* add memory regions */
@@ -212,7 +210,11 @@ void bl31_plat_arch_setup(void)
 	mmap_add_region(ro_start, ro_start,
 			ro_size,
 			MT_MEMORY | MT_RO | MT_SECURE);
+
 #if USE_COHERENT_MEM
+	coh_start = total_base + (BL31_COHERENT_RAM_BASE - BL31_RO_BASE);
+	coh_size = BL31_COHERENT_RAM_LIMIT - BL31_COHERENT_RAM_BASE;
+
 	mmap_add_region(coh_start, coh_start,
 			coh_size,
 			MT_DEVICE | MT_RW | MT_SECURE);

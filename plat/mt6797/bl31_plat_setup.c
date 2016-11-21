@@ -258,8 +258,8 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
     atf_sched_clock_init(normal_base, atf_base);
 
 	/* Initialize the console to provide early debug support */
-//    console_init(UART2_BASE); // without boot argument
-	console_init(teearg->atf_log_port);
+	// console_init(UART2_BASE); // without boot argument
+	mtk_console_init(teearg->atf_log_port);
 
 	/*init system counter in ATF but in Kernel*/
 	setup_syscnt();

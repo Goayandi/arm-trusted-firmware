@@ -34,6 +34,20 @@
 #include <platform_def.h>
 
 /*******************************************************************************
+ * Power down state IDs
+ ******************************************************************************/
+#define PSTATE_ID_CORE_POWERDN		7
+#define PSTATE_ID_CLUSTER_IDLE		16
+#define PSTATE_ID_CLUSTER_POWERDN	17
+#define PSTATE_ID_SOC_POWERDN		27
+
+/*******************************************************************************
+ * This value is used by the PSCI implementation during the `SYSTEM_SUSPEND`
+ * call as the `state-id` field in the 'power state' parameter.
+ ******************************************************************************/
+#define PLAT_SYS_SUSPEND_STATE_ID	PSTATE_ID_SOC_POWERDN
+
+/*******************************************************************************
  * Implementation defined ACTLR_EL3 bit definitions
  ******************************************************************************/
 #define ACTLR_EL3_L2ACTLR_BIT		(1 << 6)
@@ -52,6 +66,23 @@
  ******************************************************************************/
 #define TEGRA_GICD_BASE			0x50041000
 #define TEGRA_GICC_BASE			0x50042000
+
+/*******************************************************************************
+ * Tegra Memory Select Switch Controller constants
+ ******************************************************************************/
+#define TEGRA_MSELECT_BASE		0x50060000
+
+#define MSELECT_CONFIG			0x0
+#define ENABLE_WRAP_INCR_MASTER2_BIT	(1 << 29)
+#define ENABLE_WRAP_INCR_MASTER1_BIT	(1 << 28)
+#define ENABLE_WRAP_INCR_MASTER0_BIT	(1 << 27)
+#define UNSUPPORTED_TX_ERR_MASTER2_BIT	(1 << 25)
+#define UNSUPPORTED_TX_ERR_MASTER1_BIT	(1 << 24)
+#define ENABLE_UNSUP_TX_ERRORS		(UNSUPPORTED_TX_ERR_MASTER2_BIT | \
+					 UNSUPPORTED_TX_ERR_MASTER1_BIT)
+#define ENABLE_WRAP_TO_INCR_BURSTS	(ENABLE_WRAP_INCR_MASTER2_BIT | \
+					 ENABLE_WRAP_INCR_MASTER1_BIT | \
+					 ENABLE_WRAP_INCR_MASTER0_BIT)
 
 /*******************************************************************************
  * Tegra micro-seconds timer constants
