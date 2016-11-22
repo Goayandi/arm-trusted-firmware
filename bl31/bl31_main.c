@@ -209,7 +209,7 @@ void bl31_prepare_kernel_entry(uint64_t k32_64)
 	INFO("BL31: Next image address = 0x%llx\n",
 		(unsigned long long) next_image_info->pc);
 	INFO("BL31: Next image spsr = 0x%x\n", next_image_info->spsr);
-	cm_init_context(read_mpidr_el1(), next_image_info);
+	cm_init_my_context(next_image_info);
 	cm_prepare_el3_exit(image_type);
 }
 

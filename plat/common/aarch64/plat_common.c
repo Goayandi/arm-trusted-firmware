@@ -122,7 +122,7 @@ void aee_wdt_dump()
 	set_uart_flag();
 	printf("aee_wdt_dump(dis-IRQ),CPU%d\n", (int)linear_id);
 
-	ns_cpu_context = cm_get_context_by_mpidr(mpidr, NON_SECURE);
+	ns_cpu_context = cm_get_context(NON_SECURE);
 	/* compatible to the earlier chipset */
 #if (defined(MACH_TYPE_MT6735) || defined(MACH_TYPE_MT6735M) || \
 	defined(MACH_TYPE_MT6753) || defined(MACH_TYPE_MT8173))
