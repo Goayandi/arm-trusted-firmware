@@ -14,6 +14,7 @@
 
 #define RETRY_TIME_USEC   (10)
 
+#define SPMC_DEBUG	1
 #if SPMC_DEBUG
 #define PRINTF_SPMC	printf
 #else
@@ -33,54 +34,57 @@ void big_spmc_info(){
     printf("SwSeq SPMC T:0x%X C0:0x%X C1:0x%X\n",big_spmc_status(0x10),big_spmc_status(0x1),big_spmc_status(0x2));
 }
 
-int power_on_big(const unsigned int linear_id){
-    unsigned int tmp;
-//     unsigned long i;
-    extern void bl31_on_entrypoint(void);
+int power_on_big(const unsigned int linear_id)
+{
+	unsigned int tmp;
+	// unsigned long i;
+	extern void bl31_on_entrypoint(void);
 #if FPGA
-     if(!dummy)
-         return PSCI_E_SUCCESS;
+	if (!dummy)
+		return PSCI_E_SUCCESS;
 #endif
-     PRINTF_SPMC("%s linear_id:%d big_on:%x\n",__FUNCTION__,linear_id,big_on);
+	PRINTF_SPMC("%s linear_id:%d big_on:%x\n", __FUNCTION__, linear_id, big_on);
+	PRINTF_SPMC("%s continuing\n", __FUNCTION__);
+	big_spmc_info();
 
-    if(linear_id > 9){
-        PRINTF_SPMC("The required Big core:%d is not existed\n",linear_id);
-        return PSCI_E_NOT_SUPPORTED;
-    }
-    if(big_on & (1<<(linear_id-8)))
-        return PSCI_E_SUCCESS;
+	if (linear_id > 9) {
+		PRINTF_SPMC("The required Big core:%d is not existed\n", linear_id);
+		return PSCI_E_NOT_SUPPORTED;
+	}
 
-    if(mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & (1<<2))
-    {
-	PRINTF_SPMC("The required Big core:%d was powered on\n",linear_id);
-	return PSCI_E_SUCCESS;
-    }
+	if (big_on & (1<<(linear_id-8)))
+		return PSCI_E_SUCCESS;
 
-    if(!big_on){
+	if (mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & (1<<2)) {
+		PRINTF_SPMC("The required Big core:%d was powered on\n", linear_id);
+		return PSCI_E_SUCCESS;
+	}
+
+	if (!big_on) {
 #if SPMC_DVT
-        udelay(SPMC_DVT_UDELAY);
-        big_spmc_info();
+		udelay(SPMC_DVT_UDELAY);
+		big_spmc_info();
 #endif
-        power_on_cl3();
+		power_on_cl3();
 #if SPMC_DVT
-        udelay(SPMC_DVT_UDELAY);
-        big_spmc_info();
+		udelay(SPMC_DVT_UDELAY);
+		big_spmc_info();
 #endif
+	}
 
-    }
-    PRINTF_SPMC("%s before top:%x c0:%x c1:%x\n",__FUNCTION__, big_spmc_status(0x10), big_spmc_status(0x01),big_spmc_status(0x02));
-    mmio_write_32(0x10222208, 0xf<<16);//set BIG poweup on AARCH64
+	PRINTF_SPMC("%s before top:%x c0:%x c1:%x\n",__FUNCTION__, big_spmc_status(0x10), big_spmc_status(0x01),big_spmc_status(0x02));
+	mmio_write_32(0x10222208, 0xf<<16);//set BIG poweup on AARCH64
 
-    mmio_write_32(MP2_MISC_CONFIG_BOOT_ADDR_L(linear_id-8), (unsigned long)bl31_on_entrypoint);
-    mmio_write_32(MP2_MISC_CONFIG_BOOT_ADDR_H(linear_id-8), 0);
+	mmio_write_32(MP2_MISC_CONFIG_BOOT_ADDR_L(linear_id-8), (unsigned long)bl31_on_entrypoint);
+	mmio_write_32(MP2_MISC_CONFIG_BOOT_ADDR_H(linear_id-8), 0);
 
-    tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<0);
-    mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//assert CPUx_PWR_RST_B
+	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<0);
+	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//assert CPUx_PWR_RST_B
 
-    tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) | (1<<2);
-    mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//Assert PWR_ON_CPUx
+	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) | (1<<2);
+	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//Assert PWR_ON_CPUx
 
-    udelay(2);
+	udelay(2);
 
     while(!(mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<(7-(linear_id-8)))));//PWR_ON_ACK_CPU0, wait for 1
 	if(!(mmio_read_32(PTP3_CPU0_SPMC + ((linear_id-8)<<2)) & (1<<17)))
@@ -115,67 +119,70 @@ int power_on_big(const unsigned int linear_id){
 }
 
 int power_off_big(const unsigned int linear_id){
-    unsigned int tmp;
-    dummy=1;
-    unsigned int x = read_mpidr_el1();
-    PRINTF_SPMC("[%x] %s linear_id:%d big_on:%x\n",x,__FUNCTION__,linear_id,big_on);
-    if(linear_id > 9){
-        PRINTF_SPMC("The required Big core:%d is not existed\n",linear_id);
-        return PSCI_E_NOT_SUPPORTED;
-    }
-    if(!(big_on & 1<<(linear_id-8))){
-        PRINTF_SPMC("Big %d have been closed\n",linear_id);
-        return PSCI_E_SUCCESS;
-    }
+	unsigned int tmp;
+	dummy=1;
+	unsigned int x = read_mpidr_el1();
+
+	PRINTF_SPMC("[%x] %s linear_id:%d big_on:%x\n",
+			x, __FUNCTION__, linear_id,big_on);
+
+	if (linear_id > 9) {
+		PRINTF_SPMC("The required Big core:%d is not existed\n", linear_id);
+		return PSCI_E_NOT_SUPPORTED;
+	}
+
+	if (!(big_on & 1<<(linear_id-8))) {
+		PRINTF_SPMC("Big %d have been closed\n", linear_id);
+		return PSCI_E_SUCCESS;
+	}
 
 	mmio_write_32(0x10222400, 0x1b);
 	printf("debug monitor 0x10222404=%x\n",mmio_read_32(0x10222404));
 
-    PRINTF_SPMC("Wait CPU%d's WFI\n",linear_id);
+	PRINTF_SPMC("Wait CPU%d's WFI\n",linear_id);
 //SCOTT
-    while(!(mmio_read_32(SPM_CPU_IDLE_STA2)&(1<<(linear_id+2))));
-    PRINTF_SPMC("CPU%d is in WFI\n",linear_id);
+	while (!(mmio_read_32(SPM_CPU_IDLE_STA2)&(1<<(linear_id+2)))) {
+		PRINTF_SPMC("idle sta2 = %x, %x\r", mmio_read_32(SPM_CPU_IDLE_STA2), (1<<(linear_id+2)));
+	}
+	PRINTF_SPMC("CPU%d is in WFI\n", linear_id);
 
 	mmio_write_32(0x10222400, 0x1b);
 	printf("debug monitor 0x10222404=%x\n",mmio_read_32(0x10222404));
-
-
 
 #if FPGA
-    tmp = mmio_read_32(PTP3_CPU0_SPMC) | (1<<1);// cpu0_sw_pwr_on _override_en
-    mmio_write_32(PTP3_CPU0_SPMC, tmp);//De-assert PWR_ON_CPUx
-    PRINTF_SPMC("%s waiting ACK\n");
-    while((mmio_read_32(PTP3_CPU0_SPMC) & (1<<17));//PWR_ON_ACK_CPU0, wait for 0
-    PRINTF_SPMC("%s got ACK\n");
-    tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<0);
-    mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//assert CPUx_PWR_RST_B
+	tmp = mmio_read_32(PTP3_CPU0_SPMC) | (1<<1);// cpu0_sw_pwr_on _override_en
+	mmio_write_32(PTP3_CPU0_SPMC, tmp);//De-assert PWR_ON_CPUx
+	PRINTF_SPMC("%s waiting ACK\n");
+	while((mmio_read_32(PTP3_CPU0_SPMC) & (1<<17));//PWR_ON_ACK_CPU0, wait for 0
+	PRINTF_SPMC("%s got ACK\n");
+	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<0);
+	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//assert CPUx_PWR_RST_B
 #else
-    //big_spark2_core(linear_id,0); //With the SPMC, the action should be unnecessary
-    tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<2);
-    PRINTF_SPMC("%s set %x to %x\n",__FUNCTION__,SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2),tmp);
-    mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//De-assert PWR_ON_CPUx
-    PRINTF_SPMC("%s waiting ACK :%x\n",__FUNCTION__,SPM_CPU_PWR_STATUS);
-    while((mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<(7-(linear_id-8)))));//PWR_ON_ACK_CPU0, wait for 0
-    PRINTF_SPMC("%s got ACK\n",__FUNCTION__);
-    tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<0);
-    PRINTF_SPMC("%s set %x to %x\n",__FUNCTION__,SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2),tmp);
-    mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//assert CPUx_PWR_RST_B
+	//big_spark2_core(linear_id,0); //With the SPMC, the action should be unnecessary
+	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<2);
+	PRINTF_SPMC("%s set %x to %x\n",__FUNCTION__,SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2),tmp);
+	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//De-assert PWR_ON_CPUx
+	PRINTF_SPMC("%s waiting ACK :%x\n",__FUNCTION__,SPM_CPU_PWR_STATUS);
+	while((mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<(7-(linear_id-8)))));//PWR_ON_ACK_CPU0, wait for 0
+	PRINTF_SPMC("%s got ACK\n",__FUNCTION__);
+	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<0);
+	PRINTF_SPMC("%s set %x to %x\n",__FUNCTION__,SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2),tmp);
+	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//assert CPUx_PWR_RST_B
 #endif
-    big_on &= ~(1<<(linear_id-8));
-    PRINTF_SPMC("%s big_on:%x\n",__FUNCTION__,big_on);
-    //no big core is online, turn off the cluster 3
-    if(!big_on) {
-        cci_disable_cluster_coherency(0x80000200);
+	big_on &= ~(1<<(linear_id-8));
+	PRINTF_SPMC("%s big_on:%x\n",__FUNCTION__,big_on);
 
-        /* disable_scu(mpidr); */
-        mmio_write_32(0x1022220C, mmio_read_32(0x1022220C) | ACINACTM | (1 << 0));
+	//no big core is online, turn off the cluster 3
+	if (!big_on) {
+		cci_disable_cluster_coherency(0x80000200);
 
-        power_off_cl3();
-    }
+		/* disable_scu(mpidr); */
+		mmio_write_32(0x1022220C, mmio_read_32(0x1022220C) | ACINACTM | (1 << 0));
+		power_off_cl3();
+	}
 
-    return PSCI_E_SUCCESS;
+	return PSCI_E_SUCCESS;
 }
-
 
 int power_on_cl3(void)
 {

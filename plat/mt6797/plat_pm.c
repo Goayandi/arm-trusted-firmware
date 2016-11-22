@@ -319,6 +319,7 @@ int32_t plat_affinst_on(uint64_t mpidr,
 #else
 		rc = power_on_big(linear_id);
 #endif
+		printf("Yes, rc = %d\n", rc);
 		return rc;
 	} else if (linear_id >= 4) {
 		if(!(little_on & 0xF0)){
@@ -389,9 +390,17 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 
 #if SPMC_SPARK2
 	printf("%s core:%d(callee) disable SPARK-core-side\n",__FUNCTION__, linear_id);
-	//turn off spark2 cpu-side by callee
+	// turn off spark2 cpu-side by callee
 	set_cpu_retention_control(0);
 #endif
+	if (afflvl == MPIDR_AFFLVL0) {
+		if (linear_id < 8) {
+			power_off_little(linear_id);
+		} else {
+			power_off_big(linear_id);
+		}
+	}
+
 	/*
 	 * Perform cluster power down
 	 */
