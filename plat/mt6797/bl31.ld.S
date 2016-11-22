@@ -135,6 +135,7 @@ SECTIONS
      */
     coherent_ram (NOLOAD) : ALIGN(4096) {
         __COHERENT_RAM_START__ = .;
+	*(bakery_lock)
         *(tzfw_coherent_mem)
         __COHERENT_RAM_END_UNALIGNED__ = .;
         /*

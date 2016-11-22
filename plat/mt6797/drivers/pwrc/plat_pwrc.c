@@ -37,7 +37,7 @@
  * TODO: Someday there will be a generic power controller api. At the moment
  * each platform has its own pwrc so just exporting functions is fine.
  */
-static bakery_lock_t pwrc_lock __attribute__ ((section("tzfw_coherent_mem")));
+DEFINE_BAKERY_LOCK(pwrc_lock);
 
 unsigned int plat_pwrc_get_cpu_wkr(unsigned long mpidr)
 {
