@@ -37,6 +37,7 @@ void mtk_console_init(unsigned long base_addr);
 
 int console_init(uintptr_t base_addr,
 		unsigned int uart_clk, unsigned int baud_rate);
+void console_uninit(void);
 int console_putc(int c);
 int console_getc(void);
 void set_uart_flag(void);

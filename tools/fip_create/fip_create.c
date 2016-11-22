@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2015, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -55,40 +55,48 @@ uuid_t uuid_null = {0};
 
 /* The images used depends on the platform. */
 static entry_lookup_list_t toc_entry_lookup_list[] = {
+	{ "SCP Firmware Updater Configuration FWU SCP_BL2U", UUID_TRUSTED_UPDATE_FIRMWARE_SCP_BL2U,
+	  "scp_bl2u", NULL, FLAG_FILENAME },
+	{ "AP Firmware Updater Configuration BL2U", UUID_TRUSTED_UPDATE_FIRMWARE_BL2U,
+	  "bl2u", NULL, FLAG_FILENAME },
+	{ "Firmware Updater NS_BL2U", UUID_TRUSTED_UPDATE_FIRMWARE_NS_BL2U,
+	  "ns_bl2u", NULL, FLAG_FILENAME },
+	{ "Non-Trusted Firmware Updater certificate", UUID_TRUSTED_FWU_CERT,
+	  "fwu-cert", NULL, FLAG_FILENAME},
 	{ "Trusted Boot Firmware BL2", UUID_TRUSTED_BOOT_FIRMWARE_BL2,
 	  "bl2", NULL, FLAG_FILENAME },
-	{ "SCP Firmware BL3-0", UUID_SCP_FIRMWARE_BL30,
-	  "bl30", NULL, FLAG_FILENAME},
-	{ "EL3 Runtime Firmware BL3-1", UUID_EL3_RUNTIME_FIRMWARE_BL31,
+	{ "SCP Firmware SCP_BL2", UUID_SCP_FIRMWARE_SCP_BL2,
+	  "scp_bl2", NULL, FLAG_FILENAME},
+	{ "EL3 Runtime Firmware BL31", UUID_EL3_RUNTIME_FIRMWARE_BL31,
 	  "bl31", NULL, FLAG_FILENAME},
-	{ "Secure Payload BL3-2 (Trusted OS)", UUID_SECURE_PAYLOAD_BL32,
+	{ "Secure Payload BL32 (Trusted OS)", UUID_SECURE_PAYLOAD_BL32,
 	  "bl32", NULL, FLAG_FILENAME},
-	{ "Non-Trusted Firmware BL3-3", UUID_NON_TRUSTED_FIRMWARE_BL33,
+	{ "Non-Trusted Firmware BL33", UUID_NON_TRUSTED_FIRMWARE_BL33,
 	  "bl33", NULL, FLAG_FILENAME},
 	/* Key Certificates */
 	{ "Root Of Trust key certificate", UUID_ROT_KEY_CERT,
 	  "rot-cert", NULL, FLAG_FILENAME },
 	{ "Trusted key certificate", UUID_TRUSTED_KEY_CERT,
 	  "trusted-key-cert", NULL, FLAG_FILENAME},
-	{ "SCP Firmware BL3-0 key certificate", UUID_SCP_FIRMWARE_BL30_KEY_CERT,
-	  "bl30-key-cert", NULL, FLAG_FILENAME},
-	{ "EL3 Runtime Firmware BL3-1 key certificate", UUID_EL3_RUNTIME_FIRMWARE_BL31_KEY_CERT,
-	  "bl31-key-cert", NULL, FLAG_FILENAME},
-	{ "Secure Payload BL3-2 (Trusted OS) key certificate", UUID_SECURE_PAYLOAD_BL32_KEY_CERT,
-	  "bl32-key-cert", NULL, FLAG_FILENAME},
-	{ "Non-Trusted Firmware BL3-3 key certificate", UUID_NON_TRUSTED_FIRMWARE_BL33_KEY_CERT,
-	  "bl33-key-cert", NULL, FLAG_FILENAME},
+	{ "SCP Firmware key certificate", UUID_SCP_FW_KEY_CERT,
+	  "scp-fw-key-cert", NULL, FLAG_FILENAME},
+	{ "SoC Firmware key certificate", UUID_SOC_FW_KEY_CERT,
+	  "soc-fw-key-cert", NULL, FLAG_FILENAME},
+	{ "Trusted OS Firmware key certificate", UUID_TRUSTED_OS_FW_KEY_CERT,
+	  "tos-fw-key-cert", NULL, FLAG_FILENAME},
+	{ "Non-Trusted Firmware key certificate", UUID_NON_TRUSTED_FW_KEY_CERT,
+	  "nt-fw-key-cert", NULL, FLAG_FILENAME},
 	/* Content certificates */
-	{ "Trusted Boot Firmware BL2 certificate", UUID_TRUSTED_BOOT_FIRMWARE_BL2_CERT,
-	  "bl2-cert", NULL, FLAG_FILENAME },
-	{ "SCP Firmware BL3-0 certificate", UUID_SCP_FIRMWARE_BL30_CERT,
-	  "bl30-cert", NULL, FLAG_FILENAME},
-	{ "EL3 Runtime Firmware BL3-1 certificate", UUID_EL3_RUNTIME_FIRMWARE_BL31_CERT,
-	  "bl31-cert", NULL, FLAG_FILENAME},
-	{ "Secure Payload BL3-2 (Trusted OS) certificate", UUID_SECURE_PAYLOAD_BL32_CERT,
-	  "bl32-cert", NULL, FLAG_FILENAME},
-	{ "Non-Trusted Firmware BL3-3 certificate", UUID_NON_TRUSTED_FIRMWARE_BL33_CERT,
-	  "bl33-cert", NULL, FLAG_FILENAME},
+	{ "Trusted Boot Firmware BL2 certificate", UUID_TRUSTED_BOOT_FW_CERT,
+	  "tb-fw-cert", NULL, FLAG_FILENAME },
+	{ "SCP Firmware content certificate", UUID_SCP_FW_CONTENT_CERT,
+	  "scp-fw-cert", NULL, FLAG_FILENAME},
+	{ "SoC Firmware content certificate", UUID_SOC_FW_CONTENT_CERT,
+	  "soc-fw-cert", NULL, FLAG_FILENAME},
+	{ "Trusted OS Firmware content certificate", UUID_TRUSTED_OS_FW_CONTENT_CERT,
+	  "tos-fw-cert", NULL, FLAG_FILENAME},
+	{ "Non-Trusted Firmware content certificate", UUID_NON_TRUSTED_FW_CONTENT_CERT,
+	  "nt-fw-cert", NULL, FLAG_FILENAME},
 	{ NULL, {0}, 0 }
 };
 

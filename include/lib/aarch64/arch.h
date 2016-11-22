@@ -88,6 +88,14 @@
 #define ICC_CTLR_EL1    S3_0_C12_C12_4
 #define ICC_CTLR_EL3    S3_6_C12_C12_4
 #define ICC_PMR_EL1     S3_0_C4_C6_0
+#define ICC_IGRPEN1_EL3 S3_6_c12_c12_7
+#define ICC_IGRPEN0_EL1 S3_0_c12_c12_6
+#define ICC_HPPIR0_EL1  S3_0_c12_c8_2
+#define ICC_HPPIR1_EL1  S3_0_c12_c12_2
+#define ICC_IAR0_EL1    S3_0_c12_c8_0
+#define ICC_IAR1_EL1    S3_0_c12_c12_0
+#define ICC_EOIR0_EL1   S3_0_c12_c8_1
+#define ICC_EOIR1_EL1   S3_0_c12_c12_1
 
 /*******************************************************************************
  * Generic timer memory mapped registers & offsets
@@ -122,6 +130,10 @@
 #define ID_AA64PFR0_EL3_SHIFT	12
 #define ID_AA64PFR0_ELX_MASK	0xf
 
+#define ID_AA64PFR0_GIC_SHIFT	24
+#define ID_AA64PFR0_GIC_WIDTH	4
+#define ID_AA64PFR0_GIC_MASK	((1 << ID_AA64PFR0_GIC_WIDTH) - 1)
+
 /* ID_PFR1_EL1 definitions */
 #define ID_PFR1_VIRTEXT_SHIFT	12
 #define ID_PFR1_VIRTEXT_MASK	0xf
@@ -134,7 +146,7 @@
 			(1 << 4))
 
 #define SCTLR_EL1_RES1  ((1 << 29) | (1 << 28) | (1 << 23) | (1 << 22) | \
-			(1 << 11))
+			(1 << 20) | (1 << 11))
 #define SCTLR_AARCH32_EL1_RES1 \
 			((1 << 23) | (1 << 22) | (1 << 11) | (1 << 4) | \
 			(1 << 3))

@@ -39,6 +39,7 @@
 /* Board revisions */
 #define REV_JUNO_R0			0x1	/* Rev B */
 #define REV_JUNO_R1			0x2	/* Rev C */
+#define REV_JUNO_R2			0x3	/* Rev D */
 
 /* Bypass offset from start of NOR flash */
 #define BL1_ROM_BYPASS_OFFSET		0x03EC0000
@@ -71,5 +72,16 @@
 #define MMU401_SSD_OFFSET		0x4000
 #define MMU401_DMA330_BASE		0x7fb00000
 
+/*******************************************************************************
+ * Interrupt handling constants
+ ******************************************************************************/
+#define JUNO_IRQ_DMA_SMMU		126
+#define JUNO_IRQ_HDLCD0_SMMU		128
+#define JUNO_IRQ_HDLCD1_SMMU		130
+#define JUNO_IRQ_USB_SMMU		132
+#define JUNO_IRQ_THIN_LINKS_SMMU	134
+#define JUNO_IRQ_SEC_I2C		137
+#define JUNO_IRQ_GPU_SMMU_1		73
+#define JUNO_IRQ_ETR_SMMU		75
 
 #endif /* __JUNO_DEF_H__ */

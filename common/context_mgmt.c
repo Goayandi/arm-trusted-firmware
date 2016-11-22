@@ -32,16 +32,13 @@
 #include <arch_helpers.h>
 #include <assert.h>
 #include <bl31.h>
-#if (!defined(CFG_MICROTRUST_TEE_SUPPORT))
 #include <bl_common.h>
-#endif
 #include <context.h>
 #include <context_mgmt.h>
-#include <cpu_data.h>
 #include <interrupt_mgmt.h>
 #include <platform.h>
 #include <platform_def.h>
-#include <runtime_svc.h>
+#include <smcc_helpers.h>
 #include <string.h>
 
 
@@ -64,82 +61,6 @@ void cm_init(void)
 	 * The context management library has only global data to intialize, but
 	 * that will be done when the BSS is zeroed out
 	 */
-}
-
-/*******************************************************************************
- * This function returns a pointer to the most recent 'cpu_context' structure
- * for the CPU identified by `cpu_idx` that was set as the context for the
- * specified security state. NULL is returned if no such structure has been
- * specified.
- ******************************************************************************/
-void *cm_get_context_by_index(unsigned int cpu_idx,
-				unsigned int security_state)
-{
-	assert(sec_state_is_valid(security_state));
-
-	return get_cpu_data_by_index(cpu_idx, cpu_context[security_state]);
-}
-
-/*******************************************************************************
- * This function sets the pointer to the current 'cpu_context' structure for the
- * specified security state for the CPU identified by CPU index.
- ******************************************************************************/
-void cm_set_context_by_index(unsigned int cpu_idx, void *context,
-				unsigned int security_state)
-{
-	assert(sec_state_is_valid(security_state));
-
-	set_cpu_data_by_index(cpu_idx, cpu_context[security_state], context);
-}
-
-/*******************************************************************************
- * This function returns a pointer to the most recent 'cpu_context' structure
- * for the CPU identified by MPIDR that was set as the context for the specified
- * security state. NULL is returned if no such structure has been specified.
- ******************************************************************************/
-void *cm_get_context_by_mpidr(uint64_t mpidr, uint32_t security_state)
-{
-	assert(sec_state_is_valid(security_state));
-
-	return cm_get_context_by_index(platform_get_core_pos(mpidr), security_state);
-}
-
-/*******************************************************************************
- * This function sets the pointer to the current 'cpu_context' structure for the
- * specified security state for the CPU identified by MPIDR
- ******************************************************************************/
-void cm_set_context_by_mpidr(uint64_t mpidr, void *context, uint32_t security_state)
-{
-	assert(sec_state_is_valid(security_state));
-
-	cm_set_context_by_index(platform_get_core_pos(mpidr),
-						 context, security_state);
-}
-
-/*******************************************************************************
- * This function is used to program the context that's used for exception
- * return. This initializes the SP_EL3 to a pointer to a 'cpu_context' set for
- * the required security state
- ******************************************************************************/
-static inline void cm_set_next_context(void *context)
-{
-#if DEBUG
-	uint64_t sp_mode;
-
-	/*
-	 * Check that this function is called with SP_EL0 as the stack
-	 * pointer
-	 */
-	__asm__ volatile("mrs	%0, SPSel\n"
-			 : "=r" (sp_mode));
-
-	assert(sp_mode == MODE_SP_EL0);
-#endif
-
-	__asm__ volatile("msr	spsel, #1\n"
-			 "mov	sp, %0\n"
-			 "msr	spsel, #0\n"
-			 : : "r" (context));
 }
 
 /*******************************************************************************
@@ -191,7 +112,13 @@ static void cm_init_context_common(cpu_context_t *ctx, const entry_point_info_t 
 	if (EP_GET_ST(ep->h.attr))
 		scr_el3 |= SCR_ST_BIT;
 
+#if IMAGE_BL31
+	/*
+	 * IRQ/FIQ bits only need setting if interrupt routing
+	 * model has been set up for BL31.
+	 */
 	scr_el3 |= get_scr_el3_from_routing_model(security_state);
+#endif
 
 	/*
 	 * Set up SCTLR_ELx for the target exception level:
@@ -268,20 +195,6 @@ void cm_init_my_context(const entry_point_info_t *ep)
 }
 
 /*******************************************************************************
- * The following function provides a compatibility function for SPDs using the
- * existing cm library routines. This function is expected to be invoked for
- * initializing the cpu_context for the CPU specified by MPIDR for first use.
- ******************************************************************************/
-void cm_init_context(unsigned long mpidr, const entry_point_info_t *ep)
-{
-	if ((mpidr & MPIDR_AFFINITY_MASK) ==
-			(read_mpidr_el1() & MPIDR_AFFINITY_MASK))
-		cm_init_my_context(ep);
-	else
-		cm_init_context_by_index(platform_get_core_pos(mpidr), ep);
-}
-
-/*******************************************************************************
  * Prepare the CPU system registers for first entry into secure or normal world
  *
  * If execution is requested to EL2 or hyp mode, SCTLR_EL2 is initialized
@@ -328,6 +241,14 @@ void cm_prepare_el3_exit(uint32_t security_state)
 			/* Set VPIDR, VMPIDR to match MIDR, MPIDR */
 			write_vpidr_el2(read_midr_el1());
 			write_vmpidr_el2(read_mpidr_el1());
+
+			/*
+			 * Reset VTTBR_EL2.
+			 * Needed because cache maintenance operations depend on
+			 * the VMID even when non-secure EL1&0 stage 2 address
+			 * translation are disabled.
+			 */
+			write_vttbr_el2(0);
 		}
 	}
 

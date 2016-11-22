@@ -96,8 +96,14 @@
 #define PWRC_BASE			0x1c100000
 
 /* FVP SP804 timer frequency is 35 MHz*/
-#define SP804_TIMER_CLKMULT		35
-#define SP804_TIMER_CLKDIV		1
+#define SP804_TIMER_CLKMULT		1
+#define SP804_TIMER_CLKDIV		35
+
+/* SP810 controller. FVP specific flags */
+#define FVP_SP810_CTRL_TIM0_OV		(1 << 16)
+#define FVP_SP810_CTRL_TIM1_OV		(1 << 18)
+#define FVP_SP810_CTRL_TIM2_OV		(1 << 20)
+#define FVP_SP810_CTRL_TIM3_OV		(1 << 22)
 
 /*******************************************************************************
  * GIC-400 & interrupt handling related constants
@@ -115,7 +121,8 @@
 #define BASE_GICH_BASE			0x2c010000
 #define BASE_GICV_BASE			0x2c02f000
 
-#define IRQ_TZ_WDOG			56
+#define FVP_IRQ_TZ_WDOG			56
+#define FVP_IRQ_SEC_SYS_TIMER		57
 
 
 /*******************************************************************************
@@ -132,13 +139,5 @@
 /* NSAIDs used by devices in TZC filter 2 on FVP */
 #define FVP_NSAID_HDLCD0		2
 #define FVP_NSAID_CLCD			7
-
-/*******************************************************************************
- *  Shared Data
- ******************************************************************************/
-
-/* Entrypoint mailboxes */
-#define MBOX_BASE			ARM_SHARED_RAM_BASE
-
 
 #endif /* __FVP_DEF_H__ */

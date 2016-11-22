@@ -19,7 +19,7 @@ Contents
 ----------------
 
 This document describes how to add a runtime service to the EL3 Runtime
-Firmware component of ARM Trusted Firmware (BL3-1).
+Firmware component of ARM Trusted Firmware (BL31).
 
 Software executing in the normal world and in the trusted world at exception
 levels lower than EL3 will request runtime services using the Secure Monitor
@@ -30,9 +30,9 @@ results are returned.
 
 SMC Functions are grouped together based on the implementor of the service, for
 example a subset of the Function IDs are designated as "OEM Calls" (see [SMCCC]
-for full details). The EL3 runtime services framework in BL3-1 enables the
+for full details). The EL3 runtime services framework in BL31 enables the
 independent implementation of services for each group, which are then compiled
-into the BL3-1 image. This simplifies the integration of common software from
+into the BL31 image. This simplifies the integration of common software from
 ARM to support [PSCI], Secure Monitor for a Trusted OS and SoC specific
 software. The common runtime services framework ensures that SMC Functions are
 dispatched to their respective service implementation - the [Firmware Design]
@@ -114,7 +114,7 @@ initialization and call handler functions.
     is also used for diagnostic purposes
 
 *   `_start` and `_end` values must be based on the `OEN_*` values defined in
-    [`runtime_svc.h`]
+    [`smcc_helpers.h`]
 
 *   `_type` must be one of `SMC_TYPE_FAST` or `SMC_TYPE_STD`
 
@@ -127,7 +127,7 @@ initialization and call handler functions.
         typedef uint64_t (*rt_svc_handle)(uint32_t smc_fid,
                                           uint64_t x1, uint64_t x2,
                                           uint64_t x3, uint64_t x4,
-                                          void *reserved,
+                                          void *cookie,
                                           void *handle,
                                           uint64_t flags);
 
@@ -290,13 +290,13 @@ between the normal and secure worlds, deliver SMC Calls through to Secure-EL1
 and generally manage the Secure-EL1 Payload through CPU power-state transitions.
 
 TODO: Provide details of the additional work required to implement a SPD and
-the BL3-1 support for these services. Or a reference to the document that will
+the BL31 support for these services. Or a reference to the document that will
 provide this information....
 
 
 - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-_Copyright (c) 2014, ARM Limited and Contributors. All rights reserved._
+_Copyright (c) 2014-2015, ARM Limited and Contributors. All rights reserved._
 
 
 [Firmware Design]:  ./firmware-design.md
@@ -304,6 +304,7 @@ _Copyright (c) 2014, ARM Limited and Contributors. All rights reserved._
 [`services`]:               ../services
 [`services/std_svc/psci`]:  ../services/std_svc/psci
 [`std_svc_setup.c`]:        ../services/std_svc/std_svc_setup.c
-[`runtime_svc.h`]:          ../include/runtime_svc.h
+[`runtime_svc.h`]:          ../include/bl31/runtime_svc.h
+[`smcc_helpers.h`]:          ../include/common/smcc_helpers.h
 [PSCI]:                     http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf "Power State Coordination Interface PDD (ARM DEN 0022C)"
 [SMCCC]:                    http://infocenter.arm.com/help/topic/com.arm.doc.den0028a/index.html "SMC Calling Convention PDD (ARM DEN 0028A)"

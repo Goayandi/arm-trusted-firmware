@@ -104,7 +104,7 @@
 
 /* -----------------------------------------------------------------------------
  * This is the super set of actions that need to be performed during a cold boot
- * or a warm boot in EL3. This code is shared by BL1 and BL3-1.
+ * or a warm boot in EL3. This code is shared by BL1 and BL31.
  *
  * This macro will always perform reset handling, architectural initialisations
  * and stack setup. The rest of the actions are optional because they might not
@@ -214,6 +214,21 @@
 	 * ---------------------------------------------------------------------
 	 */
 	.if \_init_c_runtime
+#if IMAGE_BL31
+		/* -------------------------------------------------------------
+		 * Invalidate the RW memory used by the BL31 image. This
+		 * includes the data and NOBITS sections. This is done to
+		 * safeguard against possible corruption of this memory by
+		 * dirty cache lines in a system cache as a result of use by
+		 * an earlier boot loader stage.
+		 * -------------------------------------------------------------
+		 */
+		adr	x0, __RW_START__
+		adr	x1, __RW_END__
+		sub	x1, x1, x0
+		bl	inv_dcache_range
+#endif /* IMAGE_BL31 */
+
 		ldr	x0, =__BSS_START__
 		ldr	x1, =__BSS_SIZE__
 		bl	zeromem16
@@ -232,13 +247,11 @@
 #endif
 	.endif /* _init_c_runtime */
 
-#if IMAGE_BL31
 	/* ---------------------------------------------------------------------
 	 * Use SP_EL0 for the C runtime stack.
 	 * ---------------------------------------------------------------------
 	 */
 	msr	spsel, #0
-#endif /* IMAGE_BL31 */
 
 	/* ---------------------------------------------------------------------
 	 * Allocate a stack whose memory will be marked as Normal-IS-WBWA when

@@ -35,7 +35,8 @@
 #include <console.h>
 #include <platform_def.h>
 #include <plat_arm.h>
-#include "../../bl1/bl1_private.h"
+#include <sp805.h>
+#include "../../../bl1/bl1_private.h"
 
 
 #if USE_COHERENT_MEM
@@ -56,7 +57,6 @@
 #pragma weak bl1_plat_arch_setup
 #pragma weak bl1_platform_setup
 #pragma weak bl1_plat_sec_mem_layout
-#pragma weak bl1_plat_set_bl2_ep_info
 
 
 /* Data structure which holds the extents of the trusted SRAM for BL1*/
@@ -73,6 +73,11 @@ meminfo_t *bl1_plat_sec_mem_layout(void)
 void arm_bl1_early_platform_setup(void)
 {
 	const size_t bl1_size = BL1_RAM_LIMIT - BL1_RAM_BASE;
+
+#if !ARM_DISABLE_TRUSTED_WDOG
+	/* Enable watchdog */
+	sp805_start(ARM_SP805_TWDG_BASE, ARM_TWDG_LOAD_VAL);
+#endif
 
 	/* Initialize the console to provide early debug support */
 	console_init(PLAT_ARM_BOOT_UART_BASE, PLAT_ARM_BOOT_UART_CLK_IN_HZ,
@@ -145,15 +150,21 @@ void bl1_platform_setup(void)
 	arm_bl1_platform_setup();
 }
 
-/*******************************************************************************
- * Before calling this function BL2 is loaded in memory and its entrypoint
- * is set by load_image. This is a placeholder for the platform to change
- * the entrypoint of BL2 and set SPSR and security state.
- * On ARM standard platforms we only set the security state of the entrypoint
- ******************************************************************************/
-void bl1_plat_set_bl2_ep_info(image_info_t *bl2_image,
-				entry_point_info_t *bl2_ep)
+void bl1_plat_prepare_exit(entry_point_info_t *ep_info)
 {
-	SET_SECURITY_STATE(bl2_ep->h.attr, SECURE);
-	bl2_ep->spsr = SPSR_64(MODE_EL1, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
+#if !ARM_DISABLE_TRUSTED_WDOG
+	/* Disable watchdog before leaving BL1 */
+	sp805_stop(ARM_SP805_TWDG_BASE);
+#endif
+
+#ifdef EL3_PAYLOAD_BASE
+	/*
+	 * Program the EL3 payload's entry point address into the CPUs mailbox
+	 * in order to release secondary CPUs from their holding pen and make
+	 * them jump there.
+	 */
+	arm_program_trusted_mailbox(ep_info->pc);
+	dsbsy();
+	sev();
+#endif
 }

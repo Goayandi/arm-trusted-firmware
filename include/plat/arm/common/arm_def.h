@@ -41,10 +41,11 @@
  * Definitions common to all ARM standard platforms
  *****************************************************************************/
 
-/* Special value used to verify platform parameters from BL2 to BL3-1 */
+/* Special value used to verify platform parameters from BL2 to BL31 */
 #define ARM_BL31_PLAT_PARAM_VAL		0x0f1e2d3c4b5a6978ULL
 
-#define ARM_CLUSTER_COUNT		2ull
+#define ARM_CLUSTER_COUNT		2
+#define ARM_SYSTEM_COUNT		1
 
 #define ARM_CACHE_WRITEBACK_SHIFT	6
 
@@ -54,6 +55,7 @@
  */
 #define ARM_PWR_LVL0		MPIDR_AFFLVL0
 #define ARM_PWR_LVL1		MPIDR_AFFLVL1
+#define ARM_PWR_LVL2		MPIDR_AFFLVL2
 
 /*
  *  Macros for local power states in ARM platforms encoded by State-ID field
@@ -133,6 +135,22 @@
 #define ARM_IRQ_SEC_SGI_6		14
 #define ARM_IRQ_SEC_SGI_7		15
 
+/*
+ * Define a list of Group 1 Secure and Group 0 interrupts as per GICv3
+ * terminology. On a GICv2 system or mode, the lists will be merged and treated
+ * as Group 0 interrupts.
+ */
+#define ARM_G1S_IRQS			ARM_IRQ_SEC_PHY_TIMER,		\
+					ARM_IRQ_SEC_SGI_1,		\
+					ARM_IRQ_SEC_SGI_2,		\
+					ARM_IRQ_SEC_SGI_3,		\
+					ARM_IRQ_SEC_SGI_4,		\
+					ARM_IRQ_SEC_SGI_5,		\
+					ARM_IRQ_SEC_SGI_7
+
+#define ARM_G0_IRQS			ARM_IRQ_SEC_SGI_0,		\
+					ARM_IRQ_SEC_SGI_6
+
 #define ARM_SHARED_RAM_ATTR		((PLAT_ARM_SHARED_RAM_CACHED ?	\
 						MT_MEMORY : MT_DEVICE)	\
 						| MT_RW | MT_SECURE)
@@ -173,19 +191,20 @@
 
 #define ARM_CONSOLE_BAUDRATE		115200
 
-/* TZC related constants */
-#define ARM_TZC_BASE			0x2a4a0000
-
+/* Trusted Watchdog constants */
+#define ARM_SP805_TWDG_BASE		0x2a490000
+#define ARM_SP805_TWDG_CLK_HZ		32768
+/* The TBBR document specifies a watchdog timeout of 256 seconds. SP805
+ * asserts reset after two consecutive countdowns (2 x 128 = 256 sec) */
+#define ARM_TWDG_TIMEOUT_SEC		128
+#define ARM_TWDG_LOAD_VAL		(ARM_SP805_TWDG_CLK_HZ * 	\
+					 ARM_TWDG_TIMEOUT_SEC)
 
 /******************************************************************************
  * Required platform porting definitions common to all ARM standard platforms
  *****************************************************************************/
 
 #define ADDR_SPACE_SIZE			(1ull << 32)
-
-#define PLAT_NUM_PWR_DOMAINS		(ARM_CLUSTER_COUNT + \
-					 PLATFORM_CORE_COUNT)
-#define PLAT_MAX_PWR_LVL		ARM_PWR_LVL1
 
 /*
  * This macro defines the deepest retention state possible. A higher state
@@ -209,14 +228,6 @@
  * integrated and external caches.
  */
 #define CACHE_WRITEBACK_GRANULE		(1 << ARM_CACHE_WRITEBACK_SHIFT)
-
-#if !USE_COHERENT_MEM
-/*
- * Size of the per-cpu data in bytes that should be reserved in the generic
- * per-cpu data structure for the ARM platform port.
- */
-#define PLAT_PCPU_DATA_SIZE		2
-#endif
 
 
 /*******************************************************************************
@@ -246,7 +257,7 @@
  * BL2 specific defines.
  ******************************************************************************/
 /*
- * Put BL2 just below BL3-1. BL2_BASE is calculated using the current BL2 debug
+ * Put BL2 just below BL31. BL2_BASE is calculated using the current BL2 debug
  * size plus a little space for growth.
  */
 #if TRUSTED_BOARD_BOOT
@@ -257,11 +268,11 @@
 #define BL2_LIMIT			BL31_BASE
 
 /*******************************************************************************
- * BL3-1 specific defines.
+ * BL31 specific defines.
  ******************************************************************************/
 /*
- * Put BL3-1 at the top of the Trusted SRAM. BL31_BASE is calculated using the
- * current BL3-1 debug size plus a little space for growth.
+ * Put BL31 at the top of the Trusted SRAM. BL31_BASE is calculated using the
+ * current BL31 debug size plus a little space for growth.
  */
 #define BL31_BASE			(ARM_BL_RAM_BASE +		\
 						ARM_BL_RAM_SIZE -	\
@@ -270,7 +281,7 @@
 #define BL31_LIMIT			(ARM_BL_RAM_BASE + ARM_BL_RAM_SIZE)
 
 /*******************************************************************************
- * BL3-2 specific defines.
+ * BL32 specific defines.
  ******************************************************************************/
 /*
  * On ARM standard platforms, the TSP can execute from Trusted SRAM,
@@ -299,10 +310,24 @@
 # error "Unsupported ARM_TSP_RAM_LOCATION_ID value"
 #endif
 
+/*******************************************************************************
+ * FWU Images: NS_BL1U, BL2U & NS_BL2U defines.
+ ******************************************************************************/
+#define BL2U_BASE			BL2_BASE
+#define BL2U_LIMIT			BL31_BASE
+#define NS_BL2U_BASE			ARM_NS_DRAM1_BASE
+#define NS_BL1U_BASE			(V2M_FLASH0_BASE + 0x03EB8000)
+
 /*
  * ID of the secure physical generic timer interrupt used by the TSP.
  */
 #define TSP_IRQ_SEC_PHY_TIMER		ARM_IRQ_SEC_PHY_TIMER
+
+
+/*
+ * One cache line needed for bakery locks on ARM platforms
+ */
+#define PLAT_PERCPU_BAKERY_LOCK_SIZE		(1 * CACHE_WRITEBACK_GRANULE)
 
 
 #endif /* __ARM_DEF_H__ */

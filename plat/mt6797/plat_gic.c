@@ -85,6 +85,11 @@ __asm__ (
 "       .endm\n"
 );
 
+#undef	ICC_IAR0_EL1
+#undef	ICC_HPPIR0_EL1
+#undef	ICC_HPPIR1_EL1
+#undef	ICC_EOIR0_EL1
+
 #define ICC_GRPEN0_EL1                  sys_reg(3, 0, 12, 12, 6)
 #define ICC_GRPEN1_EL1                  sys_reg(3, 0, 12, 12, 7)
 #define ICC_GRPEN1_EL3                  sys_reg(3, 6, 12, 12, 7)

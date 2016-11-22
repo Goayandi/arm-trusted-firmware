@@ -28,6 +28,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <assert.h>
+#include <console.h>
 #include <platform.h>
 #include <xlat_tables.h>
 #include <platform.h>
@@ -52,12 +53,13 @@ uint64_t wdt_kernel_cb_addr = 0;
 uint32_t aee_wdt_dump_flag = 1;
 
 /*
- * The following 2 platform setup functions are weakly defined. They
+ * The following platform setup functions are weakly defined. They
  * provide typical implementations that may be re-used by multiple
  * platforms but may also be overridden by a platform if required.
  */
 #pragma weak bl31_plat_enable_mmu
 #pragma weak bl32_plat_enable_mmu
+#pragma weak bl31_plat_runtime_setup
 
 extern unsigned long g_dormant_log_base;
 void atf_low_level_log(int tag)
@@ -215,6 +217,15 @@ void aee_wdt_dump()
 }
 
 void __attribute__((weak)) dump_wfi_spill(void) {}
+void bl31_plat_runtime_setup(void)
+{
+	/*
+	 * Finish the use of console driver in BL31 so that any runtime logs
+	 * from BL31 will be suppressed.
+	 */
+	console_uninit();
+}
+
 #if !ENABLE_PLAT_COMPAT
 /*
  * Helper function for platform_get_pos() when platform compatibility is

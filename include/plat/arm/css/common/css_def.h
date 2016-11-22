@@ -39,8 +39,6 @@
  *************************************************************************/
 #define MHU_PAYLOAD_CACHED		0
 
-#define TRUSTED_MAILBOX_BASE		ARM_TRUSTED_SRAM_BASE
-
 #define NSROM_BASE			0x1f000000
 #define NSROM_SIZE			0x00001000
 
@@ -52,16 +50,29 @@
 #define NSRAM_BASE			0x2e000000
 #define NSRAM_SIZE			0x00008000
 
+/* System Security Control Registers */
+#define SSC_REG_BASE			0x2a420000
+#define SSC_GPRETN			(SSC_REG_BASE + 0x030)
+
 /* The slave_bootsecure controls access to GPU, DMC and CS. */
 #define CSS_NIC400_SLAVE_BOOTSECURE	8
 
 /* Interrupt handling constants */
 #define CSS_IRQ_MHU			69
 #define CSS_IRQ_GPU_SMMU_0		71
-#define CSS_IRQ_GPU_SMMU_1		73
-#define CSS_IRQ_ETR_SMMU		75
 #define CSS_IRQ_TZC			80
 #define CSS_IRQ_TZ_WDOG			86
+#define CSS_IRQ_SEC_SYS_TIMER		91
+
+/*
+ * Define a list of Group 1 Secure interrupts as per GICv3 terminology. On a
+ * GICv2 system or mode, the interrupts will be treated as Group 0 interrupts.
+ */
+#define CSS_G1S_IRQS			CSS_IRQ_MHU,		\
+					CSS_IRQ_GPU_SMMU_0,	\
+					CSS_IRQ_TZC,		\
+					CSS_IRQ_TZ_WDOG,	\
+					CSS_IRQ_SEC_SYS_TIMER
 
 /*
  * SCP <=> AP boot configuration
@@ -71,7 +82,7 @@
  * primary, according to the shift and mask definitions below.
  *
  * Note that the value stored at this address is only valid at boot time, before
- * the BL3-0 image is transferred to SCP.
+ * the SCP_BL2 image is transferred to SCP.
  */
 #define SCP_BOOT_CFG_ADDR		(ARM_TRUSTED_SRAM_BASE + 0x80)
 #define PRIMARY_CPU_SHIFT		8
@@ -99,11 +110,13 @@
  ************************************************************************/
 
 /*
- * Load address of BL3-0 in CSS platform ports
- * BL3-0 is loaded to the same place as BL3-1.  Once BL3-0 is transferred to the
- * SCP, it is discarded and BL3-1 is loaded over the top.
+ * Load address of SCP_BL2 in CSS platform ports
+ * SCP_BL2 is loaded to the same place as BL31.  Once SCP_BL2 is transferred to the
+ * SCP, it is discarded and BL31 is loaded over the top.
  */
-#define BL30_BASE			BL31_BASE
+#define SCP_BL2_BASE			BL31_BASE
+
+#define SCP_BL2U_BASE			BL31_BASE
 
 #define PLAT_ARM_SHARED_RAM_CACHED	MHU_PAYLOAD_CACHED
 
@@ -112,6 +125,13 @@
 
 /* TZC related constants */
 #define PLAT_ARM_TZC_FILTERS		REG_ATTR_FILTER_BIT_ALL
+#define PLAT_ARM_TZC_BASE		0x2a4a0000
+
+/* System timer related constants */
+#define PLAT_ARM_NSTIMER_FRAME_ID	1
+
+/* Trusted mailbox base address common to all CSS */
+#define PLAT_ARM_TRUSTED_MAILBOX_BASE	ARM_TRUSTED_SRAM_BASE
 
 
 #endif /* __CSS_DEF_H__ */

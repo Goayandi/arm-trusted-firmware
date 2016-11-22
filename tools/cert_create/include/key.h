@@ -63,12 +63,15 @@ enum {
  */
 typedef struct key_s {
 	int id;			/* Key id */
+	const char *opt;	/* Command line option to specify a key */
 	const char *desc;	/* Key description (debug purposes) */
 	char *fn;		/* Filename to load/store the key */
 	EVP_PKEY *key;		/* Key container */
 } key_t;
 
 /* Exported API */
+int key_init(void);
+key_t *key_get_by_opt(const char *opt);
 int key_create(key_t *key, int type);
 int key_load(key_t *key, unsigned int *err_code);
 int key_store(key_t *key);

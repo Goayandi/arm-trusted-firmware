@@ -62,6 +62,12 @@ SECTIONS
         __RO_END__ = .;
     } >RAM
 
+    /*
+     * Define a linker symbol to mark start of the RW memory area for this
+     * image.
+     */
+    __RW_START__ = . ;
+
     .data . : {
         __DATA_START__ = .;
         *(.data*)
@@ -119,6 +125,11 @@ SECTIONS
     } >RAM
 #endif
 
+    /*
+     * Define a linker symbol to mark the end of the RW memory area for this
+     * image.
+     */
+    __RW_END__ = .;
     __BL32_END__ = .;
 
     __BSS_SIZE__ = SIZEOF(.bss);
@@ -127,5 +138,5 @@ SECTIONS
         __COHERENT_RAM_END_UNALIGNED__ - __COHERENT_RAM_START__;
 #endif
 
-    ASSERT(. <= BL32_LIMIT, "BL3-2 image has exceeded its limit.")
+    ASSERT(. <= BL32_LIMIT, "BL32 image has exceeded its limit.")
 }

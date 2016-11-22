@@ -38,22 +38,33 @@
 #if IMAGE_BL1
 const mmap_region_t plat_arm_mmap[] = {
 	ARM_MAP_SHARED_RAM,
-	V2M_MAP_FLASH0,
+	V2M_MAP_FLASH0_RO,
 	V2M_MAP_IOFPGA,
 	CSS_MAP_DEVICE,
 	SOC_CSS_MAP_DEVICE,
+#if TRUSTED_BOARD_BOOT
+	ARM_MAP_NS_DRAM1,
+#endif
 	{0}
 };
 #endif
 #if IMAGE_BL2
 const mmap_region_t plat_arm_mmap[] = {
 	ARM_MAP_SHARED_RAM,
-	V2M_MAP_FLASH0,
+	V2M_MAP_FLASH0_RO,
 	V2M_MAP_IOFPGA,
 	CSS_MAP_DEVICE,
 	SOC_CSS_MAP_DEVICE,
 	ARM_MAP_NS_DRAM1,
 	ARM_MAP_TSP_SEC_MEM,
+	{0}
+};
+#endif
+#if IMAGE_BL2U
+const mmap_region_t plat_arm_mmap[] = {
+	ARM_MAP_SHARED_RAM,
+	CSS_MAP_DEVICE,
+	SOC_CSS_MAP_DEVICE,
 	{0}
 };
 #endif

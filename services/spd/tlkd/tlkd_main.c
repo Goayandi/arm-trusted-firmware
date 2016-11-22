@@ -54,9 +54,9 @@
 extern const spd_pm_ops_t tlkd_pm_ops;
 
 /*******************************************************************************
- * Array to keep track of per-cpu Secure Payload state
+ * Per-cpu Secure Payload state
  ******************************************************************************/
-static tlk_context_t tlk_ctx;
+tlk_context_t tlk_ctx;
 
 /* TLK UID: RFC-4122 compliant UUID (version-5, sha-1) */
 DEFINE_SVC_UUID(tlk_uuid,
@@ -199,41 +199,6 @@ uint64_t tlkd_smc_handler(uint32_t smc_fid,
 		SMC_RET1(ns_cpu_context, x1);
 
 	/*
-	 * Request from non secure world to resume the preempted
-	 * Standard SMC call.
-	 */
-	case TLK_RESUME_FID:
-
-		/* RESUME should be invoked only by normal world */
-		if (!ns)
-			SMC_RET1(handle, SMC_UNK);
-
-		/*
-		 * This is a resume request from the non-secure client.
-		 * save the non-secure state and send the request to
-		 * the secure payload.
-		 */
-		assert(handle == cm_get_context(NON_SECURE));
-
-		/* Check if we are already preempted before resume */
-		if (!get_std_smc_active_flag(tlk_ctx.state))
-			SMC_RET1(handle, SMC_UNK);
-
-		cm_el1_sysregs_context_save(NON_SECURE);
-
-		/*
-		 * We are done stashing the non-secure context. Ask the
-		 * secure payload to do the work now.
-		 */
-
-		/* We just need to return to the preempted point in
-		 * SP and the execution will resume as normal.
-		 */
-		cm_el1_sysregs_context_restore(SECURE);
-		cm_set_next_eret_context(SECURE);
-		SMC_RET0(handle);
-
-	/*
 	 * This is a request from the non-secure context to:
 	 *
 	 * a. register shared memory with the SP for storing it's
@@ -243,6 +208,7 @@ uint64_t tlkd_smc_handler(uint32_t smc_fid,
 	 *    Applications.
 	 * c. open/close sessions
 	 * d. issue commands to the Trusted Apps
+	 * e. resume the preempted standard SMC call.
 	 */
 	case TLK_REGISTER_LOGBUF:
 	case TLK_REGISTER_REQBUF:
@@ -250,6 +216,7 @@ uint64_t tlkd_smc_handler(uint32_t smc_fid,
 	case TLK_CLOSE_TA_SESSION:
 	case TLK_TA_LAUNCH_OP:
 	case TLK_TA_SEND_EVENT:
+	case TLK_RESUME_FID:
 
 		if (!ns)
 			SMC_RET1(handle, SMC_UNK);
@@ -262,9 +229,18 @@ uint64_t tlkd_smc_handler(uint32_t smc_fid,
 		 */
 		assert(handle == cm_get_context(NON_SECURE));
 
-		/* Check if we are already preempted */
-		if (get_std_smc_active_flag(tlk_ctx.state))
-			SMC_RET1(handle, SMC_UNK);
+		/*
+		 * Check if we are already processing a standard SMC
+		 * call. Of all the supported fids, only the "resume"
+		 * fid expects the flag to be set.
+		 */
+		if (smc_fid == TLK_RESUME_FID) {
+			if (!get_std_smc_active_flag(tlk_ctx.state))
+				SMC_RET1(handle, SMC_UNK);
+		} else {
+			if (get_std_smc_active_flag(tlk_ctx.state))
+				SMC_RET1(handle, SMC_UNK);
+		}
 
 		cm_el1_sysregs_context_save(NON_SECURE);
 
@@ -383,6 +359,31 @@ uint64_t tlkd_smc_handler(uint32_t smc_fid,
 		 * the original request through a synchronous entry
 		 * into the SP. Jump back to the original C runtime
 		 * context.
+		 */
+		tlkd_synchronous_sp_exit(&tlk_ctx, x1);
+
+	/*
+	 * These function IDs are used only by TLK to indicate it has
+	 * finished:
+	 * 1. suspending itself after an earlier psci cpu_suspend
+	 *    request.
+	 * 2. resuming itself after an earlier psci cpu_suspend
+	 *    request.
+	 * 3. powering down after an earlier psci system_off/system_reset
+	 *    request.
+	 */
+	case TLK_SUSPEND_DONE:
+	case TLK_RESUME_DONE:
+	case TLK_SYSTEM_OFF_DONE:
+
+		if (ns)
+			SMC_RET1(handle, SMC_UNK);
+
+		/*
+		 * TLK reports completion. TLKD must have initiated the
+		 * original request through a synchronous entry into the SP.
+		 * Jump back to the original C runtime context, and pass x1 as
+		 * return value to the caller
 		 */
 		tlkd_synchronous_sp_exit(&tlk_ctx, x1);
 

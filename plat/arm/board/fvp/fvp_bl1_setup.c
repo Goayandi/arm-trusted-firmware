@@ -29,6 +29,7 @@
  */
 
 #include <plat_arm.h>
+#include <tbbr_img_def.h>
 #include "fvp_private.h"
 
 
@@ -52,3 +53,16 @@ void bl1_early_platform_setup(void)
 	 */
 	fvp_cci_enable();
 }
+
+/*******************************************************************************
+ * The following function checks if Firmware update is needed,
+ * by checking if TOC in FIP image is valid or not.
+ ******************************************************************************/
+unsigned int bl1_plat_get_next_image_id(void)
+{
+	if (!arm_io_is_toc_valid())
+		return NS_BL1U_IMAGE_ID;
+
+	return BL2_IMAGE_ID;
+}
+

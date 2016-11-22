@@ -34,22 +34,39 @@
 
 	.weak	plat_secondary_cold_boot_setup
 	.weak	plat_get_my_entrypoint
-	.globl	plat_arm_calc_core_pos
+	.globl	css_calc_core_pos_swap_cluster
 	.weak	plat_is_my_cpu_primary
 
-	/* -----------------------------------------------------
-	 * void plat_secondary_cold_boot_setup (void);
+	/* ---------------------------------------------------------------------
+	 * void plat_secondary_cold_boot_setup(void);
 	 *
-	 * This function performs any platform specific actions
-	 * needed for a secondary cpu after a cold reset e.g
-	 * mark the cpu's presence, mechanism to place it in a
-	 * holding pen etc.
-	 * -----------------------------------------------------
+	 * In the normal boot flow, cold-booting secondary CPUs is not yet
+	 * implemented and they panic.
+	 *
+	 * When booting an EL3 payload, secondary CPUs are placed in a holding
+	 * pen, waiting for their mailbox to be populated. Note that all CPUs
+	 * share the same mailbox ; therefore, populating it will release all
+	 * CPUs from their holding pen. If finer-grained control is needed then
+	 * this should be handled in the code that secondary CPUs jump to.
+	 * ---------------------------------------------------------------------
 	 */
 func plat_secondary_cold_boot_setup
-	/* todo: Implement secondary CPU cold boot setup on CSS platforms */
+#ifndef EL3_PAYLOAD_BASE
+	/* TODO: Implement secondary CPU cold boot setup on CSS platforms */
 cb_panic:
 	b	cb_panic
+#else
+	mov_imm	x0, PLAT_ARM_TRUSTED_MAILBOX_BASE
+
+	/* Wait until the mailbox gets populated */
+poll_mailbox:
+	ldr	x1, [x0]
+	cbz	x1, 1f
+	br	x1
+1:
+	wfe
+	b	poll_mailbox
+#endif /* EL3_PAYLOAD_BASE */
 endfunc plat_secondary_cold_boot_setup
 
 	/* ---------------------------------------------------------------------
@@ -67,26 +84,26 @@ endfunc plat_secondary_cold_boot_setup
 	 * ---------------------------------------------------------------------
 	 */
 func plat_get_my_entrypoint
-	mov_imm	x0, TRUSTED_MAILBOX_BASE
+	mov_imm	x0, PLAT_ARM_TRUSTED_MAILBOX_BASE
 	ldr	x0, [x0]
 	ret
 endfunc plat_get_my_entrypoint
 
 	/* -----------------------------------------------------------
-	 * unsigned int plat_arm_calc_core_pos(uint64_t mpidr)
-	 * Function to calculate the core position by
+	 * unsigned int css_calc_core_pos_swap_cluster(uint64_t mpidr)
+	 * Utility function to calculate the core position by
 	 * swapping the cluster order. This is necessary in order to
 	 * match the format of the boot information passed by the SCP
 	 * and read in plat_is_my_cpu_primary below.
 	 * -----------------------------------------------------------
 	 */
-func plat_arm_calc_core_pos
+func css_calc_core_pos_swap_cluster
 	and	x1, x0, #MPIDR_CPU_MASK
 	and	x0, x0, #MPIDR_CLUSTER_MASK
 	eor	x0, x0, #(1 << MPIDR_AFFINITY_BITS)  // swap cluster order
 	add	x0, x1, x0, LSR #6
 	ret
-endfunc plat_arm_calc_core_pos
+endfunc css_calc_core_pos_swap_cluster
 
 	/* -----------------------------------------------------
 	 * unsigned int plat_is_my_cpu_primary (void);

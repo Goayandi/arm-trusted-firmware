@@ -181,12 +181,6 @@ static void populate_power_domain_tree(const unsigned char *topology)
 
 	/* Validate the sanity of array exported by the platform */
 	assert(j == PLATFORM_CORE_COUNT);
-
-#if !USE_COHERENT_MEM
-	/* Flush the non CPU power domain data to memory */
-	flush_dcache_range((uintptr_t) &psci_non_cpu_pd_nodes,
-			   sizeof(psci_non_cpu_pd_nodes));
-#endif
 }
 
 /*******************************************************************************
@@ -226,18 +220,6 @@ int psci_setup(void)
 	/* Populate the mpidr field of cpu node for this CPU */
 	psci_cpu_pd_nodes[plat_my_core_pos()].mpidr =
 		read_mpidr() & MPIDR_AFFINITY_MASK;
-
-#if !USE_COHERENT_MEM
-	/*
-	 * The psci_non_cpu_pd_nodes only needs flushing when it's not allocated in
-	 * coherent memory.
-	 */
-	flush_dcache_range((uintptr_t) &psci_non_cpu_pd_nodes,
-			   sizeof(psci_non_cpu_pd_nodes));
-#endif
-
-	flush_dcache_range((uintptr_t) &psci_cpu_pd_nodes,
-			   sizeof(psci_cpu_pd_nodes));
 
 	psci_init_req_local_pwr_states();
 

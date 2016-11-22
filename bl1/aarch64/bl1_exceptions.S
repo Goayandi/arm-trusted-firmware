@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2014, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -31,7 +31,8 @@
 #include <arch.h>
 #include <asm_macros.S>
 #include <bl_common.h>
-#include <runtime_svc.h>
+#include <bl1.h>
+#include <context.h>
 
 	.globl	bl1_exceptions
 
@@ -115,51 +116,15 @@ SynchronousExceptionA64:
 	/* Enable the SError interrupt */
 	msr	daifclr, #DAIF_ABT_BIT
 
-	/* ------------------------------------------------
-	 * Only a single SMC exception from BL2 to ask
-	 * BL1 to pass EL3 control to BL31 is expected
-	 * here.
-	 * It expects X0 with RUN_IMAGE SMC function id
-	 * X1 with address of a entry_point_info_t structure
-	 * describing the BL3-1 entrypoint
-	 * ------------------------------------------------
-	 */
-	mov	x19, x0
-	mov	x20, x1
+	str	x30, [sp, #CTX_GPREGS_OFFSET + CTX_GPREG_LR]
 
-	mrs	x0, esr_el3
-	ubfx	x1, x0, #ESR_EC_SHIFT, #ESR_EC_LENGTH
-	cmp	x1, #EC_AARCH64_SMC
-	b.ne	panic
+	/* Expect only SMC exceptions */
+	mrs	x30, esr_el3
+	ubfx	x30, x30, #ESR_EC_SHIFT, #ESR_EC_LENGTH
+	cmp	x30, #EC_AARCH64_SMC
+	b.ne	unexpected_sync_exception
 
-	mov	x0, #RUN_IMAGE
-	cmp	x19, x0
-	b.ne	panic
-
-	mov	x0, x20
-	bl	display_boot_progress
-
-	ldp	x0, x1, [x20, #ENTRY_POINT_INFO_PC_OFFSET]
-	msr	elr_el3, x0
-	msr	spsr_el3, x1
-	ubfx	x0, x1, #MODE_EL_SHIFT, #2
-	cmp	x0, #MODE_EL3
-	b.ne	panic
-
-	bl	disable_mmu_icache_el3
-	tlbi	alle3
-
-	ldp	x6, x7, [x20, #(ENTRY_POINT_INFO_ARGS_OFFSET + 0x30)]
-	ldp	x4, x5, [x20, #(ENTRY_POINT_INFO_ARGS_OFFSET + 0x20)]
-	ldp	x2, x3, [x20, #(ENTRY_POINT_INFO_ARGS_OFFSET + 0x10)]
-	ldp	x0, x1, [x20, #(ENTRY_POINT_INFO_ARGS_OFFSET + 0x0)]
-	eret
-panic:
-	mov	x0, #SYNC_EXCEPTION_AARCH64
-	bl	plat_report_exception
-
-	wfi
-	b	panic
+	b	smc_handler64
 	check_vector_size SynchronousExceptionA64
 
 	.align	7
@@ -214,3 +179,140 @@ SErrorA32:
 	bl	plat_report_exception
 	b	SErrorA32
 	check_vector_size SErrorA32
+
+
+func smc_handler64
+
+	/* ----------------------------------------------
+	 * Detect if this is a RUN_IMAGE or other SMC.
+	 * ----------------------------------------------
+	 */
+	mov	x30, #BL1_SMC_RUN_IMAGE
+	cmp	x30, x0
+	b.ne	smc_handler
+
+	/* ------------------------------------------------
+	 * Make sure only Secure world reaches here.
+	 * ------------------------------------------------
+	 */
+	mrs	x30, scr_el3
+	tst	x30, #SCR_NS_BIT
+	b.ne	unexpected_sync_exception
+
+	/* ----------------------------------------------
+	 * Handling RUN_IMAGE SMC. First switch back to
+	 * SP_EL0 for the C runtime stack.
+	 * ----------------------------------------------
+	 */
+	ldr	x30, [sp, #CTX_EL3STATE_OFFSET + CTX_RUNTIME_SP]
+	msr	spsel, #0
+	mov	sp, x30
+
+	/* ---------------------------------------------------------------------
+	 * Pass EL3 control to BL31.
+	 * Here it expects X1 with the address of a entry_point_info_t
+	 * structure describing the BL31 entrypoint.
+	 * ---------------------------------------------------------------------
+	 */
+	mov	x20, x1
+
+	mov	x0, x20
+	bl	bl1_print_bl31_ep_info
+
+	ldp	x0, x1, [x20, #ENTRY_POINT_INFO_PC_OFFSET]
+	msr	elr_el3, x0
+	msr	spsr_el3, x1
+	ubfx	x0, x1, #MODE_EL_SHIFT, #2
+	cmp	x0, #MODE_EL3
+	b.ne	unexpected_sync_exception
+
+	bl	disable_mmu_icache_el3
+	tlbi	alle3
+
+#if SPIN_ON_BL1_EXIT
+	bl	print_debug_loop_message
+debug_loop:
+	b	debug_loop
+#endif
+
+	mov	x0, x20
+	bl	bl1_plat_prepare_exit
+
+	ldp	x6, x7, [x20, #(ENTRY_POINT_INFO_ARGS_OFFSET + 0x30)]
+	ldp	x4, x5, [x20, #(ENTRY_POINT_INFO_ARGS_OFFSET + 0x20)]
+	ldp	x2, x3, [x20, #(ENTRY_POINT_INFO_ARGS_OFFSET + 0x10)]
+	ldp	x0, x1, [x20, #(ENTRY_POINT_INFO_ARGS_OFFSET + 0x0)]
+	eret
+endfunc smc_handler64
+
+unexpected_sync_exception:
+	mov	x0, #SYNC_EXCEPTION_AARCH64
+	bl	plat_report_exception
+	wfi
+	b	unexpected_sync_exception
+
+	/* -----------------------------------------------------
+	 * Save Secure/Normal world context and jump to
+	 * BL1 SMC handler.
+	 * -----------------------------------------------------
+	 */
+smc_handler:
+	/* -----------------------------------------------------
+	 * Save the GP registers x0-x29.
+	 * TODO: Revisit to store only SMCC specified registers.
+	 * -----------------------------------------------------
+	 */
+	bl	save_gp_registers
+
+	/* -----------------------------------------------------
+	 * Populate the parameters for the SMC handler. We
+	 * already have x0-x4 in place. x5 will point to a
+	 * cookie (not used now). x6 will point to the context
+	 * structure (SP_EL3) and x7 will contain flags we need
+	 * to pass to the handler.
+	 * -----------------------------------------------------
+	 */
+	mov	x5, xzr
+	mov	x6, sp
+
+	/* -----------------------------------------------------
+	 * Restore the saved C runtime stack value which will
+	 * become the new SP_EL0 i.e. EL3 runtime stack. It was
+	 * saved in the 'cpu_context' structure prior to the last
+	 * ERET from EL3.
+	 * -----------------------------------------------------
+	 */
+	ldr	x12, [x6, #CTX_EL3STATE_OFFSET + CTX_RUNTIME_SP]
+
+	/* ---------------------------------------------
+	 * Switch back to SP_EL0 for the C runtime stack.
+	 * ---------------------------------------------
+	 */
+	msr	spsel, #0
+	mov	sp, x12
+
+	/* -----------------------------------------------------
+	 * Save the SPSR_EL3, ELR_EL3, & SCR_EL3 in case there
+	 * is a world switch during SMC handling.
+	 * -----------------------------------------------------
+	 */
+	mrs	x16, spsr_el3
+	mrs	x17, elr_el3
+	mrs	x18, scr_el3
+	stp	x16, x17, [x6, #CTX_EL3STATE_OFFSET + CTX_SPSR_EL3]
+	str	x18, [x6, #CTX_EL3STATE_OFFSET + CTX_SCR_EL3]
+
+	/* Copy SCR_EL3.NS bit to the flag to indicate caller's security */
+	bfi	x7, x18, #0, #1
+
+	/* -----------------------------------------------------
+	 * Go to BL1 SMC handler.
+	 * -----------------------------------------------------
+	 */
+	bl	bl1_smc_handler
+
+	/* -----------------------------------------------------
+	 * Do the transition to next BL image.
+	 * -----------------------------------------------------
+	 */
+	b	el3_exit

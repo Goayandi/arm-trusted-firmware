@@ -36,12 +36,9 @@ ENTRY(bl31_entrypoint)
 
 
 MEMORY {
-<<<<<<< HEAD
     RAM (rwx): ORIGIN = BL31_BASE, LENGTH = BL31_LIMIT
-    RAM2 (rwx): ORIGIN = TZRAM2_BASE, LENGTH = TZRAM2_SIZE
-=======
     RAM (rwx): ORIGIN = BL31_BASE, LENGTH = BL31_LIMIT - BL31_BASE
->>>>>>> v1.1
+    RAM2 (rwx): ORIGIN = TZRAM2_BASE, LENGTH = TZRAM2_SIZE
 }
 
 
@@ -86,6 +83,12 @@ SECTIONS
     ASSERT(__CPU_OPS_END__ > __CPU_OPS_START__,
            "cpu_ops not defined for this platform.")
 
+    /*
+     * Define a linker symbol to mark start of the RW memory area for this
+     * image.
+     */
+    __RW_START__ = . ;
+
     .data . : {
         __DATA_START__ = .;
         *(.data*)
@@ -93,7 +96,7 @@ SECTIONS
     } >RAM
 
 #ifdef BL31_PROGBITS_LIMIT
-    ASSERT(. <= BL31_PROGBITS_LIMIT, "BL3-1 progbits has exceeded its limit.")
+    ASSERT(. <= BL31_PROGBITS_LIMIT, "BL31 progbits has exceeded its limit.")
 #endif
 
     stacks (NOLOAD) : {
@@ -106,10 +109,31 @@ SECTIONS
      * The .bss section gets initialised to 0 at runtime.
      * Its base address must be 16-byte aligned.
      */
-    .bss : ALIGN(16) {
+    .bss (NOLOAD) : ALIGN(16) {
         __BSS_START__ = .;
         *(.bss*)
         *(COMMON)
+#if !USE_COHERENT_MEM
+        /*
+         * Bakery locks are stored in normal .bss memory
+         *
+         * Each lock's data is spread across multiple cache lines, one per CPU,
+         * but multiple locks can share the same cache line.
+         * The compiler will allocate enough memory for one CPU's bakery locks,
+         * the remaining cache lines are allocated by the linker script
+         */
+        . = ALIGN(CACHE_WRITEBACK_GRANULE);
+        __BAKERY_LOCK_START__ = .;
+        *(bakery_lock)
+        . = ALIGN(CACHE_WRITEBACK_GRANULE);
+        __PERCPU_BAKERY_LOCK_SIZE__ = ABSOLUTE(. - __BAKERY_LOCK_START__);
+        . = . + (__PERCPU_BAKERY_LOCK_SIZE__ * (PLATFORM_CORE_COUNT - 1));
+        __BAKERY_LOCK_END__ = .;
+#ifdef PLAT_PERCPU_BAKERY_LOCK_SIZE
+    ASSERT(__PERCPU_BAKERY_LOCK_SIZE__ == PLAT_PERCPU_BAKERY_LOCK_SIZE,
+        "PLAT_PERCPU_BAKERY_LOCK_SIZE does not match bakery lock requirements");
+#endif
+#endif
         __BSS_END__ = .;
     } >RAM
 
@@ -133,6 +157,12 @@ SECTIONS
      */
     coherent_ram (NOLOAD) : ALIGN(4096) {
         __COHERENT_RAM_START__ = .;
+        /*
+         * Bakery locks are stored in coherent memory
+         *
+         * Each lock's data is contiguous and fully allocated by the compiler
+         */
+        *(bakery_lock)
         *(tzfw_coherent_mem)
         __COHERENT_RAM_END_UNALIGNED__ = .;
         /*
@@ -142,13 +172,14 @@ SECTIONS
          */
         . = NEXT(4096);
         __COHERENT_RAM_END__ = .;
-<<<<<<< HEAD
-    } >RAM2
-=======
     } >RAM
 #endif
->>>>>>> v1.1
 
+    /*
+     * Define a linker symbol to mark end of the RW memory area for this
+     * image.
+     */
+    __RW_END__ = .;
     __BL31_END__ = .;
 
     __BSS_SIZE__ = SIZEOF(.bss);
@@ -157,5 +188,5 @@ SECTIONS
         __COHERENT_RAM_END_UNALIGNED__ - __COHERENT_RAM_START__;
 #endif
 
-    ASSERT(. <= TZRAM2_LIMIT, "TZRAM2 image has exceeded its limit.")
+    ASSERT(. <= BL31_LIMIT, "BL31 image has exceeded its limit.")
 }

@@ -38,7 +38,7 @@
 
 /*
  * The next 3 constants identify the extents of the code & RO data region and
- * the limit of the BL3-2 image. These addresses are used by the MMU setup code
+ * the limit of the BL32 image. These addresses are used by the MMU setup code
  * and therefore they must be page-aligned.  It is the responsibility of the
  * linker script to ensure that __RO_START__, __RO_END__ & & __BL32_END__
  * linker symbols refer to page-aligned addresses.
@@ -89,7 +89,7 @@ void tsp_early_platform_setup(void)
  ******************************************************************************/
 void tsp_platform_setup(void)
 {
-	plat_arm_gic_init();
+	plat_arm_gic_driver_init();
 }
 
 /*******************************************************************************

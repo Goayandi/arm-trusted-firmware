@@ -30,7 +30,8 @@
 
 #include <arch.h>
 #include <asm_macros.S>
-#include <gic_v2.h>
+#include <gicv2.h>
+#include <gicv3.h>
 #include <platform_def.h>
 #include <v2m_def.h>
 #include "../drivers/pwrc/fvp_pwrc.h"
@@ -60,6 +61,7 @@
 	 * -----------------------------------------------------
 	 */
 func plat_secondary_cold_boot_setup
+#ifndef EL3_PAYLOAD_BASE
 	/* ---------------------------------------------
 	 * Power down this cpu.
 	 * TODO: Do we need to worry about powering the
@@ -73,9 +75,26 @@ func plat_secondary_cold_boot_setup
 	str	w0, [x1, #PPOFFR_OFF]
 
 	/* ---------------------------------------------
-	 * Deactivate the gic cpu interface as well
+	 * Disable GIC bypass as well
 	 * ---------------------------------------------
 	 */
+	/* Check for GICv3 system register access */
+	mrs	x0, id_aa64pfr0_el1
+	ubfx	x0, x0, #ID_AA64PFR0_GIC_SHIFT, #ID_AA64PFR0_GIC_WIDTH
+	cmp	x0, #1
+	b.ne	gicv2_bypass_disable
+
+	/* Check for SRE enable */
+	mrs	x1, ICC_SRE_EL3
+	tst	x1, #ICC_SRE_SRE_BIT
+	b.eq	gicv2_bypass_disable
+
+	mrs	x2, ICC_SRE_EL3
+	orr	x2, x2, #(ICC_SRE_DIB_BIT | ICC_SRE_DFB_BIT)
+	msr	ICC_SRE_EL3, x2
+	b	secondary_cold_boot_wait
+
+gicv2_bypass_disable:
 	ldr	x0, =VE_GICC_BASE
 	ldr	x1, =BASE_GICC_BASE
 	fvp_choose_gicmmap	x0, x1, x2, w2, x1
@@ -83,6 +102,7 @@ func plat_secondary_cold_boot_setup
 	orr	w0, w0, #(IRQ_BYP_DIS_GRP0 | FIQ_BYP_DIS_GRP0)
 	str	w0, [x1, #GICC_CTLR]
 
+secondary_cold_boot_wait:
 	/* ---------------------------------------------
 	 * There is no sane reason to come out of this
 	 * wfi so panic if we do. This cpu will be pow-
@@ -93,6 +113,18 @@ func plat_secondary_cold_boot_setup
 	wfi
 cb_panic:
 	b	cb_panic
+#else
+	mov_imm	x0, PLAT_ARM_TRUSTED_MAILBOX_BASE
+
+	/* Wait until the entrypoint gets populated */
+poll_mailbox:
+	ldr	x1, [x0]
+	cbz	x1, 1f
+	br	x1
+1:
+	wfe
+	b	poll_mailbox
+#endif /* EL3_PAYLOAD_BASE */
 endfunc plat_secondary_cold_boot_setup
 
 	/* ---------------------------------------------------------------------
@@ -107,7 +139,7 @@ endfunc plat_secondary_cold_boot_setup
 	 * For a warm boot, read the mailbox and return the address it contains.
 	 *
 	 * TODO: PSYSR is a common register and should be
-	 * 	accessed using locks. Since its not possible
+	 * 	accessed using locks. Since it is not possible
 	 * 	to use locks immediately after a cold reset
 	 * 	we are relying on the fact that after a cold
 	 * 	reset all cpus will read the same WK field
@@ -140,7 +172,7 @@ warm_reset:
 	 * it here with SO attributes.
 	 * ---------------------------------------------------------------------
 	 */
-	mov_imm	x0, MBOX_BASE
+	mov_imm	x0, PLAT_ARM_TRUSTED_MAILBOX_BASE
 	ldr	x0, [x0]
 	cbz	x0, _panic
 	ret

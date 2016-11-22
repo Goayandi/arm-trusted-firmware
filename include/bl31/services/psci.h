@@ -38,7 +38,7 @@
 #endif
 
 /*******************************************************************************
- * Number of power domains whose state this psci imp. can track
+ * Number of power domains whose state this PSCI implementation can track
  ******************************************************************************/
 #ifdef PLAT_NUM_PWR_DOMAINS
 #define PSCI_NUM_PWR_DOMAINS	PLAT_NUM_PWR_DOMAINS
@@ -60,7 +60,7 @@
 #define PSCI_MAX_PWR_LVL	3
 
 /*******************************************************************************
- * Defines for runtime services func ids
+ * Defines for runtime services function ids
  ******************************************************************************/
 #define PSCI_VERSION			0x84000000
 #define PSCI_CPU_SUSPEND_AARCH32	0x84000001
@@ -251,14 +251,11 @@ typedef struct psci_cpu_data {
 
 	/* The local power state of this CPU */
 	plat_local_state_t local_state;
-#if !USE_COHERENT_MEM
-	bakery_info_t pcpu_bakery_info[PSCI_NUM_NON_CPU_PWR_DOMAINS];
-#endif
 } psci_cpu_data_t;
 
 /*******************************************************************************
  * Structure populated by platform specific code to export routines which
- * perform common low level pm functions
+ * perform common low level power management functions
  ******************************************************************************/
 typedef struct plat_psci_ops {
 	void (*cpu_standby)(plat_local_state_t cpu_state);
@@ -279,16 +276,16 @@ typedef struct plat_psci_ops {
 
 /*******************************************************************************
  * Optional structure populated by the Secure Payload Dispatcher to be given a
- * chance to perform any bookkeeping before PSCI executes a power mgmt.
+ * chance to perform any bookkeeping before PSCI executes a power management
  * operation. It also allows PSCI to determine certain properties of the SP e.g.
  * migrate capability etc.
  ******************************************************************************/
 typedef struct spd_pm_ops {
 	void (*svc_on)(uint64_t target_cpu);
 	int32_t (*svc_off)(uint64_t __unused);
-	void (*svc_suspend)(uint64_t __unused);
+	void (*svc_suspend)(uint64_t max_off_pwrlvl);
 	void (*svc_on_finish)(uint64_t __unused);
-	void (*svc_suspend_finish)(uint64_t suspend_level);
+	void (*svc_suspend_finish)(uint64_t max_off_pwrlvl);
 	int32_t (*svc_migrate)(uint64_t from_cpu, uint64_t to_cpu);
 	int32_t (*svc_migrate_info)(uint64_t *resident_cpu);
 	void (*svc_system_off)(void);

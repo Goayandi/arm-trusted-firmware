@@ -8,7 +8,7 @@ Contents :
 3.  [EL3 runtime services framework](#3--el3-runtime-services-framework)
 4.  [Power State Coordination Interface](#4--power-state-coordination-interface)
 5.  [Secure-EL1 Payloads and Dispatchers](#5--secure-el1-payloads-and-dispatchers)
-6.  [Crash Reporting in BL3-1](#6--crash-reporting-in-bl3-1)
+6.  [Crash Reporting in BL31](#6--crash-reporting-in-bl3-1)
 7.  [Guidelines for Reset Handlers](#7--guidelines-for-reset-handlers)
 8.  [CPU specific operations framework](#8--cpu-specific-operations-framework)
 9.  [Memory layout of BL images](#9-memory-layout-of-bl-images)
@@ -43,22 +43,25 @@ Firmware Interrupt Management Design guide][INTRG] [4].
 2.  Cold boot
 -------------
 
-The cold boot path starts when the platform is physically turned on. One of
-the CPUs released from reset is chosen as the primary CPU, and the remaining
-CPUs are considered secondary CPUs. The primary CPU is chosen through
-platform-specific means. The cold boot path is mainly executed by the primary
-CPU, other than essential CPU initialization executed by all CPUs. The
-secondary CPUs are kept in a safe platform-specific state until the primary
-CPU has performed enough initialization to boot them.
+The cold boot path starts when the platform is physically turned on. If
+`COLD_BOOT_SINGLE_CPU=0`, one of the CPUs released from reset is chosen as the
+primary CPU, and the remaining CPUs are considered secondary CPUs. The primary
+CPU is chosen through platform-specific means. The cold boot path is mainly
+executed by the primary CPU, other than essential CPU initialization executed by
+all CPUs. The secondary CPUs are kept in a safe platform-specific state until
+the primary CPU has performed enough initialization to boot them.
+
+Refer to the [Reset Design] for more information on the effect of the
+`COLD_BOOT_SINGLE_CPU` platform build option.
 
 The cold boot path in this implementation of the ARM Trusted Firmware is divided
 into five steps (in order of execution):
 
 *   Boot Loader stage 1 (BL1) _AP Trusted ROM_
 *   Boot Loader stage 2 (BL2) _Trusted Boot Firmware_
-*   Boot Loader stage 3-1 (BL3-1) _EL3 Runtime Firmware_
-*   Boot Loader stage 3-2 (BL3-2) _Secure-EL1 Payload_ (optional)
-*   Boot Loader stage 3-3 (BL3-3) _Non-trusted Firmware_
+*   Boot Loader stage 3-1 (BL31) _EL3 Runtime Firmware_
+*   Boot Loader stage 3-2 (BL32) _Secure-EL1 Payload_ (optional)
+*   Boot Loader stage 3-3 (BL33) _Non-trusted Firmware_
 
 ARM development platforms (Fixed Virtual Platforms (FVPs) and Juno) implement a
 combination of the following types of memory regions. Each bootloader stage uses
@@ -76,10 +79,8 @@ one or more of these memory regions.
 The sections below provide the following details:
 
 *   initialization and execution of the first three stages during cold boot
-*   specification of the BL3-1 entrypoint requirements for use by alternative
+*   specification of the BL31 entrypoint requirements for use by alternative
     Trusted Boot Firmware in place of the provided BL1 and BL2
-*   changes in BL3-1 behavior when using the `RESET_TO_BL31` option which
-    allows BL3-1 to run without BL1 and BL2
 
 
 ### BL1
@@ -98,12 +99,16 @@ The functionality implemented by this stage is as follows.
 
 Whenever a CPU is released from reset, BL1 needs to distinguish between a warm
 boot and a cold boot. This is done using platform-specific mechanisms (see the
-`platform_get_entrypoint()` function in the [Porting Guide]). In the case of a
-warm boot, a CPU is expected to continue execution from a seperate
+`plat_get_my_entrypoint()` function in the [Porting Guide]). In the case of a
+warm boot, a CPU is expected to continue execution from a separate
 entrypoint. In the case of a cold boot, the secondary CPUs are placed in a safe
 platform-specific state (see the `plat_secondary_cold_boot_setup()` function in
 the [Porting Guide]) while the primary CPU executes the remaining cold boot path
 as described in the following sections.
+
+This step only applies when `PROGRAMMABLE_RESET_ADDRESS=0`. Refer to the
+[Reset Design] for more information on the effect of the
+`PROGRAMMABLE_RESET_ADDRESS` platform build option.
 
 #### Architectural initialization
 
@@ -150,7 +155,7 @@ BL1 performs minimal architectural initialization as follows.
     For the latter, BL1 installs a simple stub. The stub expects to receive
     only a single type of SMC (determined by its function ID in the general
     purpose register `X0`). This SMC is raised by BL2 to make BL1 pass control
-    to BL3-1 (loaded by BL2) at EL3. Any other SMC leads to an assertion
+    to BL31 (loaded by BL2) at EL3. Any other SMC leads to an assertion
     failure.
 
 *   CPU initialization
@@ -189,9 +194,21 @@ the CCI slave interface corresponding to the cluster that includes the
 primary CPU. BL1 also initializes a UART (PL011 console), which enables access
 to the `printf` family of functions in BL1.
 
+#### Firmware Update detection and execution
+
+After performing platform setup, BL1 common code calls
+`bl1_plat_get_next_image_id()` to determine if [Firmware Update] is required or
+to proceed with the normal boot process. If the platform code returns
+`BL2_IMAGE_ID` then the normal boot sequence is executed as described in the
+next section, else BL1 assumes that [Firmware Update] is required and execution
+passes to the first image in the [Firmware Update] process. In either case, BL1
+retrieves a descriptor of the next image by calling `bl1_plat_get_image_desc()`.
+The image descriptor contains an `entry_point_info_t` structure, which BL1
+uses to initialize the execution state of the next image.
+
 #### BL2 image load and execution
 
-BL1 execution continues as follows:
+In the normal boot flow, BL1 execution continues as follows:
 
 1.  BL1 determines the amount of free trusted SRAM memory available by
     calculating the extent of its own data section, which also resides in
@@ -200,7 +217,7 @@ BL1 execution continues as follows:
     there is not enough free trusted SRAM the following error message is
     printed:
 
-        "Failed to load boot loader stage 2 (BL2) firmware."
+        "Failed to load BL2 firmware."
 
     If the load is successful, BL1 updates the limits of the remaining free
     trusted SRAM. It also populates information about the amount of trusted
@@ -211,7 +228,7 @@ BL1 execution continues as follows:
 2.  BL1 prints the following string from the primary CPU to indicate successful
     execution of the BL1 stage:
 
-        "Booting trusted firmware boot loader stage 1"
+        "Booting Trusted Firmware"
 
 3.  BL1 passes control to the BL2 image at Secure EL1, starting from its load
     address.
@@ -240,104 +257,104 @@ bits.
 
 BL2 copies the information regarding the trusted SRAM populated by BL1 using a
 platform-specific mechanism. It calculates the limits of DRAM (main memory)
-to determine whether there is enough space to load the BL3-3 image. A platform
-defined base address is used to specify the load address for the BL3-1 image.
-It also defines the extents of memory available for use by the BL3-2 image.
+to determine whether there is enough space to load the BL33 image. A platform
+defined base address is used to specify the load address for the BL31 image.
+It also defines the extents of memory available for use by the BL32 image.
 BL2 also initializes a UART (PL011 console), which enables  access to the
 `printf` family of functions in BL2. Platform security is initialized to allow
 access to controlled components. The storage abstraction layer is initialized
 which is used to load further bootloader images.
 
-#### BL3-0 (System Control Processor Firmware) image load
+#### SCP_BL2 (System Control Processor Firmware) image load
 
 Some systems have a separate System Control Processor (SCP) for power, clock,
-reset and system control. BL2 loads the optional BL3-0 image from platform
+reset and system control. BL2 loads the optional SCP_BL2 image from platform
 storage into a platform-specific region of secure memory. The subsequent
-handling of BL3-0 is platform specific. For example, on the Juno ARM development
-platform port the image is transferred into SCP's internal memory using the Boot
-Over MHU (BOM) protocol after being loaded in the trusted SRAM memory. The SCP
-executes BL3-0 and signals to the Application Processor (AP) for BL2 execution
-to continue.
+handling of SCP_BL2 is platform specific. For example, on the Juno ARM
+development platform port the image is transferred into SCP's internal memory
+using the Boot Over MHU (BOM) protocol after being loaded in the trusted SRAM
+memory. The SCP executes SCP_BL2 and signals to the Application Processor (AP)
+for BL2 execution to continue.
 
-#### BL3-1 (EL3 Runtime Firmware) image load
+#### BL31 (EL3 Runtime Firmware) image load
 
-BL2 loads the BL3-1 image from platform storage into a platform-specific address
+BL2 loads the BL31 image from platform storage into a platform-specific address
 in trusted SRAM. If there is not enough memory to load the image or image is
-missing it leads to an assertion failure. If the BL3-1 image loads successfully,
-BL2 updates the amount of trusted SRAM used and available for use by BL3-1.
+missing it leads to an assertion failure. If the BL31 image loads successfully,
+BL2 updates the amount of trusted SRAM used and available for use by BL31.
 This information is populated at a platform-specific memory address.
 
-#### BL3-2 (Secure-EL1 Payload) image load
+#### BL32 (Secure-EL1 Payload) image load
 
-BL2 loads the optional BL3-2 image from platform storage into a platform-
+BL2 loads the optional BL32 image from platform storage into a platform-
 specific region of secure memory. The image executes in the secure world. BL2
-relies on BL3-1 to pass control to the BL3-2 image, if present. Hence, BL2
+relies on BL31 to pass control to the BL32 image, if present. Hence, BL2
 populates a platform-specific area of memory with the entrypoint/load-address
-of the BL3-2 image. The value of the Saved Processor Status Register (`SPSR`)
-for entry into BL3-2 is not determined by BL2, it is initialized by the
-Secure-EL1 Payload Dispatcher (see later) within BL3-1, which is responsible for
-managing interaction with BL3-2. This information is passed to BL3-1.
+of the BL32 image. The value of the Saved Processor Status Register (`SPSR`)
+for entry into BL32 is not determined by BL2, it is initialized by the
+Secure-EL1 Payload Dispatcher (see later) within BL31, which is responsible for
+managing interaction with BL32. This information is passed to BL31.
 
-#### BL3-3 (Non-trusted Firmware) image load
+#### BL33 (Non-trusted Firmware) image load
 
-BL2 loads the BL3-3 image (e.g. UEFI or other test or boot software) from
+BL2 loads the BL33 image (e.g. UEFI or other test or boot software) from
 platform storage into non-secure memory as defined by the platform.
 
-BL2 relies on BL3-1 to pass control to BL3-3 once secure state initialization is
+BL2 relies on BL31 to pass control to BL33 once secure state initialization is
 complete. Hence, BL2 populates a platform-specific area of memory with the
 entrypoint and Saved Program Status Register (`SPSR`) of the normal world
-software image. The entrypoint is the load address of the BL3-3 image. The
+software image. The entrypoint is the load address of the BL33 image. The
 `SPSR` is determined as specified in Section 5.13 of the [PSCI PDD] [PSCI]. This
-information is passed to BL3-1.
+information is passed to BL31.
 
-#### BL3-1 (EL3 Runtime Firmware) execution
+#### BL31 (EL3 Runtime Firmware) execution
 
 BL2 execution continues as follows:
 
 1.  BL2 passes control back to BL1 by raising an SMC, providing BL1 with the
-    BL3-1 entrypoint. The exception is handled by the SMC exception handler
+    BL31 entrypoint. The exception is handled by the SMC exception handler
     installed by BL1.
 
 2.  BL1 turns off the MMU and flushes the caches. It clears the
     `SCTLR_EL3.M/I/C` bits, flushes the data cache to the point of coherency
     and invalidates the TLBs.
 
-3.  BL1 passes control to BL3-1 at the specified entrypoint at EL3.
+3.  BL1 passes control to BL31 at the specified entrypoint at EL3.
 
 
-### BL3-1
+### BL31
 
-The image for this stage is loaded by BL2 and BL1 passes control to BL3-1 at
-EL3. BL3-1 executes solely in trusted SRAM. BL3-1 is linked against and
+The image for this stage is loaded by BL2 and BL1 passes control to BL31 at
+EL3. BL31 executes solely in trusted SRAM. BL31 is linked against and
 loaded at a platform-specific base address (more information can be found later
-in this document). The functionality implemented by BL3-1 is as follows.
+in this document). The functionality implemented by BL31 is as follows.
 
 #### Architectural initialization
 
-Currently, BL3-1 performs a similar architectural initialization to BL1 as
+Currently, BL31 performs a similar architectural initialization to BL1 as
 far as system register settings are concerned. Since BL1 code resides in ROM,
-architectural initialization in BL3-1 allows override of any previous
-initialization done by BL1. BL3-1 creates page tables to address the first
+architectural initialization in BL31 allows override of any previous
+initialization done by BL1. BL31 creates page tables to address the first
 4GB of physical address space and initializes the MMU accordingly. It initializes
 a buffer of frequently used pointers, called per-CPU pointer cache, in memory for
 faster access. Currently the per-CPU pointer cache contains only the pointer
 to crash stack. It then replaces the exception vectors populated by BL1 with its
-own. BL3-1 exception vectors implement more elaborate support for
+own. BL31 exception vectors implement more elaborate support for
 handling SMCs since this is the only mechanism to access the runtime services
-implemented by BL3-1 (PSCI for example). BL3-1 checks each SMC for validity as
+implemented by BL31 (PSCI for example). BL31 checks each SMC for validity as
 specified by the [SMC calling convention PDD][SMCCC] before passing control to
-the required SMC handler routine. BL3-1 programs the `CNTFRQ_EL0` register with
+the required SMC handler routine. BL31 programs the `CNTFRQ_EL0` register with
 the clock frequency of the system counter, which is provided by the platform.
 
 #### Platform initialization
 
-BL3-1 performs detailed platform initialization, which enables normal world
+BL31 performs detailed platform initialization, which enables normal world
 software to function correctly. It also retrieves entrypoint information for
-the BL3-3 image loaded by BL2 from the platform defined memory address populated
+the BL33 image loaded by BL2 from the platform defined memory address populated
 by BL2. It enables issuing of snoop and DVM (Distributed Virtual Memory)
 requests to the CCI slave interface corresponding to the cluster that includes
-the primary CPU. BL3-1 also initializes a UART (PL011 console), which enables
-access to the `printf` family of functions in BL3-1.  It enables the system
+the primary CPU. BL31 also initializes a UART (PL011 console), which enables
+access to the `printf` family of functions in BL31.  It enables the system
 level implementation of the generic timer through the memory mapped interface.
 
 * GICv2 initialization:
@@ -347,30 +364,30 @@ level implementation of the generic timer through the memory mapped interface.
     -   Disable the legacy interrupt bypass mechanism.
     -   Configure the priority mask register to allow interrupts of all
         priorities to be signaled to the CPU interface.
-    -   Mark SGIs 8-15, the secure physical timer interrupt (#29) and the
-        trusted watchdog interrupt (#56) as group0 (secure).
-    -   Target the trusted watchdog interrupt to CPU0.
+    -   Mark SGIs 8-15 and the other secure interrupts on the platform
+        as group0 (secure).
+    -   Target all secure SPIs to CPU0.
     -   Enable these group0 interrupts in the GIC distributor.
     -   Configure all other interrupts as group1 (non-secure).
     -   Enable signaling of group0 interrupts in the GIC distributor.
 
 *   GICv3 initialization:
 
-    If a GICv3 implementation is available in the platform, BL3-1 initializes
+    If a GICv3 implementation is available in the platform, BL31 initializes
     the GICv3 in GICv2 emulation mode with settings as described for GICv2
     above.
 
 *   Power management initialization:
 
-    BL3-1 implements a state machine to track CPU and cluster state. The state
+    BL31 implements a state machine to track CPU and cluster state. The state
     can be one of `OFF`, `ON_PENDING`, `SUSPEND` or `ON`. All secondary CPUs are
     initially in the `OFF` state. The cluster that the primary CPU belongs to is
-    `ON`; any other cluster is `OFF`. BL3-1 initializes the data structures that
-    implement the state machine, including the locks that protect them. BL3-1
+    `ON`; any other cluster is `OFF`. BL31 initializes the data structures that
+    implement the state machine, including the locks that protect them. BL31
     accesses the state of a CPU or cluster immediately after reset and before
     the data cache is enabled in the warm boot path. It is not currently
-    possible to use 'exclusive' based spinlocks, therefore BL3-1 uses locks
-    based on Lamport's Bakery algorithm instead. BL3-1 allocates these locks in
+    possible to use 'exclusive' based spinlocks, therefore BL31 uses locks
+    based on Lamport's Bakery algorithm instead. BL31 allocates these locks in
     device memory by default.
 
 *   Runtime services initialization:
@@ -381,34 +398,34 @@ level implementation of the generic timer through the memory mapped interface.
     Details about the PSCI service are provided in the "Power State Coordination
     Interface" section below.
 
-*   BL3-2 (Secure-EL1 Payload) image initialization
+*   BL32 (Secure-EL1 Payload) image initialization
 
-    If a BL3-2 image is present then there must be a matching Secure-EL1 Payload
+    If a BL32 image is present then there must be a matching Secure-EL1 Payload
     Dispatcher (SPD) service (see later for details). During initialization
-    that service  must register a function to carry out initialization of BL3-2
-    once the runtime services are fully initialized. BL3-1 invokes such a
-    registered function to initialize BL3-2 before running BL3-3.
+    that service  must register a function to carry out initialization of BL32
+    once the runtime services are fully initialized. BL31 invokes such a
+    registered function to initialize BL32 before running BL33.
 
-    Details on BL3-2 initialization and the SPD's role are described in the
+    Details on BL32 initialization and the SPD's role are described in the
     "Secure-EL1 Payloads and Dispatchers" section below.
 
-*   BL3-3 (Non-trusted Firmware) execution
+*   BL33 (Non-trusted Firmware) execution
 
-    BL3-1 initializes the EL2 or EL1 processor context for normal-world cold
+    BL31 initializes the EL2 or EL1 processor context for normal-world cold
     boot, ensuring that no secure state information finds its way into the
-    non-secure execution state. BL3-1 uses the entrypoint information provided
-    by BL2 to jump to the Non-trusted firmware image (BL3-3) at the highest
+    non-secure execution state. BL31 uses the entrypoint information provided
+    by BL2 to jump to the Non-trusted firmware image (BL33) at the highest
     available Exception Level (EL2 if available, otherwise EL1).
 
 
 ### Using alternative Trusted Boot Firmware in place of BL1 and BL2
 
 Some platforms have existing implementations of Trusted Boot Firmware that
-would like to use ARM Trusted Firmware BL3-1 for the EL3 Runtime Firmware. To
+would like to use ARM Trusted Firmware BL31 for the EL3 Runtime Firmware. To
 enable this firmware architecture it is important to provide a fully documented
-and stable interface between the Trusted Boot Firmware and BL3-1.
+and stable interface between the Trusted Boot Firmware and BL31.
 
-Future changes to the BL3-1 interface will be done in a backwards compatible
+Future changes to the BL31 interface will be done in a backwards compatible
 way, and this enables these firmware components to be independently enhanced/
 updated to develop and exploit new functionality.
 
@@ -425,58 +442,58 @@ EL3, little-endian data access, and all interrupt sources masked:
     SCTLR_EL3.EE = 0
 
 X0 and X1 can be used to pass information from the Trusted Boot Firmware to the
-platform code in BL3-1:
+platform code in BL31:
 
     X0 : Reserved for common Trusted Firmware information
     X1 : Platform specific information
 
-BL3-1 zero-init sections (e.g. `.bss`) should not contain valid data on entry,
+BL31 zero-init sections (e.g. `.bss`) should not contain valid data on entry,
 these will be zero filled prior to invoking platform setup code.
 
 ##### Use of the X0 and X1 parameters
 
 The parameters are platform specific and passed from `bl31_entrypoint()` to
 `bl31_early_platform_setup()`. The value of these parameters is never directly
-used by the common BL3-1 code.
+used by the common BL31 code.
 
-The convention is that `X0` conveys information regarding the BL3-1, BL3-2 and
-BL3-3 images from the Trusted Boot firmware and `X1` can be used for other
+The convention is that `X0` conveys information regarding the BL31, BL32 and
+BL33 images from the Trusted Boot firmware and `X1` can be used for other
 platform specific purpose. This convention allows platforms which use ARM
 Trusted Firmware's BL1 and BL2 images to transfer additional platform specific
 information from Secure Boot without conflicting with future evolution of the
 Trusted Firmware using `X0` to pass a `bl31_params` structure.
 
-BL3-1 common and SPD initialization code depends on image and entrypoint
-information about BL3-3 and BL3-2, which is provided via BL3-1 platform APIs.
-This information is required until the start of execution of BL3-3. This
+BL31 common and SPD initialization code depends on image and entrypoint
+information about BL33 and BL32, which is provided via BL31 platform APIs.
+This information is required until the start of execution of BL33. This
 information can be provided in a platform defined manner, e.g. compiled into
-the platform code in BL3-1, or provided in a platform defined memory location
+the platform code in BL31, or provided in a platform defined memory location
 by the Trusted Boot firmware, or passed from the Trusted Boot Firmware via the
 Cold boot Initialization parameters. This data may need to be cleaned out of
 the CPU caches if it is provided by an earlier boot stage and then accessed by
-BL3-1 platform code before the caches are enabled.
+BL31 platform code before the caches are enabled.
 
 ARM Trusted Firmware's BL2 implementation passes a `bl31_params` structure in
-`X0` and the ARM development platforms interpret this in the BL3-1 platform
+`X0` and the ARM development platforms interpret this in the BL31 platform
 code.
 
 ##### MMU, Data caches & Coherency
 
-BL3-1 does not depend on the enabled state of the MMU, data caches or
+BL31 does not depend on the enabled state of the MMU, data caches or
 interconnect coherency on entry to `bl31_entrypoint()`. If these are disabled
 on entry, these should be enabled during `bl31_plat_arch_setup()`.
 
-##### Data structures used in the BL3-1 cold boot interface
+##### Data structures used in the BL31 cold boot interface
 
 These structures are designed to support compatibility and independent
 evolution of the structures and the firmware images. For example, a version of
-BL3-1 that can interpret the BL3-x image information from different versions of
+BL31 that can interpret the BL3x image information from different versions of
 BL2, a platform that uses an extended entry_point_info structure to convey
-additional register information to BL3-1, or a ELF image loader that can convey
+additional register information to BL31, or a ELF image loader that can convey
 more details about the firmware images.
 
 To support these scenarios the structures are versioned and sized, which enables
-BL3-1 to detect which information is present and respond appropriately. The
+BL31 to detect which information is present and respond appropriately. The
 `param_header` is defined to capture this information:
 
     typedef struct param_header {
@@ -491,7 +508,7 @@ The structures using this format are `entry_point_info`, `image_info` and
 the header fields appropriately, and the `SET_PARAM_HEAD()` a macro is defined
 to simplify this action.
 
-#### Required CPU state for BL3-1 Warm boot initialization
+#### Required CPU state for BL31 Warm boot initialization
 
 When requesting a CPU power-on, or suspending a running CPU, ARM Trusted
 Firmware provides the platform power management code with a Warm boot
@@ -510,53 +527,6 @@ platform power management code is then invoked as required to initialize all
 necessary system, cluster and CPU resources.
 
 
-### Using BL3-1 as the CPU reset vector
-
-On some platforms the runtime firmware (BL3-x images) for the application
-processors are loaded by trusted firmware running on a secure system processor
-on the SoC, rather than by BL1 and BL2 running on the primary application
-processor. For this type of SoC it is desirable for the application processor
-to always reset to BL3-1 which eliminates the need for BL1 and BL2.
-
-ARM Trusted Firmware provides a build-time option `RESET_TO_BL31` that includes
-some additional logic in the BL3-1 entrypoint to support this use case.
-
-In this configuration, the platform's Trusted Boot Firmware must ensure that
-BL3-1 is loaded to its runtime address, which must match the CPU's RVBAR reset
-vector address, before the application processor is powered on. Additionally,
-platform software is responsible for loading the other BL3-x images required and
-providing entry point information for them to BL3-1. Loading these images might
-be done by the Trusted Boot Firmware or by platform code in BL3-1.
-
-The ARM FVP port supports the `RESET_TO_BL31` configuration, in which case the
-`bl31.bin` image must be loaded to its run address in Trusted SRAM and all CPU
-reset vectors be changed from the default `0x0` to this run address. See the
-[User Guide] for details of running the FVP models in this way.
-
-This configuration requires some additions and changes in the BL3-1
-functionality:
-
-#### Determination of boot path
-
-In this configuration, BL3-1 uses the same reset framework and code as the one
-described for BL1 above. On a warm boot a CPU is directed to the PSCI
-implementation via a platform defined mechanism. On a cold boot, the platform
-must place any secondary CPUs into a safe state while the primary CPU executes
-a modified BL3-1 initialization, as described below.
-
-#### Platform initialization
-
-In this configuration, when the CPU resets to BL3-1 there are no parameters
-that can be passed in registers by previous boot stages. Instead, the platform
-code in BL3-1 needs to know, or be able to determine, the location of the BL3-2
-(if required) and BL3-3 images and provide this information in response to the
-`bl31_plat_get_next_image_ep_info()` function.
-
-As the first image to execute in this configuration BL3-1 must also ensure that
-any security initialisation, for example programming a TrustZone address space
-controller, is carried out during early platform initialisation.
-
-
 3.  EL3 runtime services framework
 ----------------------------------
 
@@ -571,7 +541,7 @@ The EL3 runtime services framework enables the development of services by
 different providers that can be easily integrated into final product firmware.
 The following sections describe the framework which facilitates the
 registration, initialization and use of runtime services in EL3 Runtime
-Firmware (BL3-1).
+Firmware (BL31).
 
 The design of the runtime services depends heavily on the concepts and
 definitions described in the [SMCCC], in particular SMC Function IDs, Owning
@@ -628,7 +598,7 @@ the name of the service, the range of OENs covered, the type of service and
 initialization and call handler functions. This macro instantiates a `const
 struct rt_svc_desc` for the service with these details (see `runtime_svc.h`).
 This structure is allocated in a special ELF section `rt_svc_descs`, enabling
-the framework to find all service descriptors included into BL3-1.
+the framework to find all service descriptors included into BL31.
 
 The specific service for a SMC Function is selected based on the OEN and call
 type of the Function ID, and the framework uses that information in the service
@@ -650,14 +620,14 @@ call handling functions are provided in the following sections.
 ### Initialization
 
 `runtime_svc_init()` in `runtime_svc.c` initializes the runtime services
-framework running on the primary CPU during cold boot as part of the BL3-1
+framework running on the primary CPU during cold boot as part of the BL31
 initialization. This happens prior to initializing a Trusted OS and running
 Normal world boot firmware that might in turn use these services.
 Initialization involves validating each of the declared runtime service
 descriptors, calling the service initialization function and populating the
 index used for runtime lookup of the service.
 
-The BL3-1 linker script collects all of the declared service descriptors into a
+The BL31 linker script collects all of the declared service descriptors into a
 single array and defines symbols that allow the framework to locate and traverse
 the array, and determine its size.
 
@@ -742,7 +712,7 @@ required support.
 | PSCI v1.0 API         |Supported| Comments                                  |
 |:----------------------|:--------|:------------------------------------------|
 |`PSCI_VERSION`         | Yes     | The version returned is 1.0               |
-|`CPU_SUSPEND`          | Yes*    | The original `power_state` format is used |
+|`CPU_SUSPEND`          | Yes*    |                                           |
 |`CPU_OFF`              | Yes*    |                                           |
 |`CPU_ON`               | Yes*    |                                           |
 |`AFFINITY_INFO`        | Yes     |                                           |
@@ -771,22 +741,22 @@ hooks to be registered with the generic PSCI code to be supported.
 ---------------------------------------
 
 On a production system that includes a Trusted OS running in Secure-EL1/EL0,
-the Trusted OS is coupled with a companion runtime service in the BL3-1
+the Trusted OS is coupled with a companion runtime service in the BL31
 firmware. This service is responsible for the initialisation of the Trusted
-OS and all communications with it. The Trusted OS is the BL3-2 stage of the
+OS and all communications with it. The Trusted OS is the BL32 stage of the
 boot flow in ARM Trusted Firmware. The firmware will attempt to locate, load
-and execute a BL3-2 image.
+and execute a BL32 image.
 
-ARM Trusted Firmware uses a more general term for the BL3-2 software that runs
+ARM Trusted Firmware uses a more general term for the BL32 software that runs
 at Secure-EL1 - the _Secure-EL1 Payload_ - as it is not always a Trusted OS.
 
 The ARM Trusted Firmware provides a Test Secure-EL1 Payload (TSP) and a Test
 Secure-EL1 Payload Dispatcher (TSPD) service as an example of how a Trusted OS
 is supported on a production system using the Runtime Services Framework. On
-such a system, the Test BL3-2 image and service are replaced by the Trusted OS
+such a system, the Test BL32 image and service are replaced by the Trusted OS
 and its dispatcher service. The ARM Trusted Firmware build system expects that
 the dispatcher will define the build flag `NEED_BL32` to enable it to include
-the BL3-2 in the build either as a binary or to compile from source depending
+the BL32 in the build either as a binary or to compile from source depending
 on whether the `BL32` build option is specified or not.
 
 The TSP runs in Secure-EL1. It is designed to demonstrate synchronous
@@ -806,69 +776,69 @@ The TSPD service is responsible for.
 *   Routing requests and responses between the secure and the non-secure
     states during the two types of communications just described
 
-### Initializing a BL3-2 Image
+### Initializing a BL32 Image
 
 The Secure-EL1 Payload Dispatcher (SPD) service is responsible for initializing
-the BL3-2 image. It needs access to the information passed by BL2 to BL3-1 to do
+the BL32 image. It needs access to the information passed by BL2 to BL31 to do
 so. This is provided by:
 
     entry_point_info_t *bl31_plat_get_next_image_ep_info(uint32_t);
 
 which returns a reference to the `entry_point_info` structure corresponding to
 the image which will be run in the specified security state. The SPD uses this
-API to get entry point information for the SECURE image, BL3-2.
+API to get entry point information for the SECURE image, BL32.
 
-In the absence of a BL3-2 image, BL3-1 passes control to the normal world
-bootloader image (BL3-3). When the BL3-2 image is present, it is typical
-that the SPD wants control to be passed to BL3-2 first and then later to BL3-3.
+In the absence of a BL32 image, BL31 passes control to the normal world
+bootloader image (BL33). When the BL32 image is present, it is typical
+that the SPD wants control to be passed to BL32 first and then later to BL33.
 
-To do this the SPD has to register a BL3-2 initialization function during
-initialization of the SPD service. The BL3-2 initialization function has this
+To do this the SPD has to register a BL32 initialization function during
+initialization of the SPD service. The BL32 initialization function has this
 prototype:
 
-    int32_t init();
+    int32_t init(void);
 
 and is registered using the `bl31_register_bl32_init()` function.
 
-Trusted Firmware supports two approaches for the SPD to pass control to BL3-2
-before returning through EL3 and running the non-trusted firmware (BL3-3):
+Trusted Firmware supports two approaches for the SPD to pass control to BL32
+before returning through EL3 and running the non-trusted firmware (BL33):
 
-1.  In the BL3-2 setup function, use `bl31_set_next_image_type()` to
-    request that the exit from `bl31_main()` is to the BL3-2 entrypoint in
-    Secure-EL1. BL3-1 will exit to BL3-2 using the asynchronous method by
-    calling bl31_prepare_next_image_entry() and el3_exit().
+1.  In the BL32 setup function, use `bl31_set_next_image_type()` to
+    request that the exit from `bl31_main()` is to the BL32 entrypoint in
+    Secure-EL1. BL31 will exit to BL32 using the asynchronous method by
+    calling `bl31_prepare_next_image_entry()` and `el3_exit()`.
 
-    When the BL3-2 has completed initialization at Secure-EL1, it returns to
-    BL3-1 by issuing an SMC, using a Function ID allocated to the SPD. On
+    When the BL32 has completed initialization at Secure-EL1, it returns to
+    BL31 by issuing an SMC, using a Function ID allocated to the SPD. On
     receipt of this SMC, the SPD service handler should switch the CPU context
     from trusted to normal world and use the `bl31_set_next_image_type()` and
     `bl31_prepare_next_image_entry()` functions to set up the initial return to
-    the normal world firmware BL3-3. On return from the handler the framework
-    will exit to EL2 and run BL3-3.
+    the normal world firmware BL33. On return from the handler the framework
+    will exit to EL2 and run BL33.
 
-2.  The BL3-2 setup function registers a initialization function using
+2.  The BL32 setup function registers an initialization function using
     `bl31_register_bl32_init()` which provides a SPD-defined mechanism to
-    invoke a 'world-switch synchronous call' to Secure-EL1 to run the BL3-2
+    invoke a 'world-switch synchronous call' to Secure-EL1 to run the BL32
     entrypoint.
     NOTE: The Test SPD service included with the Trusted Firmware provides one
     implementation of such a mechanism.
 
-    On completion BL3-2 returns control to BL3-1 via a SMC, and on receipt the
+    On completion BL32 returns control to BL31 via a SMC, and on receipt the
     SPD service handler invokes the synchronous call return mechanism to return
-    to the BL3-2 initialization function. On return from this function,
-    `bl31_main()` will set up the return to the normal world firmware BL3-3 and
+    to the BL32 initialization function. On return from this function,
+    `bl31_main()` will set up the return to the normal world firmware BL33 and
     continue the boot process in the normal world.
 
 
-6.  Crash Reporting in BL3-1
+6.  Crash Reporting in BL31
 ----------------------------
 
-BL3-1 implements a scheme for reporting the processor state when an unhandled
+BL31 implements a scheme for reporting the processor state when an unhandled
 exception is encountered. The reporting mechanism attempts to preserve all the
-register contents and report it via a dedicated UART (PL011 console). BL3-1
+register contents and report it via a dedicated UART (PL011 console). BL31
 reports the general purpose, EL3, Secure EL1 and some EL2 state registers.
 
-A dedicated per-CPU crash stack is maintained by BL3-1 and this is retrieved via
+A dedicated per-CPU crash stack is maintained by BL31 and this is retrieved via
 the per-CPU pointer cache. The implementation attempts to minimise the memory
 required for this feature. The file `crash_reporting.S` contains the
 implementation for crash reporting.
@@ -960,7 +930,7 @@ The sample crash output is shown below.
 Trusted Firmware implements a framework that allows CPU and platform ports to
 perform actions very early after a CPU is released from reset in both the cold
 and warm boot paths. This is done by calling the `reset_handler()` function in
-both the BL1 and BL3-1 images. It in turn calls the platform and CPU specific
+both the BL1 and BL31 images. It in turn calls the platform and CPU specific
 reset handling functions.
 
 Details for implementing a CPU specific reset handler can be found in
@@ -1045,7 +1015,7 @@ regarding placement of code in a reset handler.
 
 ### CPU specific power down sequence
 
-During the BL3-1 initialization sequence, the pointer to the matching `cpu_ops`
+During the BL31 initialization sequence, the pointer to the matching `cpu_ops`
 entry is stored in per-CPU data by `init_cpu_ops()` so that it can be quickly
 retrieved during power down sequences.
 
@@ -1065,7 +1035,7 @@ turning off CCI coherency during a cluster power down.
 
 ### CPU specific register reporting during crash
 
-If the crash reporting is enabled in BL3-1, when a crash occurs, the crash
+If the crash reporting is enabled in BL31, when a crash occurs, the crash
 reporting framework calls `do_cpu_reg_dump` which retrieves the matching
 `cpu_ops` using `get_cpu_ops_ptr()` function. The `cpu_reg_dump()` in
 `cpu_ops` is invoked, which then returns the CPU specific register values to
@@ -1182,9 +1152,9 @@ for this purpose:
 * `__BL1_RAM_START__` This is the start address of BL1 RW data.
 * `__BL1_RAM_END__` This is the end address of BL1 RW data.
 
-#### BL2's, BL3-1's and TSP's linker symbols
+#### BL2's, BL31's and TSP's linker symbols
 
-BL2, BL3-1 and TSP need to know the extents of their read-only section to set
+BL2, BL31 and TSP need to know the extents of their read-only section to set
 the right memory attributes for this memory region in their MMU setup code. The
 following linker symbols are defined for this purpose:
 
@@ -1221,7 +1191,7 @@ happens, the linker will issue a message similar to the following:
     aarch64-none-elf-ld: BLx has exceeded its limit.
 
 Additionally, if the platform memory layout implies some image overlaying like
-on FVP, BL3-1 and TSP need to know the limit address that their PROGBITS
+on FVP, BL31 and TSP need to know the limit address that their PROGBITS
 sections must not overstep. The platform code must provide those.
 
 
@@ -1242,45 +1212,45 @@ The following list describes the memory layout on the ARM development platforms:
     Juno, BL1 resides in flash memory at address `0x0BEC0000`. BL1 read-write
     data are relocated to the top of Trusted SRAM at runtime.
 
-*   BL3-1 is loaded at the top of the Trusted SRAM, such that its NOBITS
+*   BL31 is loaded at the top of the Trusted SRAM, such that its NOBITS
     sections will overwrite BL1 R/W data. This implies that BL1 global variables
-    remain valid only until execution reaches the BL3-1 entry point during
+    remain valid only until execution reaches the BL31 entry point during
     a cold boot.
 
-*   BL2 is loaded below BL3-1.
+*   BL2 is loaded below BL31.
 
-*   On Juno, BL3-0 is loaded temporarily into the BL3-1 memory region and
-    transfered to the SCP before being overwritten by BL3-1.
+*   On Juno, SCP_BL2 is loaded temporarily into the BL31 memory region and
+    transfered to the SCP before being overwritten by BL31.
 
-*   BL3-2 can be loaded in one of the following locations:
+*   BL32 can be loaded in one of the following locations:
 
     *   Trusted SRAM
     *   Trusted DRAM (FVP only)
     *   Secure region of DRAM (top 16MB of DRAM configured by the TrustZone
         controller)
 
-When BL3-2 is loaded into Trusted SRAM, its NOBITS sections are allowed to
-overlay BL2. This memory layout is designed to give the BL3-2 image as much
+When BL32 is loaded into Trusted SRAM, its NOBITS sections are allowed to
+overlay BL2. This memory layout is designed to give the BL32 image as much
 memory as possible when it is loaded into Trusted SRAM.
 
-The location of the BL3-2 image will result in different memory maps. This is
+The location of the BL32 image will result in different memory maps. This is
 illustrated for both FVP and Juno in the following diagrams, using the TSP as
 an example.
 
-Note: Loading the BL3-2 image in TZC secured DRAM doesn't change the memory
+Note: Loading the BL32 image in TZC secured DRAM doesn't change the memory
 layout of the other images in Trusted SRAM.
 
 **FVP with TSP in Trusted SRAM (default option):**
 
                Trusted SRAM
     0x04040000 +----------+  loaded by BL2  ------------------
-               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL3-1 NOBITS  |
+               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL31 NOBITS   |
                |----------|  <<<<<<<<<<<<<  |----------------|
-               |          |  <<<<<<<<<<<<<  | BL3-1 PROGBITS |
+               |          |  <<<<<<<<<<<<<  | BL31 PROGBITS  |
                |----------|                 ------------------
-               |   BL2    |  <<<<<<<<<<<<<  |  BL3-2 NOBITS  |
+               |   BL2    |  <<<<<<<<<<<<<  |  BL32 NOBITS   |
                |----------|  <<<<<<<<<<<<<  |----------------|
-               |          |  <<<<<<<<<<<<<  | BL3-2 PROGBITS |
+               |          |  <<<<<<<<<<<<<  | BL32 PROGBITS  |
     0x04001000 +----------+                 ------------------
                |  Shared  |
     0x04000000 +----------+
@@ -1295,14 +1265,14 @@ layout of the other images in Trusted SRAM.
 
                Trusted DRAM
     0x08000000 +----------+
-               |  BL3-2   |
+               |  BL32   |
     0x06000000 +----------+
 
                Trusted SRAM
     0x04040000 +----------+  loaded by BL2  ------------------
-               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL3-1 NOBITS  |
+               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL31 NOBITS   |
                |----------|  <<<<<<<<<<<<<  |----------------|
-               |          |  <<<<<<<<<<<<<  | BL3-1 PROGBITS |
+               |          |  <<<<<<<<<<<<<  | BL31 PROGBITS  |
                |----------|                 ------------------
                |   BL2    |
                |----------|
@@ -1320,7 +1290,7 @@ layout of the other images in Trusted SRAM.
 
                    DRAM
     0xffffffff +----------+
-               |  BL3-2   |  (secure)
+               |  BL32   |  (secure)
     0xff000000 +----------+
                |          |
                :          :  (non-secure)
@@ -1329,9 +1299,9 @@ layout of the other images in Trusted SRAM.
 
                Trusted SRAM
     0x04040000 +----------+  loaded by BL2  ------------------
-               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL3-1 NOBITS  |
+               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL31 NOBITS   |
                |----------|  <<<<<<<<<<<<<  |----------------|
-               |          |  <<<<<<<<<<<<<  | BL3-1 PROGBITS |
+               |          |  <<<<<<<<<<<<<  | BL31 PROGBITS  |
                |----------|                 ------------------
                |   BL2    |
                |----------|
@@ -1346,7 +1316,7 @@ layout of the other images in Trusted SRAM.
     0x00000000 +----------+
 
 
-**Juno with BL3-2 in Trusted SRAM (default option):**
+**Juno with BL32 in Trusted SRAM (default option):**
 
                   Flash0
     0x0C000000 +----------+
@@ -1355,27 +1325,27 @@ layout of the other images in Trusted SRAM.
                | BL1 (ro) |
     0x0BEC0000 |----------|
                :          :
-    0x08000000 +----------+                  BL3-1 is loaded
-                                             after BL3-0 has
+    0x08000000 +----------+                  BL31 is loaded
+                                             after SCP_BL2 has
                Trusted SRAM                  been sent to SCP
     0x04040000 +----------+  loaded by BL2  ------------------
-               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL3-1 NOBITS  |
+               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL31 NOBITS   |
                |----------|  <<<<<<<<<<<<<  |----------------|
-               |  BL3-0   |  <<<<<<<<<<<<<  | BL3-1 PROGBITS |
+               | SCP_BL2  |  <<<<<<<<<<<<<  | BL31 PROGBITS  |
                |----------|                 ------------------
-               |   BL2    |  <<<<<<<<<<<<<  |  BL3-2 NOBITS  |
+               |   BL2    |  <<<<<<<<<<<<<  |  BL32 NOBITS   |
                |----------|  <<<<<<<<<<<<<  |----------------|
-               |          |  <<<<<<<<<<<<<  | BL3-2 PROGBITS |
+               |          |  <<<<<<<<<<<<<  | BL32 PROGBITS  |
     0x04001000 +----------+                 ------------------
                |   MHU    |
     0x04000000 +----------+
 
 
-**Juno with BL3-2 in TZC-secured DRAM:**
+**Juno with BL32 in TZC-secured DRAM:**
 
                    DRAM
     0xFFE00000 +----------+
-               |  BL3-2   |  (secure)
+               |  BL32   |  (secure)
     0xFF000000 |----------|
                |          |
                :          :  (non-secure)
@@ -1389,13 +1359,13 @@ layout of the other images in Trusted SRAM.
                | BL1 (ro) |
     0x0BEC0000 |----------|
                :          :
-    0x08000000 +----------+                  BL3-1 is loaded
-                                             after BL3-0 has
+    0x08000000 +----------+                  BL31 is loaded
+                                             after SCP_BL2 has
                Trusted SRAM                  been sent to SCP
     0x04040000 +----------+  loaded by BL2  ------------------
-               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL3-1 NOBITS  |
+               | BL1 (rw) |  <<<<<<<<<<<<<  |  BL31 NOBITS   |
                |----------|  <<<<<<<<<<<<<  |----------------|
-               |  BL3-0   |  <<<<<<<<<<<<<  | BL3-1 PROGBITS |
+               | SCP_BL2  |  <<<<<<<<<<<<<  | BL31 PROGBITS  |
                |----------|                 ------------------
                |   BL2    |
                |----------|
@@ -1523,38 +1493,52 @@ approach described above.
 The below sections analyze the data structures allocated in the coherent memory
 region and the changes required to allocate them in normal memory.
 
-### PSCI Affinity map nodes
+### Coherent memory usage in PSCI implementation
 
-The `psci_aff_map` data structure stores the hierarchial node information for
-each affinity level in the system including the PSCI states associated with them.
-By default, this data structure is allocated in the coherent memory region in
-the Trusted Firmware because it can be accessed by multiple CPUs, either with
-their caches enabled or disabled.
+The `psci_non_cpu_pd_nodes` data structure stores the platform's power domain
+tree information for state management of power domains. By default, this data
+structure is allocated in the coherent memory region in the Trusted Firmware
+because it can be accessed by multple CPUs, either with caches enabled or
+disabled.
 
-	typedef struct aff_map_node {
-		unsigned long mpidr;
-		unsigned char ref_count;
-		unsigned char state;
-		unsigned char level;
-	#if USE_COHERENT_MEM
-		bakery_lock_t lock;
-	#else
-		unsigned char aff_map_index;
-	#endif
-	} aff_map_node_t;
+    typedef struct non_cpu_pwr_domain_node {
+        /*
+         * Index of the first CPU power domain node level 0 which has this node
+         * as its parent.
+         */
+        unsigned int cpu_start_idx;
+
+        /*
+         * Number of CPU power domains which are siblings of the domain indexed
+         * by 'cpu_start_idx' i.e. all the domains in the range 'cpu_start_idx
+         * -> cpu_start_idx + ncpus' have this node as their parent.
+         */
+        unsigned int ncpus;
+
+        /*
+         * Index of the parent power domain node.
+         * TODO: Figure out whether to whether using pointer is more efficient.
+         */
+        unsigned int parent_node;
+
+        plat_local_state_t local_state;
+
+        unsigned char level;
+
+        /* For indexing the psci_lock array*/
+        unsigned char lock_index;
+    } non_cpu_pd_node_t;
 
 In order to move this data structure to normal memory, the use of each of its
-fields must be analyzed. Fields like `mpidr` and `level` are only written once
-during cold boot. Hence removing them from coherent memory involves only doing
-a clean and invalidate of the cache lines after these fields are written.
+fields must be analyzed. Fields like `cpu_start_idx`, `ncpus`, `parent_node`
+`level` and `lock_index` are only written once during cold boot. Hence removing
+them from coherent memory involves only doing a clean and invalidate of the
+cache lines after these fields are written.
 
-The fields `state` and `ref_count` can be concurrently accessed by multiple
-CPUs in different cache states. A Lamport's Bakery lock is used to ensure mutual
-exlusion to these fields. As a result, it is possible to move these fields out
-of coherent memory by performing software cache maintenance on them. The field
-`lock` is the bakery lock data structure when `USE_COHERENT_MEM` is enabled.
-The `aff_map_index` is used to identify the bakery lock when `USE_COHERENT_MEM`
-is disabled.
+The field `local_state` can be concurrently accessed by multiple CPUs in
+different cache states. A Lamport's Bakery lock `psci_locks` is used to ensure
+mutual exlusion to this field and a clean and invalidate is needed after it
+is written.
 
 ### Bakery lock data
 
@@ -1563,9 +1547,13 @@ and is accessed by multiple CPUs with mismatched attributes. `bakery_lock_t` is
 defined as follows:
 
     typedef struct bakery_lock {
-        int owner;
-        volatile char entering[BAKERY_LOCK_MAX_CPUS];
-        volatile unsigned number[BAKERY_LOCK_MAX_CPUS];
+        /*
+         * The lock_data is a bit-field of 2 members:
+         * Bit[0]       : choosing. This field is set when the CPU is
+         *                choosing its bakery number.
+         * Bits[1 - 15] : number. This is the bakery number allocated.
+         */
+        volatile uint16_t lock_data[BAKERY_LOCK_MAX_CPUS];
     } bakery_lock_t;
 
 It is a characteristic of Lamport's Bakery algorithm that the volatile per-CPU
@@ -1589,16 +1577,13 @@ the update made by CPU0 as well.
 
 To use bakery locks when `USE_COHERENT_MEM` is disabled, the lock data structure
 has been redesigned. The changes utilise the characteristic of Lamport's Bakery
-algorithm mentioned earlier. The per-CPU fields of the new lock structure are
-aligned such that they are allocated on separate cache lines. The per-CPU data
-framework in Trusted Firmware is used to achieve this. This enables software to
+algorithm mentioned earlier. The bakery_lock structure only allocates the memory
+for a single CPU. The macro `DEFINE_BAKERY_LOCK` allocates all the bakery locks
+needed for a CPU into a section `bakery_lock`. The linker allocates the memory
+for other cores by using the total size allocated for the bakery_lock section
+and multiplying it with (PLATFORM_CORE_COUNT - 1). This enables software to
 perform software cache maintenance on the lock data structure without running
 into coherency issues associated with mismatched attributes.
-
-The per-CPU data framework enables consolidation of data structures on the
-fewest cache lines possible. This saves memory as compared to the scenario where
-each data structure is separately aligned to the cache line boundary to achieve
-the same effect.
 
 The bakery lock data structure `bakery_info_t` is defined for use when
 `USE_COHERENT_MEM` is disabled as follows:
@@ -1615,12 +1600,10 @@ The bakery lock data structure `bakery_info_t` is defined for use when
 
 The `bakery_info_t` represents a single per-CPU field of one lock and
 the combination of corresponding `bakery_info_t` structures for all CPUs in the
-system represents the complete bakery lock. It is embedded in the per-CPU
-data framework `cpu_data` as shown below:
+system represents the complete bakery lock. The view in memory for a system
+with n bakery locks are:
 
-      CPU0 cpu_data
-    ------------------
-    | ....           |
+    bakery_lock section start
     |----------------|
     | `bakery_info_t`| <-- Lock_0 per-CPU field
     |    Lock_0      |     for CPU0
@@ -1633,12 +1616,11 @@ data framework `cpu_data` as shown below:
     | `bakery_info_t`| <-- Lock_N per-CPU field
     |    Lock_N      |     for CPU0
     ------------------
-
-
-      CPU1 cpu_data
+    |    XXXXX       |
+    | Padding to     |
+    | next Cache WB  | <--- Calculate PERCPU_BAKERY_LOCK_SIZE, allocate
+    |  Granule       |       continuous memory for remaining CPUs.
     ------------------
-    | ....           |
-    |----------------|
     | `bakery_info_t`| <-- Lock_0 per-CPU field
     |    Lock_0      |     for CPU1
     |----------------|
@@ -1650,14 +1632,20 @@ data framework `cpu_data` as shown below:
     | `bakery_info_t`| <-- Lock_N per-CPU field
     |    Lock_N      |     for CPU1
     ------------------
+    |    XXXXX       |
+    | Padding to     |
+    | next Cache WB  |
+    |  Granule       |
+    ------------------
 
-Consider a system of 2 CPUs with 'N' bakery locks as shown above.  For an
+Consider a system of 2 CPUs with 'N' bakery locks as shown above. For an
 operation on Lock_N, the corresponding `bakery_info_t` in both CPU0 and CPU1
-`cpu_data` need to be fetched and appropriate cache operations need to be
-performed for each access.
+`bakery_lock` section need to be fetched and appropriate cache operations need
+to be performed for each access.
 
-For multiple bakery locks, an array of `bakery_info_t` is declared in `cpu_data`
-and each lock is given an `id` to identify it in the array.
+On ARM Platforms, bakery locks are used in psci (`psci_locks`) and power controller
+driver (`arm_lock`).
+
 
 ### Non Functional Impact of removing coherent memory
 
@@ -1671,7 +1659,7 @@ There is however a performance impact for bakery locks, due to:
 *   Multiple cache line reads for each lock operation, since the bakery locks
     for each CPU are distributed across different cache lines.
 
-The implementation has been optimized to mimimize this additional overhead.
+The implementation has been optimized to minimize this additional overhead.
 Measurements indicate that when bakery locks are allocated in Normal memory, the
 minimum latency of acquiring a lock is on an average 3-4 micro seconds whereas
 in Device memory the same is 2 micro seconds. The measurements were done on the
@@ -1680,10 +1668,9 @@ Juno ARM development platform.
 As mentioned earlier, almost a page of memory can be saved by disabling
 `USE_COHERENT_MEM`. Each platform needs to consider these trade-offs to decide
 whether coherent memory should be used. If a platform disables
-`USE_COHERENT_MEM` and needs to use bakery locks in the porting layer, it should
-reserve memory in `cpu_data` by defining the macro `PLAT_PCPU_DATA_SIZE` (see
-the [Porting Guide]). Refer to the reference platform code for examples.
-
+`USE_COHERENT_MEM` and needs to use bakery locks in the porting layer, it can
+optionally define macro `PLAT_PERCPU_BAKERY_LOCK_SIZE`  (see the [Porting
+Guide]). Refer to the reference platform code for examples.
 
 12.  Code Structure
 -------------------
@@ -1705,7 +1692,7 @@ following categories (present as directories in the source code):
 Each boot loader stage uses code from one or more of the above mentioned
 categories. Based upon the above, the code layout looks like this:
 
-    Directory    Used by BL1?    Used by BL2?    Used by BL3-1?
+    Directory    Used by BL1?    Used by BL2?    Used by BL31?
     bl1          Yes             No              No
     bl2          No              Yes             No
     bl31         No              No              Yes
@@ -1750,5 +1737,7 @@ _Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved._
 [UUID]:             https://tools.ietf.org/rfc/rfc4122.txt "A Universally Unique IDentifier (UUID) URN Namespace"
 [User Guide]:       ./user-guide.md
 [Porting Guide]:    ./porting-guide.md
+[Reset Design]:     ./reset-design.md
 [INTRG]:            ./interrupt-framework-design.md
 [CPUBM]:            ./cpu-specific-build-macros.md.md
+[Firmware Update]:  ./firmware-update.md

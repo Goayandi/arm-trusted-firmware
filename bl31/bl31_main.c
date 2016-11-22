@@ -74,9 +74,9 @@ void bl31_lib_init(void)
  ******************************************************************************/
 void bl31_main(void)
 {
-    /* Show Only to UART */
-	NOTICE("BL3-1: %s\n", version_string);
-	NOTICE("BL3-1: %s\n", build_message);
+	/* Show Only to UART */
+	NOTICE("BL31: %s\n", version_string);
+	NOTICE("BL31: %s\n", build_message);
 
     /* compatible to the earlier chipset */
 #if (defined(MACH_TYPE_MT6735) || defined(MACH_TYPE_MT6735M) || \
@@ -101,8 +101,8 @@ void bl31_main(void)
 	}
 
 	/* Show to ATF log buffer & UART */
-	printf("BL3-1: %s\n", version_string);
-	printf("BL3-1: %s\n", build_message);
+	printf("BL31: %s\n", version_string);
+	printf("BL31: %s\n", build_message);
 
 	/* Perform remaining generic architectural setup from EL3 */
 	bl31_arch_setup();
@@ -114,7 +114,7 @@ void bl31_main(void)
 	bl31_lib_init();
 
 	/* Initialize the runtime services e.g. psci */
-	INFO("BL3-1: Initializing runtime services\n");
+	INFO("BL31: Initializing runtime services\n");
 	runtime_svc_init();
 
 	/* Clean caches before re-entering normal world */
@@ -136,20 +136,14 @@ void bl31_main(void)
 	if(teearg->tee_support)
 	{
 		printf("[BL31] Jump to secure OS for initialization!\n\r");
-		if (bl32_init)
-		{
+		if (bl32_init) {
 			(*bl32_init)();
-		}
-		else
-		{
+		} else {
 			printf("[ERROR] Secure OS is not initialized!\n\r");
 		}
-	}
-	else
-	{
+	} else {
 		printf("[BL31] Jump to FIQD for initialization!\n\r");
-		if (bl32_init)
-		{
+		if (bl32_init) {
 			(*bl32_init)();
 		}
 	}
@@ -166,7 +160,7 @@ void bl31_main(void)
 
 	printf("[BL31] Final dump!\n\r");
 
-	clear_uart_flag();
+	// clear_uart_flag();
 
 	printf("[BL31] SHOULD not dump in UART but in log buffer!\n\r");
 }
@@ -198,23 +192,23 @@ void bl31_prepare_kernel_entry(uint64_t k32_64)
 	entry_point_info_t *next_image_info;
 	uint32_t image_type;
 
-    /* Determine which image to execute next */
-    image_type = NON_SECURE; //bl31_get_next_image_type();
+	/* Determine which image to execute next */
+	image_type = NON_SECURE; //bl31_get_next_image_type();
 
-    /* Program EL3 registers to enable entry into the next EL */
-    if (0 == k32_64) {
-        next_image_info = bl31_plat_get_next_kernel32_ep_info(image_type);
-    } else {
-        next_image_info = bl31_plat_get_next_kernel64_ep_info(image_type);
-    }
+	/* Program EL3 registers to enable entry into the next EL */
+	if (0 == k32_64) {
+		next_image_info = bl31_plat_get_next_kernel32_ep_info(image_type);
+	} else {
+	next_image_info = bl31_plat_get_next_kernel64_ep_info(image_type);
+	}
 	assert(next_image_info);
 	assert(image_type == GET_SECURITY_STATE(next_image_info->h.attr));
 
-	INFO("BL3-1: Preparing for EL3 exit to %s world, Kernel\n",
+	INFO("BL31: Preparing for EL3 exit to %s world, Kernel\n",
 		(image_type == SECURE) ? "secure" : "normal");
-	INFO("BL3-1: Next image address = 0x%llx\n",
+	INFO("BL31: Next image address = 0x%llx\n",
 		(unsigned long long) next_image_info->pc);
-	INFO("BL3-1: Next image spsr = 0x%x\n", next_image_info->spsr);
+	INFO("BL31: Next image spsr = 0x%x\n", next_image_info->spsr);
 	cm_init_context(read_mpidr_el1(), next_image_info);
 	cm_prepare_el3_exit(image_type);
 }
@@ -236,11 +230,11 @@ void bl31_prepare_next_image_entry(void)
 	assert(next_image_info);
 	assert(image_type == GET_SECURITY_STATE(next_image_info->h.attr));
 
-	INFO("BL3-1: Preparing for EL3 exit to %s world, LK\n",
+	INFO("BL31: Preparing for EL3 exit to %s world, LK\n",
 		(image_type == SECURE) ? "secure" : "normal");
-	INFO("BL3-1: Next image address = 0x%llx\n",
+	INFO("BL31: Next image address = 0x%llx\n",
 		(unsigned long long) next_image_info->pc);
-	INFO("BL3-1: Next image spsr = 0x%x\n", next_image_info->spsr);
+	INFO("BL31: Next image spsr = 0x%x\n", next_image_info->spsr);
 	cm_init_my_context(next_image_info);
 	cm_prepare_el3_exit(image_type);
 }

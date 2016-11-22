@@ -39,6 +39,12 @@
 #include <string.h>
 #include "plat_def.h"
 
+/* Return codes reported by 'io_*' APIs */
+#define IO_SUCCESS              (0)
+#define IO_FAIL                 (-1)
+#define IO_NOT_SUPPORTED        (-2)
+#define IO_RESOURCES_EXHAUSTED  (-3)
+
 /* IO devices */
 static const io_dev_connector_t *sh_dev_con;
 static uintptr_t sh_dev_spec;

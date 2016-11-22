@@ -30,6 +30,9 @@
 #ifndef __COMMON_DEF_H__
 #define __COMMON_DEF_H__
 
+#include <bl_common.h>
+#include <platform_def.h>
+
 /******************************************************************************
  * Required platform porting definitions that are expected to be common to
  * all platforms
@@ -52,7 +55,7 @@
  * avoid subtle integer overflow errors due to implicit integer type promotion
  * when working with 32-bit values.
  *
- * The TSP linker script includes some of these definitions to define the BL3-2
+ * The TSP linker script includes some of these definitions to define the BL32
  * memory map, but the GNU LD does not support the 'ull' suffix, causing the
  * build process to fail. To solve this problem, the auxiliary macro MAKE_ULL(x)
  * will add the 'ull' suffix only when the macro __LINKER__  is not defined
@@ -69,15 +72,19 @@
 
 /*
  * Macros to wrap declarations of deprecated APIs within Trusted Firmware.
- * The callers of these APIs will continue to compile as long as the build
- * flag WARN_DEPRECATED is zero. Else the compiler will emit a warning
- * when the callers of these APIs are compiled.
+ * The callers of these APIs will continue to compile with a warning as long
+ * as the build flag ERROR_DEPRECATED is zero.
  */
-#if WARN_DEPRECATED
 #define __warn_deprecated	__attribute__ ((deprecated))
-#else
-#define __warn_deprecated
-#endif
+
+#define BL2_IMAGE_DESC {				\
+	.image_id = BL2_IMAGE_ID,			\
+	.image_info.h.version = VERSION_1,		\
+	.image_info.h.attr = SET_EXEC_STATE(EXECUTABLE),\
+	.image_info.image_base = BL2_BASE,		\
+	.ep_info.h.attr = SET_SEC_STATE(SECURE),	\
+	.ep_info.pc = BL2_BASE				\
+}
 
 #endif /* __COMMON_DEF_H__ */
 

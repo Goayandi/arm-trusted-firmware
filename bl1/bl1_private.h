@@ -31,6 +31,8 @@
 #ifndef __BL1_PRIVATE_H__
 #define __BL1_PRIVATE_H__
 
+#include <types.h>
+
 /*******************************************************************************
  * Declarations of linker defined symbols which will tell us where BL1 lives
  * in Trusted RAM
@@ -46,4 +48,14 @@ extern uint64_t __BL1_RAM_END__;
 void bl1_arch_setup(void);
 void bl1_arch_next_el_setup(void);
 
+void bl1_prepare_next_image(unsigned int image_id);
+
+register_t bl1_fwu_smc_handler(unsigned int smc_fid,
+		register_t x1,
+		register_t x2,
+		register_t x3,
+		register_t x4,
+		void *cookie,
+		void *handle,
+		unsigned int flags);
 #endif /* __BL1_PRIVATE_H__ */

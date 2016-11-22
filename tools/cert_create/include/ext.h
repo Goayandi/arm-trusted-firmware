@@ -56,6 +56,7 @@ typedef struct ext_s {
 				 *   - V_ASN1_OCTET_STRING
 				 */
 	int type;
+	const char *opt;	/* Command line option to specify data */
 	/* Extension data (depends on extension type) */
 	union {
 		const char *fn;	/* File with extension data */
@@ -71,6 +72,8 @@ typedef struct ext_s {
 	X509V3_EXT_METHOD method; /* This field may be used to define a custom
 				   * function to print the contents of the
 				   * extension */
+
+	int optional;	/* This field may be used optionally to exclude an image */
 } ext_t;
 
 enum {
@@ -79,7 +82,8 @@ enum {
 };
 
 /* Exported API */
-int ext_register(ext_t *tbb_ext);
+int ext_init(void);
+ext_t *ext_get_by_opt(const char *opt);
 X509_EXTENSION *ext_new_hash(int nid, int crit, const EVP_MD *md,
 		unsigned char *buf, size_t len);
 X509_EXTENSION *ext_new_nvcounter(int nid, int crit, int value);

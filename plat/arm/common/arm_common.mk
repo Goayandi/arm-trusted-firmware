@@ -63,6 +63,15 @@ endif
 $(eval $(call assert_boolean,ARM_RECOM_STATE_ID_ENC))
 $(eval $(call add_define,ARM_RECOM_STATE_ID_ENC))
 
+# Process ARM_DISABLE_TRUSTED_WDOG flag
+# By default, Trusted Watchdog is always enabled unless SPIN_ON_BL1_EXIT is set
+ARM_DISABLE_TRUSTED_WDOG	:=	0
+ifeq (${SPIN_ON_BL1_EXIT}, 1)
+ARM_DISABLE_TRUSTED_WDOG	:=	1
+endif
+$(eval $(call assert_boolean,ARM_DISABLE_TRUSTED_WDOG))
+$(eval $(call add_define,ARM_DISABLE_TRUSTED_WDOG))
+
 PLAT_INCLUDES		+=	-Iinclude/common/tbbr				\
 				-Iinclude/plat/arm/common			\
 				-Iinclude/plat/arm/common/aarch64
@@ -74,12 +83,19 @@ PLAT_BL_COMMON_SOURCES	+=	lib/aarch64/xlat_tables.c			\
 				plat/common/aarch64/plat_common.c
 
 BL1_SOURCES		+=	drivers/arm/cci/cci.c				\
+				drivers/arm/ccn/ccn.c				\
+				drivers/arm/sp805/sp805.c			\
 				drivers/io/io_fip.c				\
 				drivers/io/io_memmap.c				\
 				drivers/io/io_storage.c				\
 				plat/arm/common/arm_bl1_setup.c			\
 				plat/arm/common/arm_io_storage.c		\
 				plat/common/aarch64/platform_up_stack.S
+ifdef EL3_PAYLOAD_BASE
+# Need the arm_program_trusted_mailbox() function to release secondary CPUs from
+# their holding pen
+BL1_SOURCES		+=	plat/arm/common/arm_pm.c
+endif
 
 BL2_SOURCES		+=	drivers/arm/tzc400/tzc400.c			\
 				drivers/io/io_fip.c				\
@@ -90,16 +106,18 @@ BL2_SOURCES		+=	drivers/arm/tzc400/tzc400.c			\
 				plat/arm/common/arm_security.c			\
 				plat/common/aarch64/platform_up_stack.S
 
+BL2U_SOURCES		+=	drivers/arm/tzc400/tzc400.c			\
+				plat/arm/common/arm_bl2u_setup.c		\
+				plat/arm/common/arm_security.c			\
+				plat/common/aarch64/platform_up_stack.S
+
 BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
-				drivers/arm/gic/arm_gic.c			\
-				drivers/arm/gic/gic_v2.c			\
-				drivers/arm/gic/gic_v3.c			\
+				drivers/arm/ccn/ccn.c				\
 				drivers/arm/tzc400/tzc400.c			\
 				plat/arm/common/arm_bl31_setup.c		\
 				plat/arm/common/arm_pm.c			\
 				plat/arm/common/arm_security.c			\
 				plat/arm/common/arm_topology.c			\
-				plat/common/plat_gic.c				\
 				plat/common/aarch64/platform_mp_stack.S		\
 				plat/common/aarch64/plat_psci_common.c
 
@@ -110,12 +128,19 @@ ifneq (${TRUSTED_BOARD_BOOT},0)
 
     # Include common TBB sources
     AUTH_SOURCES	:=	drivers/auth/auth_mod.c				\
-    				drivers/auth/crypto_mod.c			\
-    				drivers/auth/img_parser_mod.c			\
-    				drivers/auth/tbbr/tbbr_cot.c			\
+				drivers/auth/crypto_mod.c			\
+				drivers/auth/img_parser_mod.c			\
+				drivers/auth/tbbr/tbbr_cot.c			\
 
-    BL1_SOURCES		+=	${AUTH_SOURCES}
+    PLAT_INCLUDES	+=	-Iinclude/bl1/tbbr
+
+    BL1_SOURCES		+=	${AUTH_SOURCES}			\
+				bl1/tbbr/tbbr_img_desc.c	\
+				plat/arm/common/arm_bl1_fwu.c
+
     BL2_SOURCES		+=	${AUTH_SOURCES}
+
+    $(eval $(call FWU_FIP_ADD_IMG,NS_BL2U,--ns_bl2u))
 
     MBEDTLS_KEY_ALG	:=	${KEY_ALG}
 

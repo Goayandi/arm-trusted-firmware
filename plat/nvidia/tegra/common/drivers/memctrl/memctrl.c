@@ -107,6 +107,23 @@ void tegra_memctrl_tzdram_setup(uint64_t phys_base, uint32_t size_in_bytes)
 	tegra_mc_write_32(MC_SECURITY_CFG1_0, size_in_bytes >> 20);
 }
 
+static void tegra_clear_videomem(uintptr_t non_overlap_area_start,
+				 unsigned long long non_overlap_area_size)
+{
+	/*
+	 * Perform cache maintenance to ensure that the non-overlapping area is
+	 * zeroed out. The first invalidation of this range ensures that
+	 * possible evictions of dirty cache lines do not interfere with the
+	 * 'zeromem16' operation. Other CPUs could speculatively prefetch the
+	 * main memory contents of this area between the first invalidation and
+	 * the 'zeromem16' operation. The second invalidation ensures that any
+	 * such cache lines are removed as well.
+	 */
+	inv_dcache_range(non_overlap_area_start, non_overlap_area_size);
+	zeromem16((void *)non_overlap_area_start, non_overlap_area_size);
+	inv_dcache_range(non_overlap_area_start, non_overlap_area_size);
+}
+
 /*
  * Program the Video Memory carveout region
  *
@@ -118,6 +135,7 @@ void tegra_memctrl_videomem_setup(uint64_t phys_base, uint32_t size_in_bytes)
 	uintptr_t vmem_end_old = video_mem_base + (video_mem_size << 20);
 	uintptr_t vmem_end_new = phys_base + size_in_bytes;
 	uint32_t regval;
+	unsigned long long non_overlap_area_size;
 
 	/*
 	 * The GPU is the user of the Video Memory region. In order to
@@ -153,12 +171,18 @@ void tegra_memctrl_videomem_setup(uint64_t phys_base, uint32_t size_in_bytes)
 	INFO("Cleaning previous Video Memory Carveout\n");
 
 	disable_mmu_el3();
-	if (phys_base > vmem_end_old || video_mem_base > vmem_end_new)
-		zeromem16((void *)video_mem_base, video_mem_size << 20);
-	else if (video_mem_base < phys_base)
-		zeromem16((void *)video_mem_base, phys_base - video_mem_base);
-	else if (vmem_end_old > vmem_end_new)
-		zeromem16((void *)vmem_end_new, vmem_end_old - vmem_end_new);
+	if (phys_base > vmem_end_old || video_mem_base > vmem_end_new) {
+		tegra_clear_videomem(video_mem_base, video_mem_size << 20);
+	} else {
+		if (video_mem_base < phys_base) {
+			non_overlap_area_size = phys_base - video_mem_base;
+			tegra_clear_videomem(video_mem_base, non_overlap_area_size);
+		}
+		if (vmem_end_old > vmem_end_new) {
+			non_overlap_area_size = vmem_end_old - vmem_end_new;
+			tegra_clear_videomem(vmem_end_new, non_overlap_area_size);
+		}
+	}
 	enable_mmu_el3(0);
 
 done:
