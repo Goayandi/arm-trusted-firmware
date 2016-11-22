@@ -379,8 +379,11 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 	 */
 	gicc_base = get_plat_config()->gicc_base;
 	gic_rdist_save();
-	gic_cpuif_deactivate(gicc_base);
+	// gic_cpuif_deactivate(gicc_base);
+	gic_cpuif_deactivate(BASE_GICC_BASE);
 	printf("%s: gic_cpuif_deactivate\n", __FUNCTION__);
+	printf("%s: gic_cpuif_deactivate, %x\n", __FUNCTION__, gicc_base);
+	printf("%s: gic_cpuif_deactivate, %x\n", __FUNCTION__, BASE_GICC_BASE);
 
 	/*
 	 *
@@ -393,6 +396,7 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 	// turn off spark2 cpu-side by callee
 	set_cpu_retention_control(0);
 #endif
+#if 0
 	if (afflvl == MPIDR_AFFLVL0) {
 		if (linear_id < 8) {
 			power_off_little(linear_id);
@@ -400,6 +404,7 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 			power_off_big(linear_id);
 		}
 	}
+#endif
 
 	/*
 	 * Perform cluster power down
