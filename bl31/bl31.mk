@@ -59,9 +59,7 @@ else
 BL31_SOURCES		+=	lib/locks/bakery/bakery_lock_normal.c
 endif
 
-MTK_PLATFORM_LC := $(shell echo ${PLAT} | tr A-Z a-z )
-MTK_ATF_PLATFORM_FOLDER := plat
-CHIP_LD_S := $(MTK_ATF_PLATFORM_FOLDER)/$(MTK_PLATFORM_LC)/bl31.ld.S
+CHIP_LD_S := $(MTK_PLAT_SOC)/bl31.ld.S
 
 ifneq ($(wildcard $(CHIP_LD_S)),)
 BL31_LINKERFILE		:=	$(CHIP_LD_S)
