@@ -38,7 +38,8 @@
 #include <platform.h>
 #include <plat_config.h>
 #include <xlat_tables.h>
-#include "../plat_def.h"
+#include <plat_def.h>
+#include <plat_private.h>
 
 /*******************************************************************************
  * plat_config holds the characteristics of the differences between the three
@@ -298,7 +299,16 @@ uint32_t plat_get_spsr_for_bl33_entry(void)
 	return spsr;
 }
 
-extern uint32_t get_devinfo_with_index(uint32_t i);
+uint32_t get_devinfo_with_index(uint32_t i)
+{
+	atf_arg_t_ptr teearg = &gteearg;
+
+	if (i < DEVINFO_SIZE) {
+		return teearg->devinfo[i];
+	} else {
+		return 0;
+	}
+}
 
 int is_mp0_off(void)
 {

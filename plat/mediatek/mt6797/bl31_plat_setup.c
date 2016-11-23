@@ -292,14 +292,6 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	assert(from_bl2 == NULL);
 	assert(plat_params_from_bl2 == NULL);
 
-	/*
-	 * Do initial security configuration to allow DRAM/device access. On
-	 * Base FVP only DRAM security is programmable (via TrustZone), but
-	 * other platforms might have more programmable security devices
-	 * present.
-	 */
-	plat_security_setup();
-
 	/* Populate entry point information for BL3-2 and BL3-3 */
 	SET_PARAM_HEAD(&bl32_image_ep_info,
 				PARAM_EP,

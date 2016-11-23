@@ -72,7 +72,6 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				${MTK_PLAT_SOC}/plat_dfd.c			\
 				${MTK_PLAT_SOC}/plat_pm.c			\
 				${MTK_PLAT_SOC}/power.c				\
-				${MTK_PLAT_SOC}/plat_security.c			\
 				${MTK_PLAT_SOC}/plat_topology.c			\
 				${MTK_PLAT_SOC}/scu.c				\
 				${MTK_PLAT_SOC}/mailbox.c			\
