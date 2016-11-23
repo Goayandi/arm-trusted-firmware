@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -39,9 +39,10 @@
 #include "../fvp_def.h"
 
 /* Required platform porting definitions */
-#define PLAT_NUM_PWR_DOMAINS		(ARM_CLUSTER_COUNT + \
+#define PLAT_NUM_PWR_DOMAINS		(FVP_CLUSTER_COUNT + \
 					PLATFORM_CORE_COUNT)
 #define PLAT_MAX_PWR_LVL		ARM_PWR_LVL1
+#define PLATFORM_CORE_COUNT		(FVP_CLUSTER_COUNT * FVP_MAX_CPUS_PER_CLUSTER)
 
 /*
  * Other platform porting definitions are provided by included headers
@@ -50,8 +51,7 @@
 /*
  * Required ARM standard platform porting definitions
  */
-#define PLAT_ARM_CLUSTER0_CORE_COUNT	4
-#define PLAT_ARM_CLUSTER1_CORE_COUNT	4
+#define PLAT_ARM_CLUSTER_COUNT		FVP_CLUSTER_COUNT
 
 #define PLAT_ARM_TRUSTED_ROM_BASE	0x00000000
 #define PLAT_ARM_TRUSTED_ROM_SIZE	0x04000000	/* 64 MB */
@@ -63,8 +63,6 @@
 #define PLAT_ARM_SCP_TZC_DRAM1_SIZE	MAKE_ULL(0x0)
 
 #define PLAT_ARM_DRAM2_SIZE		MAKE_ULL(0x780000000)
-
-#define PLAT_ARM_SHARED_RAM_CACHED	1
 
 /*
  * Load address of BL33 for this platform port
@@ -92,6 +90,10 @@
 #define PLAT_ARM_CCI_CLUSTER0_SL_IFACE_IX	3
 #define PLAT_ARM_CCI_CLUSTER1_SL_IFACE_IX	4
 
+/* CCN related constants. Only CCN 502 is currently supported */
+#define PLAT_ARM_CCN_BASE		0x2e000000
+#define PLAT_ARM_CLUSTER_TO_CCN_ID_MAP	1, 5, 7, 11
+
 /* System timer related constants */
 #define PLAT_ARM_NSTIMER_FRAME_ID		1
 
@@ -115,7 +117,7 @@
  * would normally use the default ID so allow that too.
  */
 #define PLAT_ARM_TZC_BASE		0x2a4a0000
-#define PLAT_ARM_TZC_FILTERS		REG_ATTR_FILTER_BIT(0)
+#define PLAT_ARM_TZC_FILTERS		TZC_400_REGION_ATTR_FILTER_BIT(0)
 
 #define PLAT_ARM_TZC_NS_DEV_ACCESS	(				\
 		TZC_REGION_ACCESS_RDWR(FVP_NSAID_DEFAULT)	|	\

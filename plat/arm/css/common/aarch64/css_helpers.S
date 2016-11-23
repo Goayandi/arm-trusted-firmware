@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -70,7 +70,7 @@ poll_mailbox:
 endfunc plat_secondary_cold_boot_setup
 
 	/* ---------------------------------------------------------------------
-	 * unsigned long plat_get_my_entrypoint (void);
+	 * uintptr_t plat_get_my_entrypoint (void);
 	 *
 	 * Main job of this routine is to distinguish between a cold and a warm
 	 * boot. On CSS platforms, this distinction is based on the contents of
@@ -90,7 +90,7 @@ func plat_get_my_entrypoint
 endfunc plat_get_my_entrypoint
 
 	/* -----------------------------------------------------------
-	 * unsigned int css_calc_core_pos_swap_cluster(uint64_t mpidr)
+	 * unsigned int css_calc_core_pos_swap_cluster(u_register_t mpidr)
 	 * Utility function to calculate the core position by
 	 * swapping the cluster order. This is necessary in order to
 	 * match the format of the boot information passed by the SCP
@@ -117,7 +117,8 @@ func plat_is_my_cpu_primary
 	bl	plat_my_core_pos
 	ldr	x1, =SCP_BOOT_CFG_ADDR
 	ldr	x1, [x1]
-	ubfx	x1, x1, #PRIMARY_CPU_SHIFT, #PRIMARY_CPU_BIT_WIDTH
+	ubfx	x1, x1, #PLAT_CSS_PRIMARY_CPU_SHIFT, \
+			#PLAT_CSS_PRIMARY_CPU_BIT_WIDTH
 	cmp	x0, x1
 	cset	w0, eq
 	ret	x9

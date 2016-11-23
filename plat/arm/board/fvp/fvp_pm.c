@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -86,7 +86,7 @@ static void fvp_cluster_pwrdwn_common(void)
 	uint64_t mpidr = read_mpidr_el1();
 
 	/* Disable coherency if this cluster is to be turned off */
-	fvp_cci_disable();
+	fvp_interconnect_disable();
 
 	/* Program the power controller to turn the cluster off */
 	fvp_pwrc_write_pcoffr(mpidr);
@@ -117,7 +117,7 @@ static void fvp_power_domain_on_finish_common(const psci_power_state_t *target_s
 		fvp_pwrc_write_pponr(mpidr);
 
 		/* Enable coherency if this cluster was off */
-		fvp_cci_enable();
+		fvp_interconnect_enable();
 	}
 
 	/*
@@ -287,6 +287,42 @@ static void __dead2 fvp_system_reset(void)
 	panic();
 }
 
+static int fvp_node_hw_state(u_register_t target_cpu,
+			     unsigned int power_level)
+{
+	unsigned int psysr;
+	int ret;
+
+	/*
+	 * The format of 'power_level' is implementation-defined, but 0 must
+	 * mean a CPU. We also allow 1 to denote the cluster
+	 */
+	if (power_level != ARM_PWR_LVL0 && power_level != ARM_PWR_LVL1)
+		return PSCI_E_INVALID_PARAMS;
+
+	/*
+	 * Read the status of the given MPDIR from FVP power controller. The
+	 * power controller only gives us on/off status, so map that to expected
+	 * return values of the PSCI call
+	 */
+	psysr = fvp_pwrc_read_psysr(target_cpu);
+	if (psysr == PSYSR_INVALID)
+		return PSCI_E_INVALID_PARAMS;
+
+	switch (power_level) {
+	case ARM_PWR_LVL0:
+		ret = (psysr & PSYSR_AFF_L0) ? HW_ON : HW_OFF;
+		break;
+	case ARM_PWR_LVL1:
+		ret = (psysr & PSYSR_AFF_L1) ? HW_ON : HW_OFF;
+		break;
+	default:
+		assert(0);
+	}
+
+	return ret;
+}
+
 /*******************************************************************************
  * Export the platform handlers via plat_arm_psci_pm_ops. The ARM Standard
  * platform layer will take care of registering the handlers with PSCI.
@@ -301,5 +337,6 @@ const plat_psci_ops_t plat_arm_psci_pm_ops = {
 	.system_off = fvp_system_off,
 	.system_reset = fvp_system_reset,
 	.validate_power_state = arm_validate_power_state,
-	.validate_ns_entrypoint = arm_validate_ns_entrypoint
+	.validate_ns_entrypoint = arm_validate_ns_entrypoint,
+	.get_node_hw_state = fvp_node_hw_state
 };

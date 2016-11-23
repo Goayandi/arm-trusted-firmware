@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -79,21 +79,33 @@
  * Macro to convert a GICR_TYPER affinity value into a MPIDR value. Bits[31:24]
  * are zeroes.
  */
+#ifdef AARCH32
+#define mpidr_from_gicr_typer(typer_val)	(((typer_val) >> 32) & 0xffffff)
+#else
 #define mpidr_from_gicr_typer(typer_val)				 \
-	((((typer_val >> 56) & MPIDR_AFFLVL_MASK) << MPIDR_AFF3_SHIFT) | \
-	 ((typer_val >> 32) & 0xffffff))
+	(((((typer_val) >> 56) & MPIDR_AFFLVL_MASK) << MPIDR_AFF3_SHIFT) | \
+	 (((typer_val) >> 32) & 0xffffff))
+#endif
 
 /*******************************************************************************
- * Private function prototypes
+ * Private GICv3 function prototypes for accessing entire registers.
+ * Note: The raw register values correspond to multiple interrupt IDs and
+ * the number of interrupt IDs involved depends on the register accessed.
  ******************************************************************************/
 unsigned int gicd_read_igrpmodr(uintptr_t base, unsigned int id);
 unsigned int gicr_read_ipriorityr(uintptr_t base, unsigned int id);
+void gicd_write_igrpmodr(uintptr_t base, unsigned int id, unsigned int val);
+void gicr_write_ipriorityr(uintptr_t base, unsigned int id, unsigned int val);
+
+/*******************************************************************************
+ * Private GICv3 function prototypes for accessing the GIC registers
+ * corresponding to a single interrupt ID. These functions use bitwise
+ * operations or appropriate register accesses to modify or return
+ * the bit-field corresponding the single interrupt ID.
+ ******************************************************************************/
 unsigned int gicd_get_igrpmodr(uintptr_t base, unsigned int id);
 unsigned int gicr_get_igrpmodr0(uintptr_t base, unsigned int id);
 unsigned int gicr_get_igroupr0(uintptr_t base, unsigned int id);
-unsigned int gicv3_get_pending_grp1_interrupt_id(unsigned int pending_grp);
-void gicd_write_igrpmodr(uintptr_t base, unsigned int id, unsigned int val);
-void gicr_write_ipriorityr(uintptr_t base, unsigned int id, unsigned int val);
 void gicd_set_igrpmodr(uintptr_t base, unsigned int id);
 void gicr_set_igrpmodr0(uintptr_t base, unsigned int id);
 void gicr_set_isenabler0(uintptr_t base, unsigned int id);
@@ -101,6 +113,11 @@ void gicr_set_igroupr0(uintptr_t base, unsigned int id);
 void gicd_clr_igrpmodr(uintptr_t base, unsigned int id);
 void gicr_clr_igrpmodr0(uintptr_t base, unsigned int id);
 void gicr_clr_igroupr0(uintptr_t base, unsigned int id);
+void gicr_set_ipriorityr(uintptr_t base, unsigned int id, unsigned int pri);
+
+/*******************************************************************************
+ * Private GICv3 helper function prototypes
+ ******************************************************************************/
 void gicv3_spis_configure_defaults(uintptr_t gicd_base);
 void gicv3_ppi_sgi_configure_defaults(uintptr_t gicr_base);
 void gicv3_secure_spis_configure(uintptr_t gicd_base,
@@ -128,6 +145,7 @@ static inline unsigned int gicd_read_pidr2(uintptr_t base)
 
 static inline unsigned long long gicd_read_irouter(uintptr_t base, unsigned int id)
 {
+	assert(id >= MIN_SPI_ID);
 	return mmio_read_64(base + GICD_IROUTER + (id << 3));
 }
 
@@ -135,6 +153,7 @@ static inline void gicd_write_irouter(uintptr_t base,
 				      unsigned int id,
 				      unsigned long long affinity)
 {
+	assert(id >= MIN_SPI_ID);
 	mmio_write_64(base + GICD_IROUTER + (id << 3), affinity);
 }
 
@@ -179,6 +198,11 @@ static inline void gicr_write_waker(uintptr_t base, unsigned int val)
 	mmio_write_32(base + GICR_WAKER, val);
 }
 
+/*******************************************************************************
+ * GIC Re-distributor functions for accessing entire registers.
+ * Note: The raw register values correspond to multiple interrupt IDs and
+ * the number of interrupt IDs involved depends on the register accessed.
+ ******************************************************************************/
 static inline unsigned int gicr_read_icenabler0(uintptr_t base)
 {
 	return mmio_read_32(base + GICR_ICENABLER0);

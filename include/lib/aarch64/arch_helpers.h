@@ -113,15 +113,6 @@ static inline void _op ## _type(uint64_t v)		\
 }
 
 /*******************************************************************************
- * Aarch64 translation tables manipulation helper prototypes
-******************************************************************************/
-uint64_t create_table_desc(uint64_t *next_table_ptr);
-uint64_t create_block_desc(uint64_t desc, uint64_t addr, uint32_t level);
-uint64_t create_device_block(uint64_t output_addr, uint32_t level, uint32_t ns);
-uint64_t create_romem_block(uint64_t output_addr, uint32_t level, uint32_t ns);
-uint64_t create_rwmem_block(uint64_t output_addr, uint32_t level, uint32_t ns);
-
-/*******************************************************************************
  * TLB maintenance accessor prototypes
  ******************************************************************************/
 DEFINE_SYSOP_TYPE_FUNC(tlbi, alle1)
@@ -168,15 +159,6 @@ void disable_mmu_icache_el3(void);
 DEFINE_SYSREG_WRITE_CONST_FUNC(daifset)
 DEFINE_SYSREG_WRITE_CONST_FUNC(daifclr)
 
-#define enable_irq()			write_daifclr(DAIF_IRQ_BIT)
-#define enable_fiq()			write_daifclr(DAIF_FIQ_BIT)
-#define enable_serror()			write_daifclr(DAIF_ABT_BIT)
-#define enable_debug_exceptions()	write_daifclr(DAIF_DBG_BIT)
-#define disable_irq()			write_daifset(DAIF_IRQ_BIT)
-#define disable_fiq()			write_daifset(DAIF_FIQ_BIT)
-#define disable_serror()		write_daifset(DAIF_ABT_BIT)
-#define disable_debug_exceptions()	write_daifset(DAIF_DBG_BIT)
-
 DEFINE_SYSREG_READ_FUNC(par_el1)
 DEFINE_SYSREG_READ_FUNC(id_pfr1_el1)
 DEFINE_SYSREG_READ_FUNC(id_aa64pfr0_el1)
@@ -194,6 +176,8 @@ DEFINE_SYSOP_FUNC(wfe)
 DEFINE_SYSOP_FUNC(sev)
 DEFINE_SYSOP_TYPE_FUNC(dsb, sy)
 DEFINE_SYSOP_TYPE_FUNC(dmb, sy)
+DEFINE_SYSOP_TYPE_FUNC(dmb, st)
+DEFINE_SYSOP_TYPE_FUNC(dmb, ld)
 DEFINE_SYSOP_TYPE_FUNC(dsb, ish)
 DEFINE_SYSOP_TYPE_FUNC(dmb, ish)
 DEFINE_SYSOP_FUNC(isb)
@@ -289,6 +273,7 @@ DEFINE_SYSREG_RW_FUNCS(cntvoff_el2)
 
 DEFINE_SYSREG_RW_FUNCS(vpidr_el2)
 DEFINE_SYSREG_RW_FUNCS(vmpidr_el2)
+DEFINE_SYSREG_RW_FUNCS(cntp_ctl_el0)
 
 DEFINE_SYSREG_READ_FUNC(isr_el1)
 

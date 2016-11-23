@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2015, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2014-2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -35,8 +35,8 @@
 enum arm_config_flags {
 	/* Whether Base memory map is in use */
 	ARM_CONFIG_BASE_MMAP		= 0x1,
-	/* Whether CCI should be enabled */
-	ARM_CONFIG_HAS_CCI		= 0x2,
+	/* Whether interconnect should be enabled */
+	ARM_CONFIG_HAS_INTERCONNECT	= 0x2,
 	/* Whether TZC should be configured */
 	ARM_CONFIG_HAS_TZC		= 0x4
 };

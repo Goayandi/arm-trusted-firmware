@@ -27,6 +27,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <arch_helpers.h>
 #include <assert.h>
 #include <console.h>
 #include <platform.h>
@@ -40,7 +41,7 @@
 #include <fiq_smp_call.h>
 #include <runtime_svc.h>
 #include <console.h>
-#include "plat_private.h"   //for atf_arg_t_ptr
+#include "plat_private.h"   // for atf_arg_t_ptr
 
 extern void mt_log_set_crash_flag(void);
 uint64_t wdt_kernel_cb_addr = 0;
@@ -60,6 +61,9 @@ uint32_t aee_wdt_dump_flag = 1;
 #pragma weak bl31_plat_enable_mmu
 #pragma weak bl32_plat_enable_mmu
 #pragma weak bl31_plat_runtime_setup
+#if !ERROR_DEPRECATED
+#pragma weak plat_get_syscnt_freq2
+#endif /* ERROR_DEPRECATED */
 
 extern unsigned long g_dormant_log_base;
 void atf_low_level_log(int tag)
@@ -133,8 +137,8 @@ void aee_wdt_dump()
 	regs = (void *)(teearg->atf_aee_debug_buf_start + (linear_id * sizeof(struct atf_aee_regs)));
 
 	/* save debug infos */
-	regs->pstate = SMC_GET_EL3(ns_cpu_context, CTX_SPSR_EL3)
-	regs->pc = SMC_GET_EL3(ns_cpu_context, CTX_ELR_EL3)
+	regs->pstate = SMC_GET_EL3(ns_cpu_context, CTX_SPSR_EL3);
+	regs->pc = SMC_GET_EL3(ns_cpu_context, CTX_ELR_EL3);
 	regs->sp = read_ctx_reg(get_sysregs_ctx(ns_cpu_context), CTX_SP_EL1);
 	for (i=0; i<31; i++)
 		regs->regs[i] = SMC_GET_GP(ns_cpu_context, (CTX_GPREG_X0 + (i<<3)));
@@ -239,3 +243,14 @@ unsigned int platform_core_pos_helper(unsigned long mpidr)
 	return idx;
 }
 #endif
+
+#if !ERROR_DEPRECATED
+unsigned int plat_get_syscnt_freq2(void)
+{
+	unsigned long long freq = plat_get_syscnt_freq();
+
+	assert(freq >> 32 == 0);
+
+	return (unsigned int)freq;
+}
+#endif /* ERROR_DEPRECATED */

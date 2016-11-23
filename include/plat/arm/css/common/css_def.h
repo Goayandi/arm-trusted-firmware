@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -37,15 +37,12 @@
 /*************************************************************************
  * Definitions common to all ARM Compute SubSystems (CSS)
  *************************************************************************/
-#define MHU_PAYLOAD_CACHED		0
-
 #define NSROM_BASE			0x1f000000
 #define NSROM_SIZE			0x00001000
 
 /* Following covers CSS Peripherals excluding NSROM and NSRAM  */
 #define CSS_DEVICE_BASE			0x20000000
 #define CSS_DEVICE_SIZE			0x0e000000
-#define MHU_BASE			0x2b1f0000
 
 #define NSRAM_BASE			0x2e000000
 #define NSRAM_SIZE			0x00008000
@@ -78,37 +75,60 @@
  * SCP <=> AP boot configuration
  *
  * The SCP/AP boot configuration is a 32-bit word located at a known offset from
- * the start of the Trusted SRAM. Part of this configuration is which CPU is the
- * primary, according to the shift and mask definitions below.
+ * the start of the Trusted SRAM.
  *
  * Note that the value stored at this address is only valid at boot time, before
  * the SCP_BL2 image is transferred to SCP.
  */
-#define SCP_BOOT_CFG_ADDR		(ARM_TRUSTED_SRAM_BASE + 0x80)
-#define PRIMARY_CPU_SHIFT		8
-#define PRIMARY_CPU_BIT_WIDTH		4
-
-/*
- * Base address of the first memory region used for communication between AP
- * and SCP. Used by the BOM and SCPI protocols.
- *
- * Note that this is located at the same address as SCP_BOOT_CFG_ADDR, which
- * means the SCP/AP configuration data gets overwritten when the AP initiates
- * communication with the SCP.
- */
-#define SCP_COM_SHARED_MEM_BASE		(ARM_TRUSTED_SRAM_BASE + 0x80)
+#define SCP_BOOT_CFG_ADDR		PLAT_CSS_SCP_COM_SHARED_MEM_BASE
 
 #define CSS_MAP_DEVICE			MAP_REGION_FLAT(		\
 						CSS_DEVICE_BASE,	\
 						CSS_DEVICE_SIZE,	\
 						MT_DEVICE | MT_RW | MT_SECURE)
 
+/* Platform ID address */
+#define SSC_VERSION_OFFSET			0x040
+
+#define SSC_VERSION_CONFIG_SHIFT		28
+#define SSC_VERSION_MAJOR_REV_SHIFT		24
+#define SSC_VERSION_MINOR_REV_SHIFT		20
+#define SSC_VERSION_DESIGNER_ID_SHIFT		12
+#define SSC_VERSION_PART_NUM_SHIFT		0x0
+#define SSC_VERSION_CONFIG_MASK			0xf
+#define SSC_VERSION_MAJOR_REV_MASK		0xf
+#define SSC_VERSION_MINOR_REV_MASK		0xf
+#define SSC_VERSION_DESIGNER_ID_MASK		0xff
+#define SSC_VERSION_PART_NUM_MASK		0xfff
+
+#ifndef __ASSEMBLY__
+
+/* SSC_VERSION related accessors */
+
+/* Returns the part number of the platform */
+#define GET_SSC_VERSION_PART_NUM(val)				\
+		(((val) >> SSC_VERSION_PART_NUM_SHIFT) &	\
+		SSC_VERSION_PART_NUM_MASK)
+
+/* Returns the configuration number of the platform */
+#define GET_SSC_VERSION_CONFIG(val)				\
+		(((val) >> SSC_VERSION_CONFIG_SHIFT) &		\
+		SSC_VERSION_CONFIG_MASK)
+
+#endif /* __ASSEMBLY__ */
 
 /*************************************************************************
  * Required platform porting definitions common to all
  * ARM Compute SubSystems (CSS)
  ************************************************************************/
 
+/*
+ * The loading of SCP images(SCP_BL2 or SCP_BL2U) is done if there
+ * respective base addresses are defined (i.e SCP_BL2_BASE, SCP_BL2U_BASE).
+ * Hence, `CSS_LOAD_SCP_IMAGES` needs to be set to 1 if BL2 needs to load
+ * an SCP_BL2/SCP_BL2U image.
+ */
+#if CSS_LOAD_SCP_IMAGES
 /*
  * Load address of SCP_BL2 in CSS platform ports
  * SCP_BL2 is loaded to the same place as BL31.  Once SCP_BL2 is transferred to the
@@ -117,21 +137,26 @@
 #define SCP_BL2_BASE			BL31_BASE
 
 #define SCP_BL2U_BASE			BL31_BASE
-
-#define PLAT_ARM_SHARED_RAM_CACHED	MHU_PAYLOAD_CACHED
+#endif /* CSS_LOAD_SCP_IMAGES */
 
 /* Load address of Non-Secure Image for CSS platform ports */
 #define PLAT_ARM_NS_IMAGE_OFFSET	0xE0000000
 
 /* TZC related constants */
-#define PLAT_ARM_TZC_FILTERS		REG_ATTR_FILTER_BIT_ALL
-#define PLAT_ARM_TZC_BASE		0x2a4a0000
-
-/* System timer related constants */
-#define PLAT_ARM_NSTIMER_FRAME_ID	1
+#define PLAT_ARM_TZC_FILTERS		TZC_400_REGION_ATTR_FILTER_BIT_ALL
 
 /* Trusted mailbox base address common to all CSS */
 #define PLAT_ARM_TRUSTED_MAILBOX_BASE	ARM_TRUSTED_SRAM_BASE
 
+/*
+ * Parsing of CPU and Cluster states, as returned by 'Get CSS Power State' SCP
+ * command
+ */
+#define CSS_CLUSTER_PWR_STATE_ON	0
+#define CSS_CLUSTER_PWR_STATE_OFF	3
+
+#define CSS_CPU_PWR_STATE_ON		1
+#define CSS_CPU_PWR_STATE_OFF		0
+#define CSS_CPU_PWR_STATE(state, n)	(((state) >> (n)) & 1)
 
 #endif /* __CSS_DEF_H__ */

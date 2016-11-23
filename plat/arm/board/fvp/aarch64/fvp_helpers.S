@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -111,8 +111,7 @@ secondary_cold_boot_wait:
 	 */
 	dsb	sy
 	wfi
-cb_panic:
-	b	cb_panic
+	bl	plat_panic_handler
 #else
 	mov_imm	x0, PLAT_ARM_TRUSTED_MAILBOX_BASE
 
@@ -128,7 +127,7 @@ poll_mailbox:
 endfunc plat_secondary_cold_boot_setup
 
 	/* ---------------------------------------------------------------------
-	 * unsigned long plat_get_my_entrypoint (void);
+	 * uintptr_t plat_get_my_entrypoint (void);
 	 *
 	 * Main job of this routine is to distinguish between a cold and warm
 	 * boot. On FVP, this information can be queried from the power
@@ -174,7 +173,7 @@ warm_reset:
 	 */
 	mov_imm	x0, PLAT_ARM_TRUSTED_MAILBOX_BASE
 	ldr	x0, [x0]
-	cbz	x0, _panic
+	cbz	x0, _panic_handler
 	ret
 
 	/* ---------------------------------------------------------------------
@@ -182,8 +181,8 @@ warm_reset:
 	 * is empty. This should never happen!
 	 * ---------------------------------------------------------------------
 	 */
-_panic:
-	b	_panic
+_panic_handler:
+	bl	plat_panic_handler
 endfunc plat_get_my_entrypoint
 
 	/* -----------------------------------------------------

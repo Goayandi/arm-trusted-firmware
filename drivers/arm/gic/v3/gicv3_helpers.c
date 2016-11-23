@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2015, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2015-2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -33,6 +33,7 @@
 #include <assert.h>
 #include <debug.h>
 #include <gic_common.h>
+#include "../common/gic_common_private.h"
 #include "gicv3_private.h"
 
 /*
@@ -194,6 +195,15 @@ void gicr_set_isenabler0(uintptr_t base, unsigned int id)
 	gicr_write_isenabler0(base, (1 << bit_num));
 }
 
+/*
+ * Accessor to set the byte corresponding to interrupt ID
+ * in GIC Re-distributor IPRIORITYR.
+ */
+void gicr_set_ipriorityr(uintptr_t base, unsigned int id, unsigned int pri)
+{
+	mmio_write_8(base + GICR_IPRIORITYR + id, pri & GIC_PRI_MASK);
+}
+
 /******************************************************************************
  * This function marks the core as awake in the re-distributor and
  * ensures that the interface is active.
@@ -240,7 +250,7 @@ void gicv3_rdistif_base_addrs_probe(uintptr_t *rdistif_base_addrs,
 					uintptr_t gicr_base,
 					mpidr_hash_fn mpidr_to_core_pos)
 {
-	unsigned long mpidr;
+	u_register_t mpidr;
 	unsigned int proc_num;
 	unsigned long long typer_val;
 	uintptr_t rdistif_base = gicr_base;
@@ -310,7 +320,7 @@ void gicv3_secure_spis_configure(uintptr_t gicd_base,
 				     unsigned int int_grp)
 {
 	unsigned int index, irq_num;
-	uint64_t gic_affinity_val;
+	unsigned long long gic_affinity_val;
 
 	assert((int_grp == INTR_GROUP1S) || (int_grp == INTR_GROUP0));
 	/* If `num_ints` is not 0, ensure that `sec_intr_list` is not NULL */
@@ -330,7 +340,7 @@ void gicv3_secure_spis_configure(uintptr_t gicd_base,
 				gicd_clr_igrpmodr(gicd_base, irq_num);
 
 			/* Set the priority of this interrupt */
-			gicd_write_ipriorityr(gicd_base,
+			gicd_set_ipriorityr(gicd_base,
 					      irq_num,
 					      GIC_HIGHEST_SEC_PRIORITY);
 
@@ -404,7 +414,7 @@ void gicv3_secure_ppi_sgi_configure(uintptr_t gicr_base,
 				gicr_clr_igrpmodr0(gicr_base, irq_num);
 
 			/* Set the priority of this interrupt */
-			gicr_write_ipriorityr(gicr_base,
+			gicr_set_ipriorityr(gicr_base,
 					    irq_num,
 					    GIC_HIGHEST_SEC_PRIORITY);
 

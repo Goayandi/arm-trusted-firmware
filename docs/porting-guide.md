@@ -8,7 +8,7 @@ Contents
 2.  [Common Modifications](#2--common-modifications)
     *   [Common mandatory modifications](#21-common-mandatory-modifications)
     *   [Handling reset](#22-handling-reset)
-    *   [Common mandatory modifications](#23-common-mandatory-modifications)
+    *   [Common mandatory function modifications](#23-common-mandatory-function-modifications)
     *   [Common optional modifications](#24-common-optional-modifications)
 3.  [Boot Loader stage specific modifications](#3--modifications-specific-to-a-boot-loader-stage)
     *   [Boot Loader stage 1 (BL1)](#31-boot-loader-stage-1-bl1)
@@ -72,10 +72,20 @@ either mandatory or optional.
 
 2.1 Common mandatory modifications
 ----------------------------------
-A platform port must enable the Memory Management Unit (MMU) with identity
-mapped page tables, and enable both the instruction and data caches for each BL
-stage. In ARM standard platforms, each BL stage configures the MMU in
-the platform-specific architecture setup function, `blX_plat_arch_setup()`.
+
+A platform port must enable the Memory Management Unit (MMU) as well as the
+instruction and data caches for each BL stage. Setting up the translation
+tables is the responsibility of the platform port because memory maps differ
+across platforms. A memory translation library (see `lib/xlat_tables/`) is
+provided to help in this setup. Note that although this library supports
+non-identity mappings, this is intended only for re-mapping peripheral physical
+addresses and allows platforms with high I/O addresses to reduce their virtual
+address space. All other addresses corresponding to code and data must currently
+use an identity mapping.
+
+In ARM standard platforms, each BL stage configures the MMU in the
+platform-specific architecture setup function, `blX_plat_arch_setup()`, and uses
+an identity mapping for all addresses.
 
 If the build option `USE_COHERENT_MEM` is enabled, each platform can allocate a
 block of identity mapped secure memory with Device-nGnRE attributes aligned to
@@ -85,7 +95,7 @@ section identified by name `bakery_lock` inside `coherent_ram` so that its
 possible for the firmware to place variables in it using the following C code
 directive:
 
-    __attribute__ ((section("bakery_lock")))
+    __section("bakery_lock")
 
 Or alternatively the following assembler code directive:
 
@@ -179,8 +189,19 @@ platform port to define additional platform porting constants in
     Defines the local power state corresponding to the deepest retention state
     possible at every power domain level in the platform. This macro should be
     a value less than PLAT_MAX_OFF_STATE and greater than 0. It is used by the
-    PSCI implementation to distuiguish between retention and power down local
+    PSCI implementation to distinguish between retention and power down local
     power states within PSCI_CPU_SUSPEND call.
+
+*   **#define : PLAT_MAX_PWR_LVL_STATES**
+
+    Defines the maximum number of local power states per power domain level
+    that the platform supports. The default value of this macro is 2 since
+    most platforms just support a maximum of two local power states at each
+    power domain level (power-down and retention). If the platform needs to
+    account for more local power states, then it must redefine this macro.
+
+    Currently, this macro is used by the Generic PSCI implementation to size
+    the array used for PSCI_STAT_COUNT/RESIDENCY accounting.
 
 *   **#define : BL1_RO_BASE**
 
@@ -219,11 +240,6 @@ platform port to define additional platform porting constants in
 *   **#define : BL31_LIMIT**
 
     Defines the maximum address in secure RAM that the BL31 image can occupy.
-
-*   **#define : NS_IMAGE_OFFSET**
-
-    Defines the base address in non-secure DRAM where BL2 loads the BL33 binary
-    image. Must be aligned on a page-size boundary.
 
 For every image, the platform must define individual identifiers that will be
 used by BL1 or BL2 to load the corresponding image into memory from non-volatile
@@ -413,6 +429,22 @@ constant must also be defined:
     used, choose the smallest value needed to map the required virtual addresses
     for each BL stage.
 
+*   **#define : MAX_MMAP_REGIONS**
+
+    Defines the maximum number of regions that are allocated by the translation
+    table library code. A region consists of physical base address, virtual base
+    address, size and attributes (Device/Memory, RO/RW, Secure/Non-Secure), as
+    defined in the `mmap_region_t` structure. The platform defines the regions
+    that should be mapped. Then, the translation table library will create the
+    corresponding tables and descriptors at runtime. To minimize the amount of
+    runtime memory used, choose the smallest value needed to register the
+    required regions for each BL stage.
+
+*   **#define : ADDR_SPACE_SIZE**
+
+    Defines the total size of the address space in bytes. For example, for a 32
+    bit address space, this value should be `(1ull << 32)`.
+
 If the platform port uses the IO storage framework, the following constants
 must also be defined:
 
@@ -426,6 +458,14 @@ must also be defined:
 
     Defines the maximum number of open IO handles. Attempting to open more IO
     entities than this value using `io_open()` will fail with -ENOMEM.
+
+*   **#define : MAX_IO_BLOCK_DEVICES**
+
+    Defines the maximum number of registered IO block devices. Attempting to
+    register more devices this value using `io_dev_open()` will fail
+    with -ENOMEM. MAX_IO_BLOCK_DEVICES should be less than MAX_IO_DEVICES.
+    With this macro, multiple block devices could be supported at the same
+    time.
 
 If the platform needs to allocate data within the per-cpu data framework in
 BL31, it should define the following macro. Currently this is only required if
@@ -450,26 +490,33 @@ memory layout implies some image overlaying like in ARM standard platforms.
 
     Defines the maximum address that the TSP's progbits sections can occupy.
 
+If the platform port uses the PL061 GPIO driver, the following constant may
+optionally be defined:
+
+*   **PLAT_PL061_MAX_GPIOS**
+    Maximum number of GPIOs required by the platform. This allows control how
+    much memory is allocated for PL061 GPIO controllers. The default value is
+    32.
+    [For example, define the build flag in platform.mk]:
+    PLAT_PL061_MAX_GPIOS    :=      160
+    $(eval $(call add_define,PLAT_PL061_MAX_GPIOS))
+
+
 ### File : plat_macros.S [mandatory]
 
 Each platform must ensure a file of this name is in the system include path with
 the following macro defined. In the ARM development platforms, this file is
 found in `plat/arm/board/<plat_name>/include/plat_macros.S`.
 
-*   **Macro : plat_print_gic_regs**
+*   **Macro : plat_crash_print_regs**
 
-    This macro allows the crash reporting routine to print GIC registers
-    in case of an unhandled exception in BL31. This aids in debugging and
-    this macro can be defined to be empty in case GIC register reporting is
-    not desired.
-
-*   **Macro : plat_print_interconnect_regs**
-
-    This macro allows the crash reporting routine to print interconnect
+    This macro allows the crash reporting routine to print relevant platform
     registers in case of an unhandled exception in BL31. This aids in debugging
-    and this macro can be defined to be empty in case interconnect register
-    reporting is not desired. In ARM standard platforms, the CCI snoop
-    control registers are reported.
+    and this macro can be defined to be empty in case register reporting is not
+    desired.
+
+    For instance, GIC or interconnect registers may be helpful for
+    troubleshooting.
 
 
 2.2 Handling Reset
@@ -498,7 +545,7 @@ reset vector code to perform the above tasks.
 ### Function : plat_get_my_entrypoint() [mandatory when PROGRAMMABLE_RESET_ADDRESS == 0]
 
     Argument : void
-    Return   : unsigned long
+    Return   : uintptr_t
 
 This function is called with the called with the MMU and caches disabled
 (`SCTLR_EL3.M` = 0 and `SCTLR_EL3.C` = 0). The function is responsible for
@@ -595,12 +642,50 @@ In case the function returns a hash of the key:
         digest            OCTET STRING
     }
 
-The function returns 0 on success. Any other value means the ROTPK could not be
-retrieved from the platform. The function also reports extra information related
-to the ROTPK in the flags parameter.
+The function returns 0 on success. Any other value is treated as error by the
+Trusted Board Boot. The function also reports extra information related
+to the ROTPK in the flags parameter:
+
+    ROTPK_IS_HASH      : Indicates that the ROTPK returned by the platform is a
+                         hash.
+    ROTPK_NOT_DEPLOYED : This allows the platform to skip certificate ROTPK
+                         verification while the platform ROTPK is not deployed.
+                         When this flag is set, the function does not need to
+                         return a platform ROTPK, and the authentication
+                         framework uses the ROTPK in the certificate without
+                         verifying it against the platform value. This flag
+                         must not be used in a deployed production environment.
+
+### Function: plat_get_nv_ctr()
+
+    Argument : void *, unsigned int *
+    Return   : int
+
+This function is mandatory when Trusted Board Boot is enabled. It returns the
+non-volatile counter value stored in the platform in the second argument. The
+cookie in the first argument may be used to select the counter in case the
+platform provides more than one (for example, on platforms that use the default
+TBBR CoT, the cookie will correspond to the OID values defined in
+TRUSTED_FW_NVCOUNTER_OID or NON_TRUSTED_FW_NVCOUNTER_OID).
+
+The function returns 0 on success. Any other value means the counter value could
+not be retrieved from the platform.
 
 
-2.3 Common mandatory modifications
+### Function: plat_set_nv_ctr()
+
+    Argument : void *, unsigned int
+    Return   : int
+
+This function is mandatory when Trusted Board Boot is enabled. It sets a new
+counter value in the platform. The cookie in the first argument may be used to
+select the counter (as explained in plat_get_nv_ctr()).
+
+The function returns 0 on success. Any other value means the counter value could
+not be updated.
+
+
+2.3 Common mandatory function modifications
 ---------------------------------
 
 The following functions are mandatory functions which need to be implemented
@@ -616,7 +701,8 @@ CPU-specific linear index into blocks of memory (for example while allocating
 per-CPU stacks). This function will be invoked very early in the
 initialization sequence which mandates that this function should be
 implemented in assembly and should not rely on the avalability of a C
-runtime environment.
+runtime environment. This function can clobber x0 - x8 and must preserve
+x9 - x29.
 
 This function plays a crucial role in the power domain topology framework in
 PSCI and details of this can be found in [Power Domain Topology Design].
@@ -633,7 +719,6 @@ be invoked by BL31 after the power domain topology is initialized and can
 utilize the C runtime environment. For further details about how ARM Trusted
 Firmware represents the power domain topology and how this relates to the
 linear CPU index, please refer [Power Domain Topology Design].
-
 
 
 2.4 Common optional modifications
@@ -662,7 +747,7 @@ provided in [plat/common/aarch64/platform_up_stack.S] and
 ### Function : plat_get_my_stack()
 
     Argument : void
-    Return   : unsigned long
+    Return   : uintptr_t
 
 This function returns the base address of the normal memory stack that
 has been allocated for the current CPU. For BL images that only require a
@@ -691,11 +776,15 @@ called in the following circumstances:
 The default implementation doesn't do anything, to avoid making assumptions
 about the way the platform displays its status information.
 
-This function receives the exception type as its argument. Possible values for
-exceptions types are listed in the [include/common/bl_common.h] header file.
-Note that these constants are not related to any architectural exception code;
-they are just an ARM Trusted Firmware convention.
+For AArch64, this function receives the exception type as its argument.
+Possible values for exceptions types are listed in the
+[include/common/bl_common.h] header file. Note that these constants are not
+related to any architectural exception code; they are just an ARM Trusted
+Firmware convention.
 
+For AArch32, this function receives the exception mode as its argument.
+Possible values for exception modes are listed in the
+[include/lib/aarch32/arch.h] header file.
 
 ### Function : plat_reset_handler()
 
@@ -744,6 +833,47 @@ Possible errors reported by the generic code are:
 
 The default implementation simply spins.
 
+### Function : plat_panic_handler()
+
+    Argument : void
+    Return   : void
+
+This API is called when the generic code encounters an unexpected error
+situation from which it cannot recover. This function must not return,
+and must be implemented in assembly because it may be called before the C
+environment is initialized.
+
+Note: The address from where it was called is stored in x30 (Link Register).
+The default implementation simply spins.
+
+
+### Function : plat_get_bl_image_load_info()
+
+    Argument : void
+    Return   : bl_load_info_t *
+
+This function returns pointer to the list of images that the platform has
+populated to load. This function is currently invoked in BL2 to load the
+BL3xx images, when LOAD_IMAGE_V2 is enabled.
+
+### Function : plat_get_next_bl_params()
+
+    Argument : void
+    Return   : bl_params_t *
+
+This function returns a pointer to the shared memory that the platform has
+kept aside to pass trusted firmware related information that next BL image
+needs. This function is currently invoked in BL2 to pass this information to
+the next BL image, when LOAD_IMAGE_V2 is enabled.
+
+### Function : plat_flush_next_bl_params()
+
+    Argument : void
+    Return   : void
+
+This function flushes to main memory all the image params that are passed to
+next image. This function is currently invoked in BL2 to flush this information
+to the next BL image, when LOAD_IMAGE_V2 is enabled.
 
 3.  Modifications specific to a Boot Loader stage
 -------------------------------------------------
@@ -801,8 +931,16 @@ BL1 to perform the above tasks.
 This function executes with the MMU and data caches disabled. It is only called
 by the primary CPU.
 
-In ARM standard platforms, this function initializes the console and enables
-snoop requests into the primary CPU's cluster.
+On ARM standard platforms, this function:
+
+*   Enables a secure instance of SP805 to act as the Trusted Watchdog.
+
+*   Initializes a UART (PL011 console), which enables access to the `printf`
+    family of functions in BL1.
+
+*   Enables issuing of snoop and DVM (Distributed Virtual Memory) requests to
+    the CCI slave interface corresponding to the cluster that includes the
+    primary CPU.
 
 ### Function : bl1_plat_arch_setup() [mandatory]
 
@@ -858,7 +996,7 @@ This function helps fulfill requirements 4 and 5 above.
 
 ### Function : bl1_init_bl2_mem_layout() [optional]
 
-    Argument : meminfo *, meminfo *, unsigned int, unsigned long
+    Argument : meminfo *, meminfo *
     Return   : void
 
 BL1 needs to tell the next stage the amount of secure RAM available
@@ -986,10 +1124,10 @@ using the `platform_is_primary_cpu()` function. BL1 passed control to BL2 at
     structure in memory provided by the platform with information about how
     BL31 should pass control to the BL32 image.
 
-5.  Loading the normal world BL33 binary image into non-secure DRAM from
-    platform storage and arranging for BL31 to pass control to this image. This
-    address is determined using the `plat_get_ns_image_entrypoint()` function
-    described below.
+5.  (Optional) Loading the normal world BL33 binary image (if not loaded by
+    other means) into non-secure DRAM from platform storage and arranging for
+    BL31 to pass control to this image. This address is determined using the
+    `plat_get_ns_image_entrypoint()` function described below.
 
 6.  BL2 populates an `entry_point_info` structure in memory provided by the
     platform with information about how BL31 should pass control to the
@@ -1008,15 +1146,19 @@ This function executes with the MMU and data caches disabled. It is only called
 by the primary CPU. The arguments to this function is the address of the
 `meminfo` structure populated by BL1.
 
-The platform must copy the contents of the `meminfo` structure into a private
+The platform may copy the contents of the `meminfo` structure into a private
 variable as the original memory may be subsequently overwritten by BL2. The
 copied structure is made available to all BL2 code through the
 `bl2_plat_sec_mem_layout()` function.
 
-In ARM standard platforms, this function also initializes the storage
-abstraction layer used to load further bootloader images. It is necessary to do
-this early on platforms with a SCP_BL2 image, since the later
-`bl2_platform_setup` must be done after SCP_BL2 is loaded.
+On ARM standard platforms, this function also:
+
+*   Initializes a UART (PL011 console), which enables access to the `printf`
+    family of functions in BL2.
+
+*   Initializes the storage abstraction layer used to load further bootloader
+    images. It is necessary to do this early on platforms with a SCP_BL2 image,
+    since the later `bl2_platform_setup` must be done after SCP_BL2 is loaded.
 
 
 ### Function : bl2_plat_arch_setup() [mandatory]
@@ -1028,9 +1170,9 @@ This function executes with the MMU and data caches disabled. It is only called
 by the primary CPU.
 
 The purpose of this function is to perform any architectural initialization
-that varies across platforms, for example enabling the MMU (since the memory
-map differs across platforms).
+that varies across platforms.
 
+On ARM standard platforms, this function enables the MMU.
 
 ### Function : bl2_platform_setup() [mandatory]
 
@@ -1062,6 +1204,20 @@ The purpose of this function is to return a pointer to a `meminfo` structure
 populated with the extents of secure RAM available for BL2 to use. See
 `bl2_early_platform_setup()` above.
 
+
+Following function is required only when LOAD_IMAGE_V2 is enabled.
+
+### Function : bl2_plat_handle_post_image_load() [mandatory]
+
+    Argument : unsigned int
+    Return   : int
+
+This function can be used by the platforms to update/use image information
+for given `image_id`. This function is currently invoked in BL2 to handle
+BL image specific information based on the `image_id` passed, when
+LOAD_IMAGE_V2 is enabled.
+
+Following functions are required only when LOAD_IMAGE_V2 is disabled.
 
 ### Function : bl2_plat_get_scp_bl2_meminfo() [mandatory]
 
@@ -1157,6 +1313,10 @@ This function is called after loading BL33 image and it can be used to
 overwrite the entry point set by loader and also set the security state
 and SPSR which represents the entry point system state for BL33.
 
+In the preloaded BL33 alternative boot flow, this function is called after
+populating its entry point address. It is passed a null pointer as its first
+argument in this case.
+
 
 ### Function : bl2_plat_get_bl32_meminfo() [mandatory]
 
@@ -1178,6 +1338,9 @@ BL33 image. The meminfo provided by this is used by load_image() to
 validate whether the BL33 image can be loaded with in the given
 memory from the given base.
 
+This function isn't needed if either `PRELOADED_BL33_BASE` or `EL3_PAYLOAD_BASE`
+build options are used.
+
 ### Function : bl2_plat_flush_bl31_params() [mandatory]
 
     Argument : void
@@ -1192,13 +1355,16 @@ later Bootloader stages with MMU off
 ### Function : plat_get_ns_image_entrypoint() [mandatory]
 
     Argument : void
-    Return   : unsigned long
+    Return   : uintptr_t
 
 As previously described, BL2 is responsible for arranging for control to be
 passed to a normal world BL image through BL31. This function returns the
 entrypoint of that image, which BL31 uses to jump to it.
 
 BL2 is responsible for loading the normal world BL33 image (e.g. UEFI).
+
+This function isn't needed if either `PRELOADED_BL33_BASE` or `EL3_PAYLOAD_BASE`
+build options are used.
 
 
 3.3 FWU Boot Loader Stage 2 (BL2U)
@@ -1231,7 +1397,7 @@ This function executes with the MMU and data caches disabled. It is only
 called by the primary CPU. The arguments to this function is the address
 of the `meminfo` structure and platform specific info provided by BL1.
 
-The platform must copy the contents of the `mem_info` and `plat_info` into
+The platform may copy the contents of the `mem_info` and `plat_info` into
 private storage as the original memory may be subsequently overwritten by BL2U.
 
 On ARM CSS platforms `plat_info` is interpreted as an `image_info_t` structure,
@@ -1333,7 +1499,14 @@ to the platform data also needs to be saved.
 
 In ARM standard platforms, BL2 passes a pointer to a `bl31_params` structure
 in BL2 memory. BL31 copies the information in this pointer to internal data
-structures.
+structures. It also performs the following:
+
+*   Initialize a UART (PL011 console), which enables access to the `printf`
+    family of functions in BL31.
+
+*   Enable issuing of snoop and DVM (Distributed Virtual Memory) requests to the
+    CCI slave interface corresponding to the cluster that includes the primary
+    CPU.
 
 
 ### Function : bl31_plat_arch_setup() [mandatory]
@@ -1345,8 +1518,9 @@ This function executes with the MMU and data caches disabled. It is only called
 by the primary CPU.
 
 The purpose of this function is to perform any architectural initialization
-that varies across platforms, for example enabling the MMU (since the memory
-map differs across platforms).
+that varies across platforms.
+
+On ARM standard platforms, this function enables the MMU.
 
 
 ### Function : bl31_platform_setup() [mandatory]
@@ -1361,12 +1535,32 @@ called by the primary CPU.
 The purpose of this function is to complete platform initialization so that both
 BL31 runtime services and normal world software can function correctly.
 
-In ARM standard platforms, this function does the following:
-*   Initializes the generic interrupt controller.
-*   Enables system-level implementation of the generic timer counter.
-*   Grants access to the system counter timer module
-*   Initializes the power controller device
-*   Detects the system topology.
+On ARM standard platforms, this function does the following:
+
+*   Initialize the generic interrupt controller.
+
+    Depending on the GIC driver selected by the platform, the appropriate GICv2
+    or GICv3 initialization will be done, which mainly consists of:
+
+    - Enable secure interrupts in the GIC CPU interface.
+    - Disable the legacy interrupt bypass mechanism.
+    - Configure the priority mask register to allow interrupts of all priorities
+      to be signaled to the CPU interface.
+    - Mark SGIs 8-15 and the other secure interrupts on the platform as secure.
+    - Target all secure SPIs to CPU0.
+    - Enable these secure interrupts in the GIC distributor.
+    - Configure all other interrupts as non-secure.
+    - Enable signaling of secure interrupts in the GIC distributor.
+
+*   Enable system-level implementation of the generic timer counter through the
+    memory mapped interface.
+
+*   Grant access to the system counter timer module
+
+*   Initialize the power controller device.
+
+    In particular, initialise the locks that prevent concurrent accesses to the
+    power controller device.
 
 
 ### Function : bl31_plat_runtime_setup() [optional]
@@ -1399,10 +1593,10 @@ state. This function must return a pointer to the `entry_point_info` structure
 (that was copied during `bl31_early_platform_setup()`) if the image exists. It
 should return NULL otherwise.
 
-### Function : plat_get_syscnt_freq() [mandatory]
+### Function : plat_get_syscnt_freq2() [mandatory]
 
     Argument : void
-    Return   : uint64_t
+    Return   : unsigned int
 
 This function is used by the architecture setup code to retrieve the counter
 frequency for the CPU's generic timer.  This value will be programmed into the
@@ -1585,6 +1779,22 @@ latter case, the power domain is expected to save enough state so that it can
 resume execution by restoring this state when its powered on (see
 `pwr_domain_suspend_finish()`).
 
+#### plat_psci_ops.pwr_domain_pwr_down_wfi()
+
+This is an optional function and, if implemented, is expected to perform
+platform specific actions including the `wfi` invocation which allows the
+CPU to powerdown. Since this function is invoked outside the PSCI locks,
+the actions performed in this hook must be local to the CPU or the platform
+must ensure that races between multiple CPUs cannot occur.
+
+The `target_state` has a similar meaning as described in the `pwr_domain_off()`
+operation and it encodes the platform coordinated target local power states for
+the CPU power domain and its parent power domain levels. This function must
+not return back to the caller.
+
+If this function is not implemented by the platform, PSCI generic
+implementation invokes `psci_power_down_wfi()` for power down.
+
 #### plat_psci_ops.pwr_domain_on_finish()
 
 This function is called by the PSCI implementation after the calling CPU is
@@ -1637,6 +1847,48 @@ domain level specific local states to suspend to system affinity level. The
 `pwr_domain_suspend()` will be invoked with the coordinated target state to
 enter system suspend.
 
+#### plat_psci_ops.get_pwr_lvl_state_idx()
+
+This is an optional function and, if implemented, is invoked by the PSCI
+implementation to convert the `local_state` (first argument) at a specified
+`pwr_lvl` (second argument) to an index between 0 and
+`PLAT_MAX_PWR_LVL_STATES` - 1. This function is only needed if the platform
+supports more than two local power states at each power domain level, that is
+`PLAT_MAX_PWR_LVL_STATES` is greater than 2, and needs to account for these
+local power states.
+
+#### plat_psci_ops.translate_power_state_by_mpidr()
+
+This is an optional function and, if implemented, verifies the `power_state`
+(second argument) parameter of the PSCI API corresponding to a target power
+domain. The target power domain is identified by using both `MPIDR` (first
+argument) and the power domain level encoded in `power_state`. The power domain
+level specific local states are to be extracted from `power_state` and be
+populated in the `output_state` (third argument) array.  The functionality
+is similar to the `validate_power_state` function described above and is
+envisaged to be used in case the validity of `power_state` depend on the
+targeted power domain. If the `power_state` is invalid for the targeted power
+domain, the platform must return PSCI_E_INVALID_PARAMS as error. If this
+function is not implemented, then the generic implementation relies on
+`validate_power_state` function to translate the `power_state`.
+
+This function can also be used in case the platform wants to support local
+power state encoding for `power_state` parameter of PSCI_STAT_COUNT/RESIDENCY
+APIs as described in Section 5.18 of [PSCI].
+
+#### plat_psci_ops.get_node_hw_state()
+
+This is an optional function. If implemented this function is intended to return
+the power state of a node (identified by the first parameter, the `MPIDR`) in
+the power domain topology (identified by the second parameter, `power_level`),
+as retrieved from a power controller or equivalent component on the platform.
+Upon successful completion, the implementation must map and return the final
+status among `HW_ON`, `HW_OFF` or `HW_STANDBY`. Upon encountering failures, it
+must return either `PSCI_E_INVALID_PARAMS` or `PSCI_E_NOT_SUPPORTED` as
+appropriate.
+
+Implementations are not expected to handle `power_levels` greater than
+`PLAT_MAX_PWR_LVL`.
 
 3.6  Interrupt Management framework (in BL31)
 ----------------------------------------------
@@ -1844,7 +2096,7 @@ they can be invoked without a C Runtime stack.
     Return   : int
 
 This API is used by the crash reporting mechanism to initialize the crash
-console. It should only use the general purpose registers x0 to x2 to do the
+console. It must only use the general purpose registers x0 to x4 to do the
 initialization and returns 1 on success.
 
 ### Function : plat_crash_console_putc
@@ -1853,7 +2105,7 @@ initialization and returns 1 on success.
     Return   : int
 
 This API is used by the crash reporting mechanism to print a character on the
-designated crash console. It should only use general purpose registers x1 and
+designated crash console. It must only use general purpose registers x1 and
 x2 to do its work. The parameter and the return value are in general purpose
 register x0.
 
@@ -1873,9 +2125,10 @@ build system.
 
 *   **NEED_BL33**
     By default, this flag is defined `yes` by the build system and `BL33`
-    build option should be supplied as a build option. The platform has the option
-    of excluding the BL33 image in the `fip` image by defining this flag to
-    `no`.
+    build option should be supplied as a build option. The platform has the
+    option of excluding the BL33 image in the `fip` image by defining this flag
+    to `no`. If any of the options `EL3_PAYLOAD_BASE` or `PRELOADED_BL33_BASE`
+    are used, this flag will be set to `no` automatically.
 
 5.  C Library
 -------------
@@ -1888,12 +2141,12 @@ library only contains those C library definitions required by the local
 implementation. If more functionality is required, the needed library functions
 will need to be added to the local implementation.
 
-Versions of [FreeBSD] headers can be found in `include/stdlib`. Some of these
-headers have been cut down in order to simplify the implementation. In order to
-minimize changes to the header files, the [FreeBSD] layout has been maintained.
-The generic C library definitions can be found in `include/stdlib` with more
-system and machine specific declarations in `include/stdlib/sys` and
-`include/stdlib/machine`.
+Versions of [FreeBSD] headers can be found in `include/lib/stdlib`. Some of
+these headers have been cut down in order to simplify the implementation. In
+order to minimize changes to the header files, the [FreeBSD] layout has been
+maintained. The generic C library definitions can be found in
+`include/lib/stdlib` with more system and machine specific declarations in
+`include/lib/stdlib/sys` and `include/lib/stdlib/machine`.
 
 The local C library implementations can be found in `lib/stdlib`. In order to
 extend the C library these files may need to be modified. It is recommended to
@@ -1967,11 +2220,11 @@ amount of open resources per driver.
 
 - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-_Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved._
+_Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved._
 
 
-[ARM GIC Architecture Specification 2.0]: http://arminfo.emea.arm.com/help/topic/com.arm.doc.ihi0048b/IHI0048B_gic_architecture_specification.pdf
-[ARM GIC Architecture Specification 3.0]: http://arminfo.emea.arm.com/help/topic/com.arm.doc.ihi0069a/IHI0069A_gic_architecture_specification.pdf
+[ARM GIC Architecture Specification 2.0]: http://infocenter.arm.com/help/topic/com.arm.doc.ihi0048b/index.html
+[ARM GIC Architecture Specification 3.0]: http://infocenter.arm.com/help/topic/com.arm.doc.ihi0069b/index.html
 [IMF Design Guide]:                       interrupt-framework-design.md
 [User Guide]:                             user-guide.md
 [FreeBSD]:                                http://www.freebsd.org
@@ -1985,6 +2238,7 @@ _Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved._
 [plat/common/aarch64/platform_up_stack.S]: ../plat/common/aarch64/platform_up_stack.S
 [plat/arm/board/fvp/fvp_pm.c]:             ../plat/arm/board/fvp/fvp_pm.c
 [include/common/bl_common.h]:              ../include/common/bl_common.h
+[include/lib/aarch32/arch.h]:              ../include/lib/aarch32/arch.h
 [include/plat/arm/common/arm_def.h]:       ../include/plat/arm/common/arm_def.h
 [include/plat/common/common_def.h]:        ../include/plat/common/common_def.h
 [include/plat/common/platform.h]:          ../include/plat/common/platform.h

@@ -45,6 +45,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/types.h>
 
 static inline int imax(int a, int b) { return (a > b ? a : b); }
 

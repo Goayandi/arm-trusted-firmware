@@ -220,7 +220,7 @@ unsigned long plat_get_ns_image_entrypoint(void)
 	return BL33_START_ADDRESS;
 }
 
-uint64_t plat_get_syscnt_freq(void)
+unsigned long long plat_get_syscnt_freq(void)
 {
 	uint64_t counter_base_frequency;
 

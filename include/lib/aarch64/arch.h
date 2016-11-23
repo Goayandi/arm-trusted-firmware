@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2015, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -187,6 +187,11 @@
 #define HCR_IMO_BIT		(1 << 4)
 #define HCR_FMO_BIT		(1 << 3)
 
+/* ISR definitions */
+#define ISR_A_SHIFT		8
+#define ISR_I_SHIFT		7
+#define ISR_F_SHIFT		6
+
 /* CNTHCTL_EL2 definitions */
 #define EVNTEN_BIT		(1 << 2)
 #define EL1PCEN_BIT		(1 << 1)
@@ -238,6 +243,9 @@
 #define TCR_EL3_RES1		((1UL << 31) | (1UL << 23))
 #define TCR_EL1_IPS_SHIFT	32
 #define TCR_EL3_PS_SHIFT	16
+
+#define TCR_TxSZ_MIN		16
+#define TCR_TxSZ_MAX		39
 
 /* (internal) physical address size bits in EL3/EL1 */
 #define TCR_PS_BITS_4GB		(0x0)
@@ -330,8 +338,6 @@
 #define CTR_IMINLINE_MASK	0xf
 
 #define MAX_CACHE_LINE_SIZE	0x800 /* 2KB */
-#define SIZE_FROM_LOG2_WORDS(n)	(4 << (n))
-
 
 /* Physical timer control register bit fields shifts and masks */
 #define CNTP_CTL_ENABLE_SHIFT   0
