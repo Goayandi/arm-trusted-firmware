@@ -123,7 +123,9 @@
 #define SLAVE_IF_UNUSED			-1
 
 #if ARM_CCI_PRODUCT_ID == 400
-	#define CCI_SLAVE_INTERFACE_COUNT	5
+	// #define CCI_SLAVE_INTERFACE_COUNT	5
+	// MTK MSCI_A has one more slave port than CCI 400
+	#define CCI_SLAVE_INTERFACE_COUNT	6
 #elif ARM_CCI_PRODUCT_ID == 500
 	#define CCI_SLAVE_INTERFACE_COUNT	7
 #else

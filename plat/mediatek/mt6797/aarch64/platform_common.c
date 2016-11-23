@@ -32,7 +32,7 @@
 #include <arch_helpers.h>
 #include <arm_gic.h>
 #include <bl_common.h>
-#include <cci400.h>
+#include <cci.h>
 #include <debug.h>
 #include <mmio.h>
 #include <platform.h>
@@ -216,8 +216,8 @@ int plat_config_setup(void)
 
 unsigned long plat_get_ns_image_entrypoint(void)
 {
-//	return NS_IMAGE_OFFSET;
-    return BL33_START_ADDRESS;
+	// return NS_IMAGE_OFFSET;
+	return BL33_START_ADDRESS;
 }
 
 uint64_t plat_get_syscnt_freq(void)
@@ -225,8 +225,8 @@ uint64_t plat_get_syscnt_freq(void)
 	uint64_t counter_base_frequency;
 
 	/* Read the frequency from Frequency modes table */
-	//counter_base_frequency = mmio_read_32(SYS_CNTCTL_BASE + CNTFID_OFF);
-    counter_base_frequency = 13000000; //FIXME, 13 MHz
+	// counter_base_frequency = mmio_read_32(SYS_CNTCTL_BASE + CNTFID_OFF);
+	counter_base_frequency = 13000000; //FIXME, 13 MHz
 
 	/* The first entry of the frequency modes table must not be 0 */
 	if (counter_base_frequency == 0)
@@ -235,29 +235,34 @@ uint64_t plat_get_syscnt_freq(void)
 	return counter_base_frequency;
 }
 
+static const int cci_map[] = {
+	4,
+	3,
+	5,
+};
+
 void plat_cci_init(void)
 {
 	/*
 	 * Initialize MCSI-A driver, which is a variant of CCI-400
 	 */
-	if (plat_config.flags & CONFIG_HAS_CCI)
-		mcsi_a_init(CCI400_BASE,
-			CCI400_SL_IFACE3_CLUSTER_IX,
-			CCI400_SL_IFACE4_CLUSTER_IX,
-			CCI400_SL_IFACE5_CLUSTER_IX);
+	cci_init(CCI400_BASE, cci_map, ARRAY_SIZE(cci_map));
 }
 
 void plat_cci_enable(void)
 {
 	/*
-	 * Enable CCI-400 coherency for this cluster. No need
+	 * Enable MCSI-A coherency for this cluster. No need
 	 * for locks as no other cpu is active at the
 	 * moment
 	 */
-	if (plat_config.flags & CONFIG_HAS_CCI) {
-		mcsi_a_enable_cluster_dcm(read_mpidr());
-		cci_enable_cluster_coherency(read_mpidr());
-	}
+	mmio_write_32(CCI400_BASE, (mmio_read_32(CCI400_BASE)|0xffff0000));
+	cci_enable_snoop_dvm_reqs(MPIDR_AFFLVL1_VAL(read_mpidr()));
+}
+
+void plat_cci_disable(void)
+{
+	cci_disable_snoop_dvm_reqs(MPIDR_AFFLVL1_VAL(read_mpidr()));
 }
 
 /*******************************************************************************

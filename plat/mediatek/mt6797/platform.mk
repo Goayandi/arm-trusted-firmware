@@ -28,8 +28,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-MTK_PLAT                :=      plat/mediatek
-MTK_PLAT_SOC            :=      ${MTK_PLAT}/${PLAT}
+MTK_PLAT                :=	plat/mediatek
+MTK_PLAT_SOC            :=	${MTK_PLAT}/${PLAT}
 
 PLAT_INCLUDES		:=	-I${MTK_PLAT_SOC}/include/			\
 				-I${MTK_PLAT_SOC}/				\
@@ -55,7 +55,7 @@ PLAT_BL_COMMON_SOURCES	:=	drivers/io/io_fip.c				\
 				plat/common/cache/plat_cache.c			\
 				plat/common/cache/plat_cache_ops.S
 
-BL31_SOURCES		+=	drivers/arm/cci400/cci400.c			\
+BL31_SOURCES		+=	drivers/arm/cci/cci.c			\
 				drivers/arm/gic/arm_gic.c			\
 				drivers/arm/gic/gic_v2.c			\
 				drivers/arm/gic/gic_v3.c			\

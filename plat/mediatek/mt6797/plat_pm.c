@@ -419,7 +419,8 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 		if (linear_id < 8) {
 			/* move to power_off_big() if (linear_id >= 8) */
 			if (get_plat_config()->flags & CONFIG_HAS_CCI) {
-				cci_disable_cluster_coherency(mpidr);
+				// cci_disable_cluster_coherency(mpidr);
+				plat_cci_disable();
 				printf("%s: cci_disable_cluster_coherency(%d)\n", __FUNCTION__, linear_id);
 			}
 			disable_scu(mpidr);
@@ -476,7 +477,8 @@ void plat_affinst_suspend(unsigned long sec_entrypoint,
 
 		// plat_cluster_pwrdwn_common();
 		if (get_plat_config()->flags & CONFIG_HAS_CCI)
-			cci_disable_cluster_coherency(mpidr);
+			plat_cci_disable();
+			// cci_disable_cluster_coherency(mpidr);
 
 		disable_scu(mpidr);
 

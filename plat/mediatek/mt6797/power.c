@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <mmio.h>
-#include <cci400.h>
+#include <cci.h>
 #include <debug.h>
 #include <assert.h>
 #include "power.h"
@@ -172,9 +172,9 @@ int power_off_big(const unsigned int linear_id){
 	big_on &= ~(1<<(linear_id-8));
 	PRINTF_SPMC("%s big_on:%x\n",__FUNCTION__,big_on);
 
-	//no big core is online, turn off the cluster 3
+	// no big core is online, turn off the cluster 3
 	if (!big_on) {
-		cci_disable_cluster_coherency(0x80000200);
+		cci_disable_snoop_dvm_reqs(MPIDR_AFFLVL1_VAL(0x80000200));
 
 		/* disable_scu(mpidr); */
 		mmio_write_32(0x1022220C, mmio_read_32(0x1022220C) | ACINACTM | (1 << 0));

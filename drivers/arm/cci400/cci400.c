@@ -33,10 +33,9 @@
 #include <cci400.h>
 #include <debug.h>
 #include <mmio.h>
-#include <plat_def.h>
 #include <stdint.h>
 
-#define MAX_CLUSTERS		3
+#define MAX_CLUSTERS		2
 
 static uintptr_t cci_base_addr;
 static unsigned int cci_cluster_ix_to_iface[MAX_CLUSTERS];
@@ -70,39 +69,6 @@ void cci_init(uintptr_t cci_base,
 			SLAVE_IFACE4_OFFSET;
 }
 
-void mcsi_a_init(unsigned long cci_base,
-		int slave_iface3_cluster_ix,
-		int slave_iface4_cluster_ix,
-		int slave_iface5_cluster_ix)
-{
-	/*
-	 * Check the passed arguments are valid. The cluster indices must be
-	 * less than MAX_CLUSTERS, not the same as each other and at least one
-	 * of them must be refer to a valid cluster index.
-	 */
-	assert(cci_base);
-	assert(slave_iface3_cluster_ix < MAX_CLUSTERS);
-	assert(slave_iface4_cluster_ix < MAX_CLUSTERS);
-	assert(slave_iface5_cluster_ix < MAX_CLUSTERS);
-	assert(slave_iface3_cluster_ix != slave_iface4_cluster_ix);
-	assert(slave_iface3_cluster_ix != slave_iface5_cluster_ix);
-	assert(slave_iface4_cluster_ix != slave_iface5_cluster_ix);
-	assert((slave_iface3_cluster_ix >= 0) ||
-		(slave_iface4_cluster_ix >= 0) ||
-		(slave_iface5_cluster_ix >= 0));
-
-	cci_base_addr = cci_base;
-	if (slave_iface3_cluster_ix >= 0)
-		cci_cluster_ix_to_iface[slave_iface3_cluster_ix] =
-			SLAVE_IFACE3_OFFSET;
-	if (slave_iface4_cluster_ix >= 0)
-		cci_cluster_ix_to_iface[slave_iface4_cluster_ix] =
-			SLAVE_IFACE4_OFFSET;
-	if (slave_iface5_cluster_ix >= 0)
-		cci_cluster_ix_to_iface[slave_iface5_cluster_ix] =
-			SLAVE_IFACE5_OFFSET;
-}
-
 static inline unsigned long get_slave_iface_base(unsigned long mpidr)
 {
 	/*
@@ -130,11 +96,6 @@ void cci_enable_cluster_coherency(unsigned long mpidr)
 	/* Wait for the dust to settle down */
 	while (mmio_read_32(cci_base_addr + STATUS_REG) & CHANGE_PENDING_BIT)
 		;
-}
-
-void mcsi_a_enable_cluster_dcm(unsigned long mpidr)
-{
-	mmio_write_32(CCI400_BASE, (mmio_read_32(CCI400_BASE)|0xffff0000));
 }
 
 void cci_disable_cluster_coherency(unsigned long mpidr)

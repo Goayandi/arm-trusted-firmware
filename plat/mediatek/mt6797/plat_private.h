@@ -109,6 +109,7 @@ int plat_config_setup(void);
 
 void plat_cci_init(void);
 void plat_cci_enable(void);
+void plat_cci_disable(void);
 
 /* Declarations for mt_gic.c */
 void gic_cpuif_deactivate(unsigned int);
