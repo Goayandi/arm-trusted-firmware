@@ -40,7 +40,8 @@ PLAT_INCLUDES		:=	-I${MTK_PLAT_SOC}/include/			\
 				-I${MTK_PLAT_SOC}/drivers/idvfs			\
 				-I${MTK_PLAT_SOC}/drivers/ocp			\
 				-I${MTK_PLAT_SOC}/drivers/scp/			\
-				-Iplat/common
+				-Iplat/common					\
+				-Iinclude/plat/arm/common
 
 PLAT_BL_COMMON_SOURCES	:=	drivers/io/io_fip.c				\
 				drivers/io/io_memmap.c				\
@@ -53,12 +54,13 @@ PLAT_BL_COMMON_SOURCES	:=	drivers/io/io_fip.c				\
 				${MTK_PLAT_SOC}/plat_io_storage.c		\
 				plat/common/fiq_smp_call.c                      \
 				plat/common/cache/plat_cache.c			\
-				plat/common/cache/plat_cache_ops.S
+				plat/common/cache/plat_cache_ops.S		\
+				plat/common/plat_gicv2.c			\
 
-BL31_SOURCES		+=	drivers/arm/cci/cci.c			\
-				drivers/arm/gic/arm_gic.c			\
-				drivers/arm/gic/gic_v2.c			\
-				drivers/arm/gic/gic_v3.c			\
+BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
+				drivers/arm/gic/common/gic_common.c			\
+				drivers/arm/gic/v2/gicv2_main.c			\
+				drivers/arm/gic/v2/gicv2_helpers.c			\
 				drivers/arm/tzc400/tzc400.c			\
 				lib/cpus/aarch64/aem_generic.S			\
 				lib/cpus/aarch64/cortex_a53.S			\

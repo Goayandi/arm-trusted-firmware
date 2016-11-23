@@ -631,7 +631,7 @@ static void enable_sgi_fiq(void)
 #endif
 	/* set fiq smp call as fiq */
 	gicd_clr_igroupr(rdist_sgi_base, FIQ_SMP_CALL_SGI);
-	gicd_set_ipriorityr(rdist_sgi_base, FIQ_SMP_CALL_SGI, GIC_HIGHEST_SEC_PRIORITY);
+	gicd_write_ipriorityr(rdist_sgi_base, FIQ_SMP_CALL_SGI, GIC_HIGHEST_SEC_PRIORITY);
 	gicd_set_isenabler(rdist_sgi_base, FIQ_SMP_CALL_SGI);
 }
 
@@ -772,7 +772,7 @@ static void enable_wdt_fiq(void)
 	gicd_clr_igroupr(gicd_base, WDT_IRQ_BIT_ID);
 
 	/* give FIQ the highest priority */
-	gicd_set_ipriorityr(gicd_base, WDT_IRQ_BIT_ID, GIC_HIGHEST_SEC_PRIORITY);
+	gicd_write_ipriorityr(gicd_base, WDT_IRQ_BIT_ID, GIC_HIGHEST_SEC_PRIORITY);
 #if 1
 	/* use 1-N model, means as long as one of N core can handle, this will be handled */
 	gicd_v3_set_irouter(gicd_base, WDT_IRQ_BIT_ID, GICD_V3_IROUTER_SPI_MODE_ANY);
