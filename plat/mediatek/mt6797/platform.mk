@@ -40,6 +40,7 @@ PLAT_INCLUDES		:=	-I${MTK_PLAT_SOC}/include/			\
 				-I${MTK_PLAT_SOC}/drivers/idvfs			\
 				-I${MTK_PLAT_SOC}/drivers/ocp			\
 				-I${MTK_PLAT_SOC}/drivers/scp/			\
+				-I${MTK_PLAT}/common/drivers/uart/		\
 				-Iplat/common					\
 				-Iinclude/plat/arm/common
 
@@ -58,15 +59,17 @@ PLAT_BL_COMMON_SOURCES	:=	drivers/io/io_fip.c				\
 				plat/common/plat_gicv2.c			\
 
 BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
-				drivers/arm/gic/common/gic_common.c			\
+				drivers/console/aarch64/console.S		\
+				drivers/arm/gic/common/gic_common.c		\
 				drivers/arm/gic/v2/gicv2_main.c			\
-				drivers/arm/gic/v2/gicv2_helpers.c			\
+				drivers/arm/gic/v2/gicv2_helpers.c		\
 				drivers/arm/tzc400/tzc400.c			\
 				lib/cpus/aarch64/aem_generic.S			\
 				lib/cpus/aarch64/cortex_a53.S			\
 				lib/cpus/aarch64/cortex_a57.S			\
 				lib/cpus/aarch64/cortex_a72.S			\
 				plat/common/aarch64/platform_mp_stack.S		\
+				${MTK_PLAT}/common/drivers/uart/8250_console.S	\
 				${MTK_PLAT_SOC}/bl31_plat_setup.c		\
 				${MTK_PLAT_SOC}/plat_gic.c			\
 				${MTK_PLAT_SOC}/plat_dfd.c			\
@@ -77,7 +80,6 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				${MTK_PLAT_SOC}/mailbox.c			\
 				${MTK_PLAT_SOC}/aarch64/plat_helpers.S		\
 				${MTK_PLAT_SOC}/aarch64/platform_common.c	\
-				${MTK_PLAT_SOC}/drivers/uart/uart.c		\
 				${MTK_PLAT_SOC}/drivers/timer/mt_cpuxgpt.c	\
 				${MTK_PLAT_SOC}/drivers/pwrc/plat_pwrc.c	\
 				${MTK_PLAT_SOC}/drivers/md/md.c			\

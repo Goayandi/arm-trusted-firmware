@@ -238,51 +238,50 @@ entry_point_info_t *bl31_plat_get_next_kernel32_ep_info(uint32_t type)
 void bl31_early_platform_setup(bl31_params_t *from_bl2,
 				void *plat_params_from_bl2)
 {
-    unsigned long long normal_base;
-    unsigned long long atf_base;
+	unsigned long long normal_base;
+	unsigned long long atf_base;
 
-    config_L2_size();
+	config_L2_size();
 
-    /* copy tee boot argument into ATF structure */
-    memcpy((void *)&gteearg, (void *)(uintptr_t)TEE_BOOT_INFO_ADDR, sizeof(atf_arg_t));
-    atf_arg_t_ptr teearg = &gteearg;
+	/* copy tee boot argument into ATF structure */
+	memcpy((void *)&gteearg, (void *)(uintptr_t)TEE_BOOT_INFO_ADDR, sizeof(atf_arg_t));
+	atf_arg_t_ptr teearg = &gteearg;
 
-    // overwrite core0 reset address, to avoid overwrite tee boot argument
-    mmio_write_32(MP0_MISC_CONFIG_BOOT_ADDR(0), (unsigned long)bl31_on_entrypoint);
+	// overwrite core0 reset address, to avoid overwrite tee boot argument
+	mmio_write_32(MP0_MISC_CONFIG_BOOT_ADDR(0), (unsigned long)bl31_on_entrypoint);
 
-    normal_base = 0;
-    /* in ATF boot time, tiemr for cntpct_el0 is not initialized
-     * so it will not count now.
-     */
-    atf_base = read_cntpct_el0();
-    atf_sched_clock_init(normal_base, atf_base);
+	normal_base = 0;
+	/* in ATF boot time, tiemr for cntpct_el0 is not initialized
+	 * so it will not count now.
+	 */
+	atf_base = read_cntpct_el0();
+	atf_sched_clock_init(normal_base, atf_base);
 
 	/* Initialize the console to provide early debug support */
-	// console_init(UART2_BASE); // without boot argument
-	mtk_console_init(teearg->atf_log_port);
+        console_init(teearg->atf_log_port, MT6797_UART_CLOCK, MT6797_UART_BAUDRATE);
 
 	/*init system counter in ATF but in Kernel*/
 	setup_syscnt();
 
-    printf("BL33 boot argument location=0x%x\n\r", BOOT_ARGUMENT_LOCATION);
-    printf("BL33 boot argument size=0x%x\n\r", BOOT_ARGUMENT_SIZE);
-    printf("BL33 start addr=0x%x\n\r", BL33_START_ADDRESS);
-    printf("teearg addr=0x%x\n\r", TEE_BOOT_INFO_ADDR);
-    printf("atf_magic=0x%x\n\r", teearg->atf_magic);
-    printf("tee_support=0x%x\n\r", teearg->tee_support);
-    printf("tee_entry=0x%x\n\r", teearg->tee_entry);
-    printf("tee_boot_arg_addr=0x%x\n\r", teearg->tee_boot_arg_addr);
-    printf("atf_log_port=0x%x\n\r", teearg->atf_log_port);
-    printf("atf_log_baudrate=0x%x\n\r", teearg->atf_log_baudrate);
-    printf("atf_log_buf_start=0x%x\n\r", teearg->atf_log_buf_start);
-    printf("atf_log_buf_size=0x%x\n\r", teearg->atf_log_buf_size);
-    printf("atf_aee_debug_buf_start=0x%x\n\r", teearg->atf_aee_debug_buf_start);
-    printf("atf_aee_debug_buf_size=0x%x\n\r", teearg->atf_aee_debug_buf_size);
-    printf("atf_irq_num=%d\n\r", teearg->atf_irq_num);
-    printf("BL33_START_ADDRESS=0x%x\n\r", BL33_START_ADDRESS);
+	printf("BL33 boot argument location=0x%x\n\r", BOOT_ARGUMENT_LOCATION);
+	printf("BL33 boot argument size=0x%x\n\r", BOOT_ARGUMENT_SIZE);
+	printf("BL33 start addr=0x%x\n\r", BL33_START_ADDRESS);
+	printf("teearg addr=0x%x\n\r", TEE_BOOT_INFO_ADDR);
+	printf("atf_magic=0x%x\n\r", teearg->atf_magic);
+	printf("tee_support=0x%x\n\r", teearg->tee_support);
+	printf("tee_entry=0x%x\n\r", teearg->tee_entry);
+	printf("tee_boot_arg_addr=0x%x\n\r", teearg->tee_boot_arg_addr);
+	printf("atf_log_port=0x%x\n\r", teearg->atf_log_port);
+	printf("atf_log_baudrate=0x%x\n\r", teearg->atf_log_baudrate);
+	printf("atf_log_buf_start=0x%x\n\r", teearg->atf_log_buf_start);
+	printf("atf_log_buf_size=0x%x\n\r", teearg->atf_log_buf_size);
+	printf("atf_aee_debug_buf_start=0x%x\n\r", teearg->atf_aee_debug_buf_start);
+	printf("atf_aee_debug_buf_size=0x%x\n\r", teearg->atf_aee_debug_buf_size);
+	printf("atf_irq_num=%d\n\r", teearg->atf_irq_num);
+	printf("BL33_START_ADDRESS=0x%x\n\r", BL33_START_ADDRESS);
 
-    printf("atf chip_code[%x]\n", mt_get_chip_hw_code());
-    printf("atf chip_ver[%x]\n", mt_get_chip_sw_ver());
+	printf("atf chip_code[%x]\n", mt_get_chip_hw_code());
+	printf("atf chip_ver[%x]\n", mt_get_chip_sw_ver());
 
 	/* Initialize the platform config for future decision making */
 	plat_config_setup();
@@ -312,13 +311,13 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	bl33_image_ep_info.pc = plat_get_ns_image_entrypoint();
 	bl33_image_ep_info.spsr = plat_get_spsr_for_bl33_entry();
 
-    /*
-     * Pass boot argument to LK
-     * ldr     w4, =pl_boot_argument
-     * ldr     w5, =BOOT_ARGUMENT_SIZE
-     */
-    bl33_image_ep_info.args.arg4=(unsigned long)(uintptr_t)BOOT_ARGUMENT_LOCATION;
-    bl33_image_ep_info.args.arg5=(unsigned long)(uintptr_t)BOOT_ARGUMENT_SIZE;
+	/*
+	 * Pass boot argument to LK
+	 * ldr     w4, =pl_boot_argument
+	 * ldr     w5, =BOOT_ARGUMENT_SIZE
+	 */
+	bl33_image_ep_info.args.arg4=(unsigned long)(uintptr_t)BOOT_ARGUMENT_LOCATION;
+	bl33_image_ep_info.args.arg5=(unsigned long)(uintptr_t)BOOT_ARGUMENT_SIZE;
 	SET_SECURITY_STATE(bl33_image_ep_info.h.attr, NON_SECURE);
 
 #else
@@ -326,7 +325,7 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	 * We are not checking plat_params_from_bl2 as NULL as we are not
 	 * using it on MTK_platform
 	 */
-    printf("not RESET_TO_BL31\n");
+	printf("not RESET_TO_BL31\n");
 
 	assert(from_bl2 != NULL);
 	assert(from_bl2->h.type == PARAM_BL31);

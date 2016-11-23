@@ -285,6 +285,9 @@
 #define UART3_BASE          (IO_PHYS + 0x01005000)
 #define PERICFG_BASE        (IO_PHYS + 0x2000)
 
+#define MT6797_UART_CLOCK		26000000
+#define MT6797_UART_BAUDRATE		921600
+
 /*******************************************************************************
  * TrustZone address space controller related constants
  ******************************************************************************/

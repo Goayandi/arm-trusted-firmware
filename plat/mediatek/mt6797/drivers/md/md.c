@@ -44,9 +44,9 @@
 #include <sip_error.h>
 #include <platform.h>
 #include <mmio.h>
-#include <console.h> //set_uart_flag(), clear_uart_flag();
-#include "plat_private.h"   //for atf_arg_t_ptr
-#include "mt_cpuxgpt.h"
+#include <console.h> 
+#include <plat_private.h>
+#include <mt_cpuxgpt.h>
 #include <emi_drv.h>
 
 
