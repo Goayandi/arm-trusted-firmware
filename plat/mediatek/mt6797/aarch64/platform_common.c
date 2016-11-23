@@ -36,19 +36,9 @@
 #include <debug.h>
 #include <mmio.h>
 #include <platform.h>
-#include <plat_config.h>
 #include <xlat_tables.h>
 #include <plat_def.h>
 #include <plat_private.h>
-
-/*******************************************************************************
- * plat_config holds the characteristics of the differences between the three
- * FVP platforms (Base, A53_A57 & Foundation). It will be populated during cold
- * boot at each boot stage by the primary before enabling the MMU (to allow cci
- * configuration) & used thereafter. Each BL will have its own copy to allow
- * independent operation.
- ******************************************************************************/
-plat_config_t plat_config;
 
 /*
  * Table of regions to map using the MMU.
@@ -137,83 +127,6 @@ const unsigned int num_sec_irqs = sizeof(irq_sec_array) /
 /* Define EL1 and EL3 variants of the function initialising the MMU */
 DEFINE_CONFIGURE_MMU_EL(1)
 DEFINE_CONFIGURE_MMU_EL(3)
-
-/*******************************************************************************
- * A single boot loader stack is expected to work on both the Foundation FVP
- * models and the two flavours of the Base FVP models (AEMv8 & Cortex). The
- * SYS_ID register provides a mechanism for detecting the differences between
- * these platforms. This information is stored in a per-BL array to allow the
- * code to take the correct path.Per BL platform configuration.
- ******************************************************************************/
-int plat_config_setup(void)
-{
-	unsigned int rev, hbi, bld, arch;
-
-    rev = REV_MT;
-    arch = ARCH_MODEL;  //FIXME, bypass this stage
-    bld = BLD_GIC_A53A57_MMAP;  //FIXME, bypass this stage
-    hbi = HBI_MT_BASE;  //FIXME, bypass this stage
-
-	if (arch != ARCH_MODEL) {
-		ERROR("This firmware is for FVP models\n");
-		panic();
-	}
-
-	/*
-	 * The build field in the SYS_ID tells which variant of the GIC
-	 * memory is implemented by the model.
-	 */
-	switch (bld) {
-#if 0
-	case BLD_GIC_VE_MMAP:
-		plat_config.gicd_base = VE_GICD_BASE;
-		plat_config.gicc_base = VE_GICC_BASE;
-		plat_config.gich_base = VE_GICH_BASE;
-		plat_config.gicv_base = VE_GICV_BASE;
-		break;
-#endif
-	case BLD_GIC_A53A57_MMAP:
-		plat_config.gicd_base = BASE_GICD_BASE;
-		plat_config.gicc_base = BASE_GICC_BASE;
-		plat_config.gich_base = BASE_GICH_BASE;
-		plat_config.gicv_base = BASE_GICV_BASE;
-		break;
-	default:
-		ERROR("Unsupported board build %x\n", bld);
-		panic();
-	}
-
-	/*
-	 * The hbi field in the SYS_ID is 0x020 for the Base FVP & 0x010
-	 * for the Foundation FVP.
-	 */
-	switch (hbi) {
-	case HBI_MT_BASE:
-		plat_config.max_aff0 = 4;
-		plat_config.max_aff1 = 2;
-		// 4 cores do not need CCI
-		// 8 cores need CCI only, CONFIG_HAS_CCI
-		plat_config.flags = (CONFIG_BASE_MMAP | CONFIG_HAS_CCI);
-
-		/*
-		 * Check for supported revisions
-		 * Allow future revisions to run but emit warning diagnostic
-		 */
-		switch (rev) {
-		case REV_MT:
-			break;
-		default:
-			WARN("Unrecognized Base FVP revision %x\n", rev);
-			break;
-		}
-		break;
-	default:
-		ERROR("Unsupported board HBI number 0x%x\n", hbi);
-		panic();
-	}
-
-	return 0;
-}
 
 unsigned long plat_get_ns_image_entrypoint(void)
 {

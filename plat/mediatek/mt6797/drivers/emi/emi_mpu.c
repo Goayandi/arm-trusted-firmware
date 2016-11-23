@@ -4,7 +4,6 @@
 #include <debug.h>
 #include <interrupt_mgmt.h>
 #include <platform.h>
-#include <plat_config.h>
 #include <stdint.h>
 #include "plat_def.h"
 #include "plat_private.h"

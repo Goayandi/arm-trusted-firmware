@@ -36,7 +36,6 @@
 #include <gic_v3.h>
 #include <interrupt_mgmt.h>
 #include <platform.h>
-#include <plat_config.h>
 #include <stdint.h>
 #include <fiq_smp_call.h>
 #include "plat_def.h"
@@ -211,7 +210,7 @@ static
 #else
 static
 #endif
- int gic_populate_rdist(unsigned int *rdist_base)
+int gic_populate_rdist(unsigned int *rdist_base)
 {
 	int cpuid = 0;
 	unsigned int reg = 0;
@@ -252,7 +251,7 @@ void gic_dist_save(void)
 	int i;
 
 	/* TODO: pending bit MUST added */
-	dist_base = get_plat_config()->gicd_base;
+	dist_base = BASE_GICD_BASE; // get_plat_config()->gicd_base;
 
 	gic_irqs = 32 * ((gicd_read_typer(dist_base) & IT_LINES_NO_MASK) + 1);
 
@@ -321,7 +320,7 @@ void gic_dist_restore(void)
 	unsigned int rdist_sgi_base;
 	unsigned int i = 0;
 
-	dist_base = get_plat_config()->gicd_base;
+	dist_base = BASE_GICD_BASE; // get_plat_config()->gicd_base;
 	gic_irqs = 32 * ((gicd_read_typer(dist_base) & IT_LINES_NO_MASK) + 1);
 
 	/* get the base of redistributor first */
@@ -516,13 +515,13 @@ void ack_sgi(unsigned int irq)
 
 void mt_atf_trigger_irq()
 {
-    atf_arg_t_ptr teearg = &gteearg;
-    gicd_set_ispendr(get_plat_config()->gicd_base, teearg->atf_irq_num);
+	atf_arg_t_ptr teearg = &gteearg;
+	gicd_set_ispendr(BASE_GICD_BASE, teearg->atf_irq_num);
 }
 
 void mask_wdt_fiq()
 {
-	gicd_set_icenabler(get_plat_config()->gicd_base, WDT_IRQ_BIT_ID);
+	gicd_set_icenabler(BASE_GICD_BASE, WDT_IRQ_BIT_ID);
 }
 
 
@@ -532,7 +531,7 @@ void mask_wdt_fiq()
 //===========================================================================
 void mt_atf_trigger_WDT_FIQ()
 {
-	gicd_set_ispendr(get_plat_config()->gicd_base, WDT_IRQ_BIT_ID);
+	gicd_set_ispendr(BASE_GICD_BASE, WDT_IRQ_BIT_ID);
 }
 
 /*******************************************************************************
@@ -763,7 +762,7 @@ static void enable_wdt_fiq(void)
 {
 	unsigned int gicd_base = 0;
 
-	gicd_base = get_plat_config()->gicd_base;
+	gicd_base = BASE_GICD_BASE; // get_plat_config()->gicd_base;
 
 #ifdef GIC_DEBUG
 	printf("dbase:0x%x\n", gicd_base);
@@ -793,12 +792,12 @@ void gic_setup(void)
 {
 	unsigned int gicd_base = 0;
 
-	gicd_base = get_plat_config()->gicd_base;
+	gicd_base = BASE_GICD_BASE; // get_plat_config()->gicd_base;
 
 	gic_distif_init(gicd_base);
 	gic_cpuif_init();
 #if CFG_MICROTRUST_TEE_SUPPORT
-    teei_gic_setup();
+	teei_gic_setup();
 #endif
 	enable_wdt_fiq();
 }
@@ -914,7 +913,7 @@ uint32_t plat_ic_get_interrupt_type(uint32_t id)
 {
 	uint32_t group;
 
-	group = gicd_get_igroupr(get_plat_config()->gicd_base, id);
+	group = gicd_get_igroupr(BASE_GICD_BASE, id);
 
 	/* Assume that all secure interrupts are S-EL1 interrupts */
 	if (group == GRP0)
@@ -940,7 +939,7 @@ uint64_t mt_irq_dump_status(uint32_t irq)
 		return 0;
 	}
 
-	dist_base = get_plat_config()->gicd_base;
+	dist_base = BASE_GICD_BASE; // get_plat_config()->gicd_base;
 
 	/* get mask */
 	bit = 1 << (irq % 32);

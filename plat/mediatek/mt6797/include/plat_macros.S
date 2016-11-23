@@ -29,8 +29,7 @@
  */
 #include <cci400.h>
 #include <gic_v2.h>
-#include <plat_config.h>
-#include "../plat_def.h"
+#include <plat_def.h>
 
 .section .rodata.gic_reg_name, "aS"
 gic_regs:

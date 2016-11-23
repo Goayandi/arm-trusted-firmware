@@ -284,7 +284,7 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	printf("atf chip_ver[%x]\n", mt_get_chip_sw_ver());
 
 	/* Initialize the platform config for future decision making */
-	plat_config_setup();
+	// plat_config_setup();
 
 #if RESET_TO_BL31
 	/* There are no parameters from BL2 if BL31 is a reset vector */

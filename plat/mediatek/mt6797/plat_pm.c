@@ -36,7 +36,6 @@
 #include <debug.h>
 #include <mmio.h>
 #include <platform.h>
-#include <plat_config.h>
 #include <platform_def.h>
 #include <psci.h>
 #include <errno.h>
@@ -273,6 +272,7 @@ void plat_affinst_standby(unsigned int power_state)
 	 * Enter standby state
 	 * dsb is good practice before using wfi to enter low power states
 	 */
+	INFO("in %s\n", __FUNCTION__);
 	dsb();
 	wfi();
 }
@@ -363,7 +363,6 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 	if (plat_do_plat_actions(afflvl, state) == -EAGAIN)
 		return;
 
-	unsigned int gicc_base;
         unsigned long mpidr = read_mpidr_el1();
 
 	/*
@@ -377,13 +376,8 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 	 * Prevent interrupts from spuriously waking up
 	 * this cpu
 	 */
-	gicc_base = get_plat_config()->gicc_base;
 	gic_rdist_save();
-	// gic_cpuif_deactivate(gicc_base);
 	gic_cpuif_deactivate(BASE_GICC_BASE);
-	printf("%s: gic_cpuif_deactivate\n", __FUNCTION__);
-	printf("%s: gic_cpuif_deactivate, %x\n", __FUNCTION__, gicc_base);
-	printf("%s: gic_cpuif_deactivate, %x\n", __FUNCTION__, BASE_GICC_BASE);
 
 	/*
 	 *
@@ -395,15 +389,6 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 	printf("%s core:%d(callee) disable SPARK-core-side\n",__FUNCTION__, linear_id);
 	// turn off spark2 cpu-side by callee
 	set_cpu_retention_control(0);
-#endif
-#if 0
-	if (afflvl == MPIDR_AFFLVL0) {
-		if (linear_id < 8) {
-			power_off_little(linear_id);
-		} else {
-			power_off_big(linear_id);
-		}
-	}
 #endif
 
 	/*
@@ -418,11 +403,8 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 		 */
 		if (linear_id < 8) {
 			/* move to power_off_big() if (linear_id >= 8) */
-			if (get_plat_config()->flags & CONFIG_HAS_CCI) {
-				// cci_disable_cluster_coherency(mpidr);
-				plat_cci_disable();
-				printf("%s: cci_disable_cluster_coherency(%d)\n", __FUNCTION__, linear_id);
-			}
+			plat_cci_disable();
+			printf("%s: cci_disable_cluster_coherency(%d)\n", __FUNCTION__, linear_id);
 			disable_scu(mpidr);
 			printf("%s: disable_scu(%d)\n", __FUNCTION__, linear_id);
 		}
@@ -473,15 +455,12 @@ void plat_affinst_suspend(unsigned long sec_entrypoint,
 	if (afflvl != MPIDR_AFFLVL0) {
 		/* Perform the common cpu specific operations */
 		// plat_cpu_pwrdwn_common();
-		gic_cpuif_deactivate(get_plat_config()->gicc_base);
-
 		// plat_cluster_pwrdwn_common();
-		if (get_plat_config()->flags & CONFIG_HAS_CCI)
-			plat_cci_disable();
-			// cci_disable_cluster_coherency(mpidr);
+
+		gic_cpuif_deactivate(BASE_GICC_BASE);
+		plat_cci_disable();
 
 		disable_scu(mpidr);
-
 		plat_save_el3_dormant_data();
 		generic_timer_backup();
 		gic_dist_save();
@@ -676,7 +655,6 @@ static void __dead2 plat_system_reset(void)
 	mmio_setbits_32(MTK_WDT_SWRST, MTK_WDT_SWRST_KEY);
 
 	wfi();
-	ERROR("MT6797 System Reset: operation not handled.\n");
 	panic();
 }
 
