@@ -62,7 +62,6 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				drivers/arm/gic/common/gic_common.c		\
 				drivers/arm/gic/v2/gicv2_main.c			\
 				drivers/arm/gic/v2/gicv2_helpers.c		\
-				drivers/arm/tzc400/tzc400.c			\
 				lib/cpus/aarch64/aem_generic.S			\
 				lib/cpus/aarch64/cortex_a53.S			\
 				lib/cpus/aarch64/cortex_a57.S			\
