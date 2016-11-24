@@ -37,6 +37,7 @@
 #include <context_mgmt.h>
 #include <debug.h>
 #include <mmio.h>
+#include <mtk_plat_common.h>
 #include <platform.h>
 #include <plat_pwrc.h>
 #include <plat_def.h>
@@ -95,7 +96,7 @@ static entry_point_info_t bl33_image_ep_info;
 static bl31_params_t *bl2_to_bl31_params;
 #endif
 
-atf_arg_t gteearg;
+struct atf_arg_t gteearg;
 
 /*******************************************************************************
  * Return a pointer to the 'entry_point_info' structure of the next image for the
@@ -260,8 +261,8 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 #define BL33_START_ADDRESS	0x46000000
 
 	/* copy tee boot argument into ATF structure */
-	memcpy((void *)&gteearg, (void *)(uintptr_t)TEE_BOOT_INFO_ADDR, sizeof(atf_arg_t));
-	atf_arg_t_ptr teearg = &gteearg;
+	memcpy((void *)&gteearg, (void *)(uintptr_t)TEE_BOOT_INFO_ADDR, sizeof(struct atf_arg_t));
+	struct atf_arg_t *teearg = &gteearg;
 
 	// overwrite core0 reset address, to avoid overwrite tee boot argument
 	mmio_write_32(MP0_MISC_CONFIG_BOOT_ADDR(0), (unsigned long)bl31_warm_entrypoint);
@@ -274,7 +275,7 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	atf_sched_clock_init(normal_base, atf_base);
 
 	/* Initialize the console to provide early debug support */
-        console_init(teearg->atf_log_port, MT6797_UART_CLOCK, MT6797_UART_BAUDRATE);
+        console_init(teearg->atf_log_port, UART_CLOCK, UART_BAUDRATE);
 
 	/*init system counter in ATF but in Kernel*/
 	setup_syscnt();
@@ -435,7 +436,7 @@ void bl31_plat_arch_setup(void)
 
 	{
 		// atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
-		atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t) &gteearg;
+		struct atf_arg_t *teearg = (struct atf_arg_t *)(uintptr_t) &gteearg;
 		if (teearg->atf_log_buf_size !=0) {
 			printf("mmap atf buffer : 0x%x, 0x%x\n\r", teearg->atf_log_buf_start, teearg->atf_log_buf_size);
 			mmap_add_region((teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), (teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), PAGE_SIZE_2MB, MT_DEVICE | MT_RW | MT_NS);

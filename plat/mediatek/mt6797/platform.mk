@@ -41,6 +41,7 @@ PLAT_INCLUDES		:=	-I${MTK_PLAT_SOC}/include			\
 				-I${MTK_PLAT_SOC}/drivers/pwrc			\
 				-I${MTK_PLAT_SOC}/drivers/scp			\
 				-I${MTK_PLAT_SOC}/drivers/timer			\
+				-I${MTK_PLAT}/common/				\
 				-I${MTK_PLAT}/common/drivers/uart		\
 				-Iplat/common					\
 				-Iinclude/plat/arm/common
@@ -68,6 +69,7 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				lib/cpus/aarch64/cortex_a72.S			\
 				plat/common/aarch64/platform_mp_stack.S		\
 				${MTK_PLAT}/common/drivers/uart/8250_console.S	\
+				${MTK_PLAT}/common/mtk_plat_common.c		\
 				${MTK_PLAT_SOC}/bl31_plat_setup.c		\
 				${MTK_PLAT_SOC}/plat_gic.c			\
 				${MTK_PLAT_SOC}/plat_dfd.c			\
@@ -117,3 +119,7 @@ RESET_TO_BL31		:=	1
 ARM_CCI_PRODUCT_ID	:=	500
 
 BUILD_PLAT		:=	${BUILD_BASE}/${BUILD_TYPE}
+
+MTK_SIP_KERNEL_BOOT_ENABLE	:=	1
+
+$(eval $(call add_define,MTK_SIP_KERNEL_BOOT_ENABLE))

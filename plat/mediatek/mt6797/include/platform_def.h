@@ -356,4 +356,7 @@
 #define PAGE_SIZE_2MB_MASK		(PAGE_SIZE_2MB - 1)
 #define IS_PAGE_2MB_ALIGNED(addr)	(((addr) & PAGE_SIZE_2MB_MASK) == 0)
 
+#define UART_CLOCK              26000000
+#define UART_BAUDRATE           921600
+
 #endif /* __PLATFORM_DEF_H__ */

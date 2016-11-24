@@ -262,31 +262,14 @@
 #define IRQ_SEC_SGI_7			15
 #define IRQ_SEC_SGI_8			16
 
-/*******************************************************************************
- * PL011 related constants
- ******************************************************************************/
-#define PL011_UART0_BASE		0x1c090000
-#define PL011_UART1_BASE		0x1c0a0000
-#define PL011_UART2_BASE		0x1c0b0000
-#define PL011_UART3_BASE		0x1c0c0000
-
-#define PL011_BAUDRATE  115200
-
-#define PL011_UART0_CLK_IN_HZ 24000000
-#define PL011_UART1_CLK_IN_HZ 24000000
-#define PL011_UART2_CLK_IN_HZ 24000000
-#define PL011_UART3_CLK_IN_HZ 24000000
-#define IO_PHYS             (0x10000000)
+#define IO_PHYS			(0x10000000)
 #define PAGE_ADDR_MASK          (0xFFF00000)
 
-#define UART0_BASE          (IO_PHYS + 0x01002000)
-#define UART1_BASE          (IO_PHYS + 0x01003000)
-#define UART2_BASE          (IO_PHYS + 0x01004000)
-#define UART3_BASE          (IO_PHYS + 0x01005000)
-#define PERICFG_BASE        (IO_PHYS + 0x2000)
-
-#define MT6797_UART_CLOCK		26000000
-#define MT6797_UART_BAUDRATE		921600
+#define UART0_BASE		(IO_PHYS + 0x01002000)
+#define UART1_BASE		(IO_PHYS + 0x01003000)
+#define UART2_BASE		(IO_PHYS + 0x01004000)
+#define UART3_BASE		(IO_PHYS + 0x01005000)
+#define PERICFG_BASE		(IO_PHYS + 0x2000)
 
 /*******************************************************************************
  * TrustZone address space controller related constants

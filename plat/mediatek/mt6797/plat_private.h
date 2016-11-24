@@ -59,37 +59,11 @@ typedef struct bl2_to_bl31_params_mem {
 	entry_point_info_t bl31_ep_info;
 } bl2_to_bl31_params_mem_t;
 
-typedef struct {
-    unsigned int atf_magic;
-    unsigned int tee_support;
-    unsigned int tee_entry;
-    unsigned int tee_boot_arg_addr;
-    unsigned int hwuid[4];     // HW Unique id for t-base used
-    unsigned int HRID[2];      // HW random id for t-base used
-    unsigned int atf_log_port;
-    unsigned int atf_log_baudrate;
-    unsigned int atf_log_buf_start;
-    unsigned int atf_log_buf_size;
-    unsigned int atf_irq_num;
-    unsigned int devinfo[DEVINFO_SIZE];
-    unsigned int atf_aee_debug_buf_start;
-    unsigned int atf_aee_debug_buf_size;
-} atf_arg_t, *atf_arg_t_ptr;
-
-struct kernel_info {
-    uint64_t pc;
-    uint64_t r0;
-    uint64_t r1;
-    uint64_t r2;
-    uint64_t k32_64;
-};
-
 /*******************************************************************************
  * Forward declarations
  ******************************************************************************/
 struct meminfo;
 
-extern atf_arg_t gteearg;
 /*******************************************************************************
  * Function and variable prototypes
  ******************************************************************************/

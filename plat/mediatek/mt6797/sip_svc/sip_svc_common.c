@@ -45,10 +45,10 @@
 #include <platform.h>
 #include <mmio.h>
 #include <console.h> //set_uart_flag(), clear_uart_flag();
-#include "plat_private.h"   //for atf_arg_t_ptr
 #include "sip_private.h"
 #include "scp.h"
 #include "mt_cpuxgpt.h"
+#include <mtk_plat_common.h>
 
 #include "mt_idvfs_api.h"
 #include "mt_ocp_api.h"
@@ -59,59 +59,6 @@
 #define ATF_OCP_DREQ 1  // PTP3 OCP + DREQ function
 
 extern void dfd_disable(void);
-
-/*******************************************************************************
- * SIP top level handler for servicing SMCs.
- ******************************************************************************/
-
-static struct kernel_info k_info;
-
-static void save_kernel_info(uint64_t pc, uint64_t r0, uint64_t r1,
-                                                       uint64_t k32_64)
-{
-    k_info.k32_64 = k32_64;
-    k_info.pc=pc;
-
-    if ( LINUX_KERNEL_32 == k32_64 ) {
-        /* for 32 bits kernel */
-        k_info.r0=0;
-        k_info.r1=r0;   /* machtype */
-        k_info.r2=r1;   /* tags */
-    } else {
-        /* for 64 bits kernel */
-        k_info.r0=r0;
-        k_info.r1=r1;
-    }
-}
-
-static void set_kernel_k32_64(uint64_t k32_64)
-{
-    k_info.k32_64 = k32_64;
-}
-
-uint64_t get_kernel_k32_64(void)
-{
-    return k_info.k32_64;
-}
-
-uint64_t get_kernel_info_pc(void)
-{
-    return k_info.pc;
-}
-
-uint64_t get_kernel_info_r0(void)
-{
-    return k_info.r0;
-}
-
-uint64_t get_kernel_info_r1(void)
-{
-    return k_info.r1;
-}
-uint64_t get_kernel_info_r2(void)
-{
-    return k_info.r2;
-}
 
 extern void bl31_prepare_kernel_entry(uint64_t k32_64);
 extern void el3_exit(void);
@@ -163,7 +110,7 @@ uint64_t sip_smc_handler(uint32_t smc_fid,
 {
     uint64_t rc = 0;
     uint32_t ns;
-    atf_arg_t_ptr teearg = &gteearg;
+    struct atf_arg_t *teearg = &gteearg;
 
     /* Determine which security state this SMC originated from */
     ns = is_caller_non_secure(flags);
@@ -191,8 +138,7 @@ uint64_t sip_smc_handler(uint32_t smc_fid,
         break;
     case MTK_SIP_KERNEL_BOOT_AARCH32:
         INFO("save kernel info\n");
-        save_kernel_info(x1, x2, x3, x4);
-        bl31_prepare_kernel_entry(x4);
+        boot_to_kernel(x1, x2, x3, x4);
         INFO("el3_exit\n");
         SMC_RET0(handle);
         break;
@@ -202,7 +148,7 @@ uint64_t sip_smc_handler(uint32_t smc_fid,
 	    break;
     case MTK_SIP_LK_WDT_AARCH32:
     case MTK_SIP_LK_WDT_AARCH64:
-        set_kernel_k32_64(LINUX_KERNEL_32);
+        // set_kernel_k32_64(LINUX_KERNEL_32);
         rc = teearg->atf_aee_debug_buf_start;
         break;
     case MTK_SIP_KERNEL_EMIMPU_WRITE_AARCH32:

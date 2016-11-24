@@ -44,6 +44,8 @@
 #include <stdio.h>
 #include <mt_gic_v3.h>
 
+#include <mtk_plat_common.h>
+
 //#define GIC_DEBUG
 
 #ifndef MAX_GIC_NR
@@ -515,7 +517,7 @@ void ack_sgi(unsigned int irq)
 
 void mt_atf_trigger_irq()
 {
-	atf_arg_t_ptr teearg = &gteearg;
+	struct atf_arg_t *teearg = &gteearg;
 	gicd_set_ispendr(BASE_GICD_BASE, teearg->atf_irq_num);
 }
 

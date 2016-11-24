@@ -34,6 +34,8 @@
 #include <bl_common.h>
 #include <cci.h>
 #include <debug.h>
+
+#include <mtk_plat_common.h>
 #include <mmio.h>
 #include <platform.h>
 #include <xlat_tables.h>
@@ -192,30 +194,9 @@ uint32_t plat_get_spsr_for_bl32_entry(void)
 	return 0;
 }
 
-/*******************************************************************************
- * Gets SPSR for BL33 entry
- ******************************************************************************/
-uint32_t plat_get_spsr_for_bl33_entry(void)
-{
-	unsigned int mode;
-	uint32_t spsr;
-
-	mode = MODE32_svc;
-	/*
-	 * TODO: Consider the possibility of specifying the SPSR in
-	 * the FIP ToC and allowing the platform to have a say as
-	 * well.
-	 */
-//	spsr = SPSR_64(mode, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
-	spsr = SPSR_MODE32 (mode, SPSR_T_ARM, SPSR_E_LITTLE,
-		(DAIF_FIQ_BIT | DAIF_IRQ_BIT | DAIF_ABT_BIT));
-
-	return spsr;
-}
-
 uint32_t get_devinfo_with_index(uint32_t i)
 {
-	atf_arg_t_ptr teearg = &gteearg;
+	struct atf_arg_t *teearg = &gteearg;
 
 	if (i < DEVINFO_SIZE) {
 		return teearg->devinfo[i];
