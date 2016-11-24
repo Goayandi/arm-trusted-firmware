@@ -2,14 +2,13 @@
 #include <assert.h>
 #include <bl_common.h>
 #include <debug.h>
-#include <gic_v2.h>
-#include <gic_v3.h>
 #include <interrupt_mgmt.h>
 #include <platform.h>
 #include <stdint.h>
+#include <stdio.h>  //for printf
+
 #include <platform_def.h>
 #include <fiq_smp_call.h>
-#include <stdio.h>  //for printf
 
 extern void irq_raise_softirq(unsigned int map, unsigned int irq);
 volatile struct call_function_data cfd[PLATFORM_CORE_COUNT];

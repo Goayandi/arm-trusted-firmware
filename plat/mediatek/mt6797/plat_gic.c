@@ -32,9 +32,11 @@
 #include <assert.h>
 #include <bl_common.h>
 #include <debug.h>
-#include <gic_v2.h>
-#include <gic_v3.h>
+#include <gic_common.h>
+#include <gicv2.h>
+#include <gicv3.h>
 #include <interrupt_mgmt.h>
+#include <mmio.h>
 #include <platform.h>
 #include <stdint.h>
 #include <fiq_smp_call.h>
@@ -45,6 +47,11 @@
 #include <mt_gic_v3.h>
 
 #include <mtk_plat_common.h>
+
+static inline unsigned int gicd_read_typer(uintptr_t base)
+{
+        return mmio_read_32(base + GICD_TYPER);
+}
 
 //#define GIC_DEBUG
 
@@ -255,7 +262,7 @@ void gic_dist_save(void)
 	/* TODO: pending bit MUST added */
 	dist_base = BASE_GICD_BASE; // get_plat_config()->gicd_base;
 
-	gic_irqs = 32 * ((gicd_read_typer(dist_base) & IT_LINES_NO_MASK) + 1);
+	gic_irqs = 32 * ((gicd_read_typer(dist_base) & TYPER_IT_LINES_NO_MASK) + 1);
 
 	for (i = 1; i < DIV_ROUND_UP(gic_irqs, 16); i++)
 		gic_data[0].saved_conf[i] =
@@ -323,7 +330,7 @@ void gic_dist_restore(void)
 	unsigned int i = 0;
 
 	dist_base = BASE_GICD_BASE; // get_plat_config()->gicd_base;
-	gic_irqs = 32 * ((gicd_read_typer(dist_base) & IT_LINES_NO_MASK) + 1);
+	gic_irqs = 32 * ((gicd_read_typer(dist_base) & TYPER_IT_LINES_NO_MASK) + 1);
 
 	/* get the base of redistributor first */
 	if (gic_populate_rdist(&rdist_sgi_base) == -1) {
@@ -515,6 +522,14 @@ void ack_sgi(unsigned int irq)
 	gicc_write_eoi0_el1(irq);
 }
 
+extern void gicd_set_ispendr(uintptr_t base, unsigned int id);
+extern void gicd_set_icenabler(uintptr_t base, unsigned int id);
+extern void gicd_write_igroupr(uintptr_t base, unsigned int id, unsigned int val);
+extern void gicd_clr_igroupr(uintptr_t base, unsigned int id);
+extern void gicd_write_ipriorityr(uintptr_t base, unsigned int id, unsigned int val);
+extern void gicd_set_isenabler(uintptr_t base, unsigned int id);
+extern unsigned int gicd_get_igroupr(uintptr_t, unsigned int);
+
 void mt_atf_trigger_irq()
 {
 	struct atf_arg_t *teearg = &gteearg;
@@ -671,11 +686,11 @@ int gic_cpuif_init(void)
 
 	/* enable SRE bit in ICC_SRE_ELx in order */
 	val = read_icc_sre_el3();
-	write_icc_sre_el3(val | ICC_SRE_EN | ICC_SRE_SRE);
+	write_icc_sre_el3(val | ICC_SRE_EN_BIT | ICC_SRE_SRE_BIT);
 	isb(); /* before enable lower SRE, be sure SRE in el3 takes effect */
 
 	val = read_icc_sre_el2();
-	write_icc_sre_el2(val | ICC_SRE_EN | ICC_SRE_SRE);
+	write_icc_sre_el2(val | ICC_SRE_EN_BIT | ICC_SRE_SRE_BIT);
 	isb(); /* before enable lower SRE, be sure SRE in el2 takes effect */
 
 	write_icc_pmr_el1(GIC_PRI_MASK);
@@ -688,7 +703,7 @@ int gic_cpuif_init(void)
 	/* MUST set secure copy of icc_sre_el1 as SRE_SRE to enable FIQ,
 	see GICv3 spec 4.6.4 FIQ Enable */
 	val = read_icc_sre_el1();
-	write_icc_sre_el1(val | ICC_SRE_SRE);
+	write_icc_sre_el1(val | ICC_SRE_SRE_BIT);
 	isb(); /* before we can touch other ICC_* system registers, make sure this have effect */
 
 	/* here we go, can handle FIQ after this */
@@ -918,7 +933,7 @@ uint32_t plat_ic_get_interrupt_type(uint32_t id)
 	group = gicd_get_igroupr(BASE_GICD_BASE, id);
 
 	/* Assume that all secure interrupts are S-EL1 interrupts */
-	if (group == GRP0)
+	if (group == 0)
 		return INTR_TYPE_S_EL1;
 	else
 		return INTR_TYPE_NS;

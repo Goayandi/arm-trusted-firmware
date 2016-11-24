@@ -28,7 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <cci.h>
-#include <gic_v2.h>
+#include <gic_common.h>
+#include <gicv2.h>
 #include <plat_def.h>
 
 .section .rodata.gic_reg_name, "aS"

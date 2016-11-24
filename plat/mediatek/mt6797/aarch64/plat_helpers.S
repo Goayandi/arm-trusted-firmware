@@ -31,10 +31,9 @@
 #include <arch.h>
 #include <asm_macros.S>
 #include <bl_common.h>
-#include <gic_v2.h>
-#include "../plat_def.h"
-#include <pl011.h>
-#include "../drivers/pwrc/plat_pwrc.h"
+#include <gicv2.h>
+#include <plat_def.h>
+#include <plat_pwrc.h>
 
 	.globl	platform_get_entrypoint
 	.globl	plat_secondary_cold_boot_setup
