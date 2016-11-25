@@ -50,7 +50,8 @@ PLAT_BL_COMMON_SOURCES	:=	drivers/io/io_fip.c				\
 				drivers/io/io_memmap.c				\
 				drivers/io/io_semihosting.c			\
 				drivers/io/io_storage.c				\
-				lib/aarch64/xlat_tables.c			\
+				lib/xlat_tables/xlat_tables_common.c		\
+				lib/xlat_tables/aarch64/xlat_tables.c		\
 				lib/semihosting/semihosting.c			\
 				lib/semihosting/aarch64/semihosting_call.S	\
 				plat/common/aarch64/plat_common.c		\

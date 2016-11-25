@@ -359,4 +359,6 @@
 #define UART_CLOCK              26000000
 #define UART_BAUDRATE           921600
 
+#define	SYS_COUNTER_FREQ_IN_TICKS	13000000
+
 #endif /* __PLATFORM_DEF_H__ */

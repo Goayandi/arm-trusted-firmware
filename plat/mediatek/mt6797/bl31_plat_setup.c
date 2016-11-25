@@ -540,3 +540,8 @@ void bl31_prepare_kernel_entry(uint64_t k32_64)
 	cm_init_my_context(next_image_info);
 	cm_prepare_el3_exit(image_type);
 }
+
+unsigned int plat_get_syscnt_freq2(void)
+{
+	return SYS_COUNTER_FREQ_IN_TICKS;
+}
