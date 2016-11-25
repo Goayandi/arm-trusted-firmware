@@ -43,8 +43,8 @@
 #include <plat_private.h>   //for kernel_info and related API
 #include <power.h>
 #include <stddef.h>
-#include <stdio.h>  //for printf
-#include <string.h> /* for memcpy */
+#include <stdio.h>  
+#include <string.h> 
 #include <xlat_tables.h>	// for ATF log implementation, mmap_region_add
 #include "l2c.h"
 #include "mt_cpuxgpt.h" // for atf_sched_clock_init(normal_base, atf_base);
@@ -132,46 +132,44 @@ entry_point_info_t *bl31_plat_get_next_image_ep_info(uint32_t type)
 entry_point_info_t *bl31_plat_get_next_kernel64_ep_info(uint32_t type)
 {
 	entry_point_info_t *next_image_info;
-    unsigned long el_status;
-    unsigned int mode;
+	unsigned long el_status;
+	unsigned int mode;
 
-    el_status = 0;
-    mode = 0;
+	el_status = 0;
+	mode = 0;
 
 	assert(sec_state_is_valid(type));
 
-    next_image_info = (type == NON_SECURE) ?
-		&bl33_image_ep_info :
-		&bl32_image_ep_info;
+	next_image_info = (type == NON_SECURE) ?
+		&bl33_image_ep_info : &bl32_image_ep_info;
 
-    /* Figure out what mode we enter the non-secure world in */
+	/* Figure out what mode we enter the non-secure world in */
 	el_status = read_id_aa64pfr0_el1() >> ID_AA64PFR0_EL2_SHIFT;
 	el_status &= ID_AA64PFR0_ELX_MASK;
 
 	if (el_status){
 		mode = MODE_EL2;
-	} else{
+	} else {
 		mode = MODE_EL1;
-    }
+	}
 
-    printf("K64\n");
-    next_image_info->spsr = SPSR_64(mode, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
+	INFO("Starting K64 kernel\n");
+	next_image_info->spsr = SPSR_64(mode, MODE_SP_ELX, DISABLE_ALL_EXCEPTIONS);
 #ifndef SVP3_ENABLE
-    next_image_info->pc = get_kernel_info_pc();
-    next_image_info->args.arg0=get_kernel_info_r0();
+	next_image_info->pc = get_kernel_info_pc();
+	next_image_info->args.arg0=get_kernel_info_r0();
 #else
-    next_image_info->pc = 0x40000000 + 0x80000;
-    next_image_info->args.arg0= 0x40000000 + 0x300;
+	next_image_info->pc = 0x40000000 + 0x80000;
+	next_image_info->args.arg0= 0x40000000 + 0x300;
 #endif
-    next_image_info->args.arg1=get_kernel_info_r1();
+	next_image_info->args.arg1=get_kernel_info_r1();
 
-    printf("pc=0x%llx, r0=0x%llx, r1=0x%llx\n",
-            (long long unsigned int)next_image_info->pc,
-            (long long unsigned int)next_image_info->args.arg0,
-            (long long unsigned int)next_image_info->args.arg1);
+    	INFO("pc=0x%llx, r0=0x%llx, r1=0x%llx\n",
+		(long long unsigned int)next_image_info->pc,
+		(long long unsigned int)next_image_info->args.arg0,
+		(long long unsigned int)next_image_info->args.arg1);
 
-
-    SET_SECURITY_STATE(next_image_info->h.attr, NON_SECURE);
+	SET_SECURITY_STATE(next_image_info->h.attr, NON_SECURE);
 
 	/* None of the images on this platform can have 0x0 as the entrypoint */
 	if (next_image_info->pc)
@@ -183,40 +181,40 @@ entry_point_info_t *bl31_plat_get_next_kernel64_ep_info(uint32_t type)
 entry_point_info_t *bl31_plat_get_next_kernel32_ep_info(uint32_t type)
 {
 	entry_point_info_t *next_image_info;
-    unsigned int mode;
+	unsigned int mode;
 
-    mode = 0;
-
+	mode = 0;
 	assert(sec_state_is_valid(type));
 
-    next_image_info = (type == NON_SECURE) ?
+	next_image_info = (type == NON_SECURE) ?
 		&bl33_image_ep_info :
 		&bl32_image_ep_info;
 
-    /* Figure out what mode we enter the non-secure world in */
-    mode = MODE32_hyp;
-    /*
-     * TODO: Consider the possibility of specifying the SPSR in
-     * the FIP ToC and allowing the platform to have a say as
-     * well.
-     */
+	/* Figure out what mode we enter the non-secure world in */
+	mode = MODE32_hyp;
 
-    printf("K32\n");
-    next_image_info->spsr = SPSR_MODE32 (mode, SPSR_T_ARM, SPSR_E_LITTLE,
-                            (DAIF_FIQ_BIT | DAIF_IRQ_BIT | DAIF_ABT_BIT));
-    next_image_info->pc = get_kernel_info_pc();
-    next_image_info->args.arg0=get_kernel_info_r0();
-    next_image_info->args.arg1=get_kernel_info_r1();
-    next_image_info->args.arg2=get_kernel_info_r2();
+	/*
+	 * TODO: Consider the possibility of specifying the SPSR in
+	 * the FIP ToC and allowing the platform to have a say as
+	 * well.
+	 */
 
-    printf("pc=0x%llx, r0=0x%llx, r1=0x%llx, r2=0x%llx\n",
-           (long long unsigned int)next_image_info->pc,
-           (long long unsigned int)next_image_info->args.arg0,
-           (long long unsigned int)next_image_info->args.arg1,
-           (long long unsigned int)next_image_info->args.arg2);
+	INFO("Starting K32 kernel\n");
+	next_image_info->spsr = SPSR_MODE32 (mode, SPSR_T_ARM, SPSR_E_LITTLE,
+			(DAIF_FIQ_BIT | DAIF_IRQ_BIT | DAIF_ABT_BIT));
 
+	next_image_info->pc = get_kernel_info_pc();
+	next_image_info->args.arg0=get_kernel_info_r0();
+	next_image_info->args.arg1=get_kernel_info_r1();
+	next_image_info->args.arg2=get_kernel_info_r2();
 
-    SET_SECURITY_STATE(next_image_info->h.attr, NON_SECURE);
+	INFO("pc=0x%llx, r0=0x%llx, r1=0x%llx, r2=0x%llx\n",
+		(long long unsigned int)next_image_info->pc,
+		(long long unsigned int)next_image_info->args.arg0,
+		(long long unsigned int)next_image_info->args.arg1,
+		(long long unsigned int)next_image_info->args.arg2);
+
+	SET_SECURITY_STATE(next_image_info->h.attr, NON_SECURE);
 
 	/* None of the images on this platform can have 0x0 as the entrypoint */
 	if (next_image_info->pc)
@@ -278,25 +276,25 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 
 	/*init system counter in ATF but in Kernel*/
 	setup_syscnt();
-	printf("BL33 boot argument location=0x%x\n\r", BOOT_ARGUMENT_LOCATION);
-	printf("BL33 boot argument size=0x%x\n\r", BOOT_ARGUMENT_SIZE);
-	printf("BL33 start addr=0x%x\n\r", BL33_START_ADDRESS);
-	printf("teearg addr=0x%x\n\r", TEE_BOOT_INFO_ADDR);
-	printf("atf_magic=0x%x\n\r", teearg->atf_magic);
-	printf("tee_support=0x%x\n\r", teearg->tee_support);
-	printf("tee_entry=0x%x\n\r", teearg->tee_entry);
-	printf("tee_boot_arg_addr=0x%x\n\r", teearg->tee_boot_arg_addr);
-	printf("atf_log_port=0x%x\n\r", teearg->atf_log_port);
-	printf("atf_log_baudrate=0x%x\n\r", teearg->atf_log_baudrate);
-	printf("atf_log_buf_start=0x%x\n\r", teearg->atf_log_buf_start);
-	printf("atf_log_buf_size=0x%x\n\r", teearg->atf_log_buf_size);
-	printf("atf_aee_debug_buf_start=0x%x\n\r", teearg->atf_aee_debug_buf_start);
-	printf("atf_aee_debug_buf_size=0x%x\n\r", teearg->atf_aee_debug_buf_size);
-	printf("atf_irq_num=%d\n\r", teearg->atf_irq_num);
-	printf("BL33_START_ADDRESS=0x%x\n\r", BL33_START_ADDRESS);
+	INFO("BL33 boot argument location=0x%x\n\r", BOOT_ARGUMENT_LOCATION);
+	INFO("BL33 boot argument size=0x%x\n\r", BOOT_ARGUMENT_SIZE);
+	INFO("BL33 start addr=0x%x\n\r", BL33_START_ADDRESS);
+	INFO("teearg addr=0x%x\n\r", TEE_BOOT_INFO_ADDR);
+	INFO("atf_magic=0x%x\n\r", teearg->atf_magic);
+	INFO("tee_support=0x%x\n\r", teearg->tee_support);
+	INFO("tee_entry=0x%x\n\r", teearg->tee_entry);
+	INFO("tee_boot_arg_addr=0x%x\n\r", teearg->tee_boot_arg_addr);
+	INFO("atf_log_port=0x%x\n\r", teearg->atf_log_port);
+	INFO("atf_log_baudrate=0x%x\n\r", teearg->atf_log_baudrate);
+	INFO("atf_log_buf_start=0x%x\n\r", teearg->atf_log_buf_start);
+	INFO("atf_log_buf_size=0x%x\n\r", teearg->atf_log_buf_size);
+	INFO("atf_aee_debug_buf_start=0x%x\n\r", teearg->atf_aee_debug_buf_start);
+	INFO("atf_aee_debug_buf_size=0x%x\n\r", teearg->atf_aee_debug_buf_size);
+	INFO("atf_irq_num=%d\n\r", teearg->atf_irq_num);
+	INFO("BL33_START_ADDRESS=0x%x\n\r", BL33_START_ADDRESS);
 
-	printf("atf chip_code[%x]\n", mt_get_chip_hw_code());
-	printf("atf chip_ver[%x]\n", mt_get_chip_sw_ver());
+	INFO("atf chip_code[%x]\n", mt_get_chip_hw_code());
+	INFO("atf chip_ver[%x]\n", mt_get_chip_sw_ver());
 
 #if RESET_TO_BL31
 	/* There are no parameters from BL2 if BL31 is a reset vector */
@@ -337,7 +335,7 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	 * We are not checking plat_params_from_bl2 as NULL as we are not
 	 * using it on MTK_platform
 	 */
-	printf("not RESET_TO_BL31\n");
+	INFO("not RESET_TO_BL31\n");
 
 	assert(from_bl2 != NULL);
 	assert(from_bl2->h.type == PARAM_BL31);
@@ -426,21 +424,21 @@ void bl31_plat_arch_setup(void)
 	/* Enable non-secure access to CCI-400 registers */
 	mmio_write_32(CCI400_BASE + CCI_SEC_ACCESS_OFFSET , 0x1);
 	/* set secondary CPUs to AArch64 */
-	printf("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
+	INFO("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
 	mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | 0x0000E000);
-	printf("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
+	INFO("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
 
 	{
 		// atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;
 		struct atf_arg_t *teearg = (struct atf_arg_t *)(uintptr_t) &gteearg;
 		if (teearg->atf_log_buf_size !=0) {
-			printf("mmap atf buffer : 0x%x, 0x%x\n\r", teearg->atf_log_buf_start, teearg->atf_log_buf_size);
+			INFO("mmap atf buffer : 0x%x, 0x%x\n\r", teearg->atf_log_buf_start, teearg->atf_log_buf_size);
 			mmap_add_region((teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), (teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), PAGE_SIZE_2MB, MT_DEVICE | MT_RW | MT_NS);
-			printf("mmap atf buffer (force 2MB aligned): 0x%x, 0x%x\n\r", (teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), PAGE_SIZE_2MB);
+			INFO("mmap atf buffer (force 2MB aligned): 0x%x, 0x%x\n\r", (teearg->atf_log_buf_start & ~(PAGE_SIZE_2MB_MASK)), PAGE_SIZE_2MB);
 		}
 	}
 
-	printf("###@@@ CPUSYS1 OFF @@@###\n");
+	INFO("###@@@ CPUSYS1 OFF @@@###\n");
 	power_off_little_cl(1);
 
 	// add TZRAM2_BASE to memory map

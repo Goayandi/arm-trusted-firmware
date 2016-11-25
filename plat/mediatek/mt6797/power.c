@@ -16,7 +16,7 @@
 
 #define SPMC_DEBUG	1
 #if SPMC_DEBUG
-#define PRINTF_SPMC	printf
+#define PRINTF_SPMC	INFO
 #else
 void __null_error(const char *fmt, ...) { }
 #define PRINTF_SPMC	__null_error
@@ -32,7 +32,7 @@ void power_off_little_cl(unsigned int cl_idx);
 
 void big_spmc_info()
 {
-	printf("SwSeq SPMC T:0x%X C0:0x%X C1:0x%X\n",
+	PRINTF_SPMC("SwSeq SPMC T:0x%X C0:0x%X C1:0x%X\n",
 		big_spmc_status(0x10), big_spmc_status(0x1), big_spmc_status(0x2));
 }
 
@@ -88,7 +88,7 @@ int power_on_big(const unsigned int linear_id)
 
 	while (!(mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<(7-(linear_id-8))))); //PWR_ON_ACK_CPU0, wait for 1
 	if (!(mmio_read_32(PTP3_CPU0_SPMC + ((linear_id-8)<<2)) & (1<<17)))
-		printf("SPMC and SPM are dismathed\n");
+		PRINTF_SPMC("SPMC and SPM are dismathed\n");
 	while (!(mmio_read_32(PTP3_CPU0_SPMC + ((linear_id-8)<<2)) & (1<<17))); //double check
 	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) | (1<<0);
 	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//Release CPU0_PWR_RST_B
@@ -136,7 +136,7 @@ int power_off_big(const unsigned int linear_id){
 	}
 
 	mmio_write_32(0x10222400, 0x1b);
-	printf("debug monitor 0x10222404=%x\n",mmio_read_32(0x10222404));
+	PRINTF_SPMC("debug monitor 0x10222404=%x\n",mmio_read_32(0x10222404));
 
 	PRINTF_SPMC("Wait CPU%d's WFI\n",linear_id);
 	//SCOTT
@@ -146,7 +146,7 @@ int power_off_big(const unsigned int linear_id){
 	PRINTF_SPMC("CPU%d is in WFI\n", linear_id);
 
 	mmio_write_32(0x10222400, 0x1b);
-	printf("debug monitor 0x10222404=%x\n",mmio_read_32(0x10222404));
+	PRINTF_SPMC("debug monitor 0x10222404=%x\n",mmio_read_32(0x10222404));
 
 #if FPGA
 	tmp = mmio_read_32(PTP3_CPU0_SPMC) | (1<<1);// cpu0_sw_pwr_on _override_en
@@ -219,7 +219,7 @@ pll_retry:
 
 	while (!(mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<17))); //wait PWR_ON_ACK_CA15MCPUTOP, wait for 1
 	if (!(mmio_read_32(PTP3_CPUTOP_SPMC) & (1<<17)))
-		printf("SPMC and SPM are dismatched\n");
+		PRINTF_SPMC("SPMC and SPM are dismatched\n");
 	while (!(mmio_read_32(PTP3_CPUTOP_SPMC) & (1<<17))); //double check
 
 #if 1
@@ -331,7 +331,7 @@ pll_retry:
 	if ((((output > 757500) || (output < 742500)) && (init == 0)) ||
 			(((output > 505000) || (output < 495000)) && (init != 0))) {
 
-		printf("big armpll = %d Khz, retry = %u.\n", output, ++init);
+		PRINTF_SPMC("big armpll = %d Khz, retry = %u.\n", output, ++init);
 		// Step1: Switch Clock Muxed to 26 MHz
 		// try to get HW SEM
 		mmio_write_32(HW_SEM_ENABLE_WORKAROUND_1axxx, 0x0b160001);
@@ -372,9 +372,9 @@ pll_retry:
 	}
 	//try to get HW SEM
 	mmio_write_32(HW_SEM_ENABLE_WORKAROUND_1axxx, 0x0b160001);
-	do{
+	do {
 		mmio_write_32(HW_SEM_WORKAROUND_1axxx, 0x1);
-	}while(! (mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
+	} while(! (mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
 	mmio_write_32(ARMPLL_K1, 0xFFFFFFFF);
 	mmio_write_32(ARMDIV_MON_EN, 0x00000000);
 	udelay(1);
@@ -382,7 +382,6 @@ pll_retry:
 	mmio_write_32(HW_SEM_WORKAROUND_1axxx, 0x1);
 
 #endif
-
 	tmp = mmio_read_32(INFRA_TOPAXI_PROTECTEN1) & ~((1<<2)|(1<<6)|(1<<10));
 	mmio_write_32(INFRA_TOPAXI_PROTECTEN1, tmp);
 	DSB;
@@ -1390,7 +1389,7 @@ void big_spark2_setldo(unsigned int cpu0_amuxsel, unsigned int cpu1_amuxsel){
 	unsigned int tmp;
 	unsigned int sparkvretcntrl = 0x3f;
 
-	PRINTF_SPMC("%s sparkvretcntrl=%x",__FUNCTION__,sparkvretcntrl);
+	PRINTF_SPMC("%s sparkvretcntrl=%x\n", __FUNCTION__, sparkvretcntrl);
 	if (cpu0_amuxsel > 7 || cpu1_amuxsel > 7) {
 		return;
 	}
@@ -1402,7 +1401,7 @@ int big_spark2_core(unsigned int core, unsigned int sw){
 	unsigned int tmp;
 	if (sw>1 || core <8 || core>9)
 		return -1;
-	PRINTF_SPMC("%s core:%d sw:%d\n",__FUNCTION__,core,sw);
+	PRINTF_SPMC("%s core:%d sw:%d\n", __FUNCTION__, core, sw);
 	if (core==9) {
 		tmp = ((mmio_read_32(PTP3_CPU1_SPMC)>>1)<<1) | sw;
 		PRINTF_SPMC("Write %x = %x\n",PTP3_CPU1_SPMC,tmp);
@@ -1421,7 +1420,7 @@ int little_spark2_setldo(unsigned int core)
 		return -1;
 	unsigned long long base_vret;
 	unsigned int offset, tmp, sparkvretcntrl = 0x3f;
-	PRINTF_SPMC("%s sparkvretcntrl=%x",__FUNCTION__,sparkvretcntrl);
+	PRINTF_SPMC("%s sparkvretcntrl=%x\n", __FUNCTION__, sparkvretcntrl);
 	if (core < 4) {
 		offset = core;
 		base_vret = CPUSYS0_SPARKVRETCNTRL;
