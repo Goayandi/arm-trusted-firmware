@@ -34,20 +34,18 @@
 #include <assert.h>
 #include <bakery_lock.h>
 #include <cci.h>
-#include <cortex_a57.h>
 #include <debug.h>
 #include <mmio.h>
 #include <platform.h>
 #include <psci.h>
 #include <errno.h>
 
-#include <scu.h>
 #include <mt_cpuxgpt.h> //  generic_timer_backup()
 #include <plat_def.h>
 #include <plat_private.h>
-#include <plat_pwrc.h>
 #include <platform_def.h>
 #include <power.h>
+#include <scu.h>
 
 extern void dfd_setup(void);
 extern void gic_cpuif_init(void);
@@ -207,35 +205,6 @@ static void plat_program_mailbox(uint64_t mpidr, uint64_t address)
 }
 
 /*******************************************************************************
- * Function which implements the common FVP specific operations to power down a
- * cpu in response to a CPU_OFF or CPU_SUSPEND request.
- ******************************************************************************/
-// static void plat_cpu_pwrdwn_common()
-// {
-// 	/* Prevent interrupts from spuriously waking up this cpu */
-//	arm_gic_cpuif_deactivate();
-//
-// 	/* Program the power controller to power off this cpu. */
-// 	plat_pwrc_write_ppoffr(read_mpidr_el1());
-// }
-
-/*******************************************************************************
- * Function which implements the common FVP specific operations to power down a
- * cluster in response to a CPU_OFF or CPU_SUSPEND request.
- ******************************************************************************/
-// static void plat_cluster_pwrdwn_common()
-// {
-// 	uint64_t mpidr = read_mpidr_el1();
-//
-// 	/* Disable coherency if this cluster is to be turned off */
-// 	if (get_plat_config()->flags & CONFIG_HAS_CCI)
-// 		cci_disable_cluster_coherency(mpidr);
-//
-// 	/* Program the power controller to turn the cluster off */
-// 	plat_pwrc_write_pcoffr(mpidr);
-// }
-
-/*******************************************************************************
  * Private FVP function which is used to determine if any platform actions
  * should be performed for the specified affinity instance given its
  * state. Nothing needs to be done if the 'state' is not off or if this is not
@@ -295,19 +264,7 @@ int32_t plat_affinst_on(uint64_t mpidr,
 	if (afflvl != MPIDR_AFFLVL0)
 		return rc;
 
-	/*
-	 * Ensure that we do not cancel an inflight power off request
-	 * for the target cpu. That would leave it in a zombie wfi.
-	 * Wait for it to power off, program the jump address for the
-	 * target cpu and then program the power controller to turn
-	 * that cpu on
-	 */
-	// do {
-	// 	psysr = plat_pwrc_read_psysr(mpidr);
-	// } while (psysr & PSYSR_AFF_L0);
-
 	plat_program_mailbox(mpidr, sec_entrypoint);
-	// plat_pwrc_write_pponr(mpidr);
 
 	linear_id = platform_get_core_pos(mpidr);
 	extern void bl31_warm_entrypoint(void);
@@ -452,9 +409,6 @@ void plat_affinst_suspend(unsigned long sec_entrypoint,
 	/* Program the jump address for the target cpu */
 	plat_program_mailbox(read_mpidr_el1(), sec_entrypoint);
 
-	/* Program the power controller to enable wakeup interrupts. */
-	// plat_pwrc_set_wen(mpidr);
-
 	/* Perform the common cluster specific operations */
 	if (afflvl != MPIDR_AFFLVL0) {
 		/* Perform the common cpu specific operations */
@@ -491,23 +445,12 @@ void plat_affinst_on_finish(unsigned int afflvl, unsigned int state)
 
 	/* Perform the common cluster specific operations */
 	if (afflvl != MPIDR_AFFLVL0) {
-		/*
-		 * This CPU might have woken up whilst the cluster was
-		 * attempting to power down. In this case the FVP power
-		 * controller will have a pending cluster power off request
-		 * which needs to be cleared by writing to the PPONR register.
-		 * This prevents the power controller from interpreting a
-		 * subsequent entry of this cpu into a simple wfi as a power
-		 * down request.
-		 */
-		// plat_pwrc_write_pponr(mpidr);
-
 		enable_scu(mpidr);
-		printf("%s: enable_scu()\n", __FUNCTION__);
+		INFO("%s: enable_scu()\n", __FUNCTION__);
 
 		/* Enable coherency if this cluster was off */
 		plat_cci_enable();
-		printf("%s: plat_cci_enable()\n", __FUNCTION__);
+		INFO("%s: plat_cci_enable()\n", __FUNCTION__);
 	}
 
 #if SPMC_SPARK2
@@ -531,12 +474,6 @@ void plat_affinst_on_finish(unsigned int afflvl, unsigned int state)
 	 * clear CNTVOFF, for slave cores
 	 */
 	clear_cntvoff(mpidr);
-
-	/*
-	 * Clear PWKUPR.WEN bit to ensure interrupts do not interfere
-	 * with a cpu power down unless the bit is set again
-	 */
-	// plat_pwrc_clr_wen(mpidr);
 
 	/* Zero the jump address in the mailbox for this cpu */
 	plat_program_mailbox(read_mpidr_el1(), 0);
@@ -570,17 +507,6 @@ void plat_affinst_suspend_finish(unsigned int afflvl, unsigned int state)
 		gic_setup();
 		gic_dist_restore();
 		gic_rdist_restore();
-
-		/*
-		 * This CPU might have woken up whilst the cluster was
-		 * attempting to power down. In this case the FVP power
-		 * controller will have a pending cluster power off request
-		 * which needs to be cleared by writing to the PPONR register.
-		 * This prevents the power controller from interpreting a
-		 * subsequent entry of this cpu into a simple wfi as a power
-		 * down request.
-		 */
-		// plat_pwrc_write_pponr(mpidr);
 
 		enable_scu(mpidr);
 
@@ -619,12 +545,6 @@ void plat_affinst_suspend_finish(unsigned int afflvl, unsigned int state)
 	 */
 	clear_cntvoff(mpidr);
 
-	/*
-	 * Clear PWKUPR.WEN bit to ensure interrupts do not interfere
-	 * with a cpu power down unless the bit is set again
-	 */
-	// plat_pwrc_clr_wen(mpidr);
-
 	/* Zero the jump address in the mailbox for this cpu */
 	plat_program_mailbox(read_mpidr_el1(), 0);
 
@@ -642,7 +562,7 @@ static void __dead2 plat_system_off(void)
 	mmio_write_32(VE_SYSREGS_BASE + V2M_SYS_CFGCTRL,
 		CFGCTRL_START | CFGCTRL_RW | CFGCTRL_FUNC(FUNC_SHUTDOWN));
 	wfi();
-	ERROR("FVP System Off: operation not handled.\n");
+	ERROR("MT6797 System Off: operation not handled.\n");
 	panic();
 }
 
@@ -659,6 +579,7 @@ static void __dead2 plat_system_reset(void)
 	mmio_setbits_32(MTK_WDT_SWRST, MTK_WDT_SWRST_KEY);
 
 	wfi();
+	ERROR("MT6797 System Reset: operation not handled.\n");
 	panic();
 }
 

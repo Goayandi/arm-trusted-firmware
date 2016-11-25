@@ -39,7 +39,6 @@
 #include <mmio.h>
 #include <mtk_plat_common.h>
 #include <platform.h>
-#include <plat_pwrc.h>
 #include <plat_def.h>
 #include <plat_private.h>   //for kernel_info and related API
 #include <power.h>
@@ -388,7 +387,7 @@ void bl31_platform_setup(void)
 	mmio_write_32(SYS_TIMCTL_BASE + CNTNSAR, reg_val);
 #endif
 	/* Intialize the power controller */
-	plat_pwrc_setup();
+	// plat_pwrc_setup();
 
 	/* Topologies are best known to the platform. */
 	plat_setup_topology();

@@ -32,7 +32,6 @@
 #include <platform_def.h>
 /* TODO: Reusing psci error codes & state information. Get our own! */
 #include <psci.h>
-#include "drivers/pwrc/plat_pwrc.h"
 
 /* We treat '255' as an invalid affinity instance */
 #define AFFINST_INVAL	0xff

@@ -33,7 +33,6 @@
 #include <bl_common.h>
 #include <gicv2.h>
 #include <plat_def.h>
-#include <plat_pwrc.h>
 
 	.globl	platform_get_entrypoint
 	.globl	plat_secondary_cold_boot_setup
@@ -63,37 +62,7 @@
 	 * -----------------------------------------------------
 	 */
 func plat_secondary_cold_boot_setup
-	/* ---------------------------------------------
-	 * Power down this cpu.
-	 * TODO: Do we need to worry about powering the
-	 * cluster down as well here. That will need
-	 * locks which we won't have unless an elf-
-	 * loader zeroes out the zi section.
-	 * ---------------------------------------------
-	 */
-	mrs	x0, mpidr_el1
-	ldr	x1, =PWRC_BASE
-	str	w0, [x1, #PPOFFR_OFF]
-
-	/* ---------------------------------------------
-	 * Deactivate the gic cpu interface as well
-	 * ---------------------------------------------
-	 */
-	ldr	x0, =VE_GICC_BASE
-	ldr	x1, =BASE_GICC_BASE
-	plat_choose_gicmmap	x0, x1, x2, w2, x1
-	mov	w0, #(IRQ_BYP_DIS_GRP1 | FIQ_BYP_DIS_GRP1)
-	orr	w0, w0, #(IRQ_BYP_DIS_GRP0 | FIQ_BYP_DIS_GRP0)
-	str	w0, [x1, #GICC_CTLR]
-
-	/* ---------------------------------------------
-	 * There is no sane reason to come out of this
-	 * wfi so panic if we do. This cpu will be pow-
-	 * ered on and reset by the cpu_on pm api
-	 * ---------------------------------------------
-	 */
-	dsb	sy
-	wfi
+	/* MT6797 does not do cold boot for secondary CPU */
 cb_panic:
 	b	cb_panic
 endfunc plat_secondary_cold_boot_setup

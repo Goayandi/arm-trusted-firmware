@@ -38,7 +38,6 @@ PLAT_INCLUDES		:=	-I${MTK_PLAT_SOC}/include			\
 				-I${MTK_PLAT_SOC}/drivers/idvfs			\
 				-I${MTK_PLAT_SOC}/drivers/l2c			\
 				-I${MTK_PLAT_SOC}/drivers/ocp			\
-				-I${MTK_PLAT_SOC}/drivers/pwrc			\
 				-I${MTK_PLAT_SOC}/drivers/scp			\
 				-I${MTK_PLAT_SOC}/drivers/timer			\
 				-I${MTK_PLAT}/common/				\
@@ -76,7 +75,6 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				${MTK_PLAT_SOC}/debug/cache/plat_cache.c	\
 				${MTK_PLAT_SOC}/debug/cache/plat_cache_ops.S	\
 				${MTK_PLAT_SOC}/drivers/timer/mt_cpuxgpt.c	\
-				${MTK_PLAT_SOC}/drivers/pwrc/plat_pwrc.c	\
 				${MTK_PLAT_SOC}/drivers/l2c/l2c.c		\
 				${MTK_PLAT_SOC}/drivers/emi/emi_mpu.c		\
 				${MTK_PLAT_SOC}/drivers/idvfs/mt_idvfs_api.c	\
