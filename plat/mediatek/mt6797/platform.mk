@@ -46,16 +46,9 @@ PLAT_INCLUDES		:=	-I${MTK_PLAT_SOC}/include			\
 				-Iplat/common					\
 				-Iinclude/plat/arm/common
 
-PLAT_BL_COMMON_SOURCES	:=	drivers/io/io_fip.c				\
-				drivers/io/io_memmap.c				\
-				drivers/io/io_semihosting.c			\
-				drivers/io/io_storage.c				\
-				lib/xlat_tables/xlat_tables_common.c		\
+PLAT_BL_COMMON_SOURCES	:=	lib/xlat_tables/xlat_tables_common.c		\
 				lib/xlat_tables/aarch64/xlat_tables.c		\
-				lib/semihosting/semihosting.c			\
-				lib/semihosting/aarch64/semihosting_call.S	\
 				plat/common/aarch64/plat_common.c		\
-				${MTK_PLAT_SOC}/plat_io_storage.c		\
 				plat/common/plat_gicv2.c			\
 
 BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
@@ -85,7 +78,6 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				${MTK_PLAT_SOC}/debug/cache/plat_cache_ops.S	\
 				${MTK_PLAT_SOC}/drivers/timer/mt_cpuxgpt.c	\
 				${MTK_PLAT_SOC}/drivers/pwrc/plat_pwrc.c	\
-				${MTK_PLAT_SOC}/drivers/md/md.c			\
 				${MTK_PLAT_SOC}/drivers/l2c/l2c.c		\
 				${MTK_PLAT_SOC}/drivers/emi/emi_mpu.c		\
 				${MTK_PLAT_SOC}/drivers/idvfs/mt_idvfs_api.c	\
