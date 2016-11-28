@@ -276,7 +276,6 @@ int32_t plat_affinst_on(uint64_t mpidr,
 #else
 		rc = power_on_big(linear_id);
 #endif
-		INFO("Yes, rc = %d\n", rc);
 		return rc;
 	} else if (linear_id >= 4) {
 		if (!(little_on & 0xF0)){
@@ -654,7 +653,6 @@ int platform_pwr_domain_on(u_register_t mpidr)
 #else
 		rc = power_on_big(linear_id);
 #endif
-		INFO("Yes, rc = %d\n", rc);
 		return rc;
 	} else if (linear_id >= 4) {
 		if (!(little_on & 0xF0)) {
@@ -683,6 +681,43 @@ int platform_pwr_domain_on(u_register_t mpidr)
 
 void platform_pwr_domain_off(const psci_power_state_t *state)
 {
+        unsigned long mpidr = read_mpidr_el1();
+
+	/*
+	 * Prevent interrupts from spuriously waking up
+	 * this cpu
+	 */
+	gic_rdist_save();
+	gic_cpuif_deactivate(BASE_GICC_BASE);
+
+	/*
+	 *
+	 */
+	unsigned int linear_id = plat_core_pos_by_mpidr(mpidr);
+	pend_off = linear_id;
+
+#if SPMC_SPARK2
+	INFO("%s core:%d(callee) disable SPARK-core-side\n",__FUNCTION__, linear_id);
+	// turn off spark2 cpu-side by callee
+	set_cpu_retention_control(0);
+#endif
+
+	/*
+	 * Perform cluster power down
+	 */
+	if (MTK_CLUSTER_PWR_STATE(state) == MTK_LOCAL_STATE_OFF) {
+		/*
+		 * Disable coherency if this cluster is to be
+		 * turned off
+		 */
+		if (linear_id < 8) {
+			/* move to power_off_big() if (linear_id >= 8) */
+			plat_cci_disable();
+			INFO("%s: cci_disable_cluster_coherency(%d)\n", __FUNCTION__, linear_id);
+			disable_scu(mpidr);
+			INFO("%s: disable_scu(%d)\n", __FUNCTION__, linear_id);
+		}
+	}
 }
 
 void platform_pwr_domain_suspend(const psci_power_state_t *state)
@@ -895,6 +930,10 @@ int platform_validate_ns_entrypoint(uintptr_t entrypoint)
 
 void platform_get_sys_suspend_power_state(psci_power_state_t *req_state)
 {
+	assert(PLAT_MAX_PWR_LVL >= 2);
+
+	for (int i = MPIDR_AFFLVL0; i <= PLAT_MAX_PWR_LVL; i++)
+		req_state->pwr_domain_state[i] = MTK_LOCAL_STATE_OFF;
 }
 
 /*******************************************************************************
