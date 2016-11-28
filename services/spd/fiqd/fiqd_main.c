@@ -180,7 +180,7 @@ int32_t fiqd_setup(void)
 	uint64_t mpidr = read_mpidr();
 	uint32_t linear_id;
 
-	linear_id = platform_get_core_pos(mpidr);
+	linear_id = plat_core_pos_by_mpidr(mpidr);
 
 	/*
 	 * Get information about the Secure Payload (BL32) image. Its

@@ -191,7 +191,7 @@ int power_on_cl3(void)
 	unsigned int init = 0;
 	// unsigned long i;
 
-	int caller = platform_get_core_pos(read_mpidr_el1());
+	int caller = plat_core_pos_by_mpidr(read_mpidr_el1());
 	// flush_dcache_range(0x10222000,0x1000);
 	PRINTF_SPMC("%s before top:%x c0:%x c1:%x\n",__FUNCTION__, big_spmc_status(0x10), big_spmc_status(0x01),big_spmc_status(0x02));
 	// This part was moved to kernel
@@ -410,7 +410,7 @@ int power_off_cl3(void)
 {
 	PRINTF_SPMC("%s\n",__FUNCTION__);
 	unsigned int tmp, mask;
-	int caller = platform_get_core_pos(read_mpidr_el1());
+	int caller = plat_core_pos_by_mpidr(read_mpidr_el1());
 	tmp = (mmio_read_32(MP2_SNOOP_CTRL) & ~0x3) | ((caller+1)<<4);
 	mmio_write_32(MP2_SNOOP_CTRL, tmp);
 	while(mmio_read_32(MP2_SNOOP_STATUS) & 1); //wait to 0

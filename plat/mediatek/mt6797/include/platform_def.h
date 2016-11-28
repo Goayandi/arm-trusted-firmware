@@ -361,4 +361,19 @@
 
 #define	SYS_COUNTER_FREQ_IN_TICKS	13000000
 
+#if !ENABLE_PLAT_COMPAT
+#define PLAT_MAX_OFF_STATE	2
+#define PLAT_MAX_RET_STATE	1
+#define PLAT_MAX_PWR_LVL	PLAT_MAX_OFF_STATE
+
+/* Local power state for power domains in Run state. */
+#define MTK_LOCAL_STATE_RUN     0
+/* Local power state for retention. Valid only for CPU power domains */
+#define MTK_LOCAL_STATE_RET     1
+/* Local power state for OFF/power-down. Valid for CPU and cluster power
+   domains */
+#define MTK_LOCAL_STATE_OFF     2
+#else
+#endif
+
 #endif /* __PLATFORM_DEF_H__ */

@@ -355,9 +355,7 @@ void bl31_platform_setup(void)
 {
 //	unsigned int reg_val;
 
-	/* Initialize the gic cpu and distributor interfaces */
 	dfd_setup();
-	gic_setup();
 
 #if 0   //do not init CLCD in ATF
 	/*
@@ -387,8 +385,12 @@ void bl31_platform_setup(void)
 	/* Intialize the power controller */
 	// plat_pwrc_setup();
 
+#if ENABLE_PLAT_COMPAT
 	/* Topologies are best known to the platform. */
 	plat_setup_topology();
+#endif
+	/* Initialize the gic cpu and distributor interfaces */
+	gic_setup();
 
 	/* */
 #if SPMC_SPARK2
@@ -538,4 +540,8 @@ void bl31_prepare_kernel_entry(uint64_t k32_64)
 unsigned int plat_get_syscnt_freq2(void)
 {
 	return SYS_COUNTER_FREQ_IN_TICKS;
+}
+
+void bl31_plat_runtime_setup(void)
+{
 }

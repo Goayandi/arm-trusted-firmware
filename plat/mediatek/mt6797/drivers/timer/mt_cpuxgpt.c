@@ -34,12 +34,14 @@
  * Software") have been modified by MediaTek Inc. All revisions are subject to
  * any receiver's applicable license agreements with MediaTek Inc.
  */
+#include <arch_helpers.h>
+#include <debug.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <arch_helpers.h>
-#include "typedefs.h"
-#include "platform.h"
-#include "mt_cpuxgpt.h"
+
+#include <typedefs.h>
+#include <platform.h>
+#include <mt_cpuxgpt.h>
 
 #define CPUXGPT_BASE 	0x10220000
 #define INDEX_BASE  	(CPUXGPT_BASE+0x0674)
@@ -103,7 +105,7 @@ static void enable_cpuxgpt(void)
 	tmp |= EN_CPUXGPT;
 	__write_cpuxgpt(INDEX_CTL_REG, tmp);
 
-	printf("CPUxGPT reg(%x)\n", __read_cpuxgpt(INDEX_CTL_REG));
+	INFO("CPUxGPT reg(%x)\n", __read_cpuxgpt(INDEX_CTL_REG));
 }
 
 /*

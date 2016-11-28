@@ -67,7 +67,7 @@ void fiq_icc_isr(void)
 	printf("inter-cpu-call interrupt is triggered\n");
 
 	mpidr = read_mpidr();
-	cpu = platform_get_core_pos(mpidr);
+	cpu = plat_core_pos_by_mpidr(mpidr);
 
 	if ((cfd[cpu].func != NULL) && (cfd[cpu].lock == 1)) {
 		cfd[cpu].func(cfd[cpu].info);

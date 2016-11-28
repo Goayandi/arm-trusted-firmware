@@ -39,6 +39,11 @@
 	.globl	platform_mem_init
 	.globl	plat_report_exception
 	.globl	platform_is_primary_cpu
+#if !ENABLE_PLAT_COMPAT
+	.globl 	plat_is_my_cpu_primary
+	.globl	plat_get_my_entrypoint
+	.globl 	plat_my_core_pos
+#endif
 	.globl	plat_crash_console_init
 	.globl	plat_crash_console_putc
 
@@ -89,22 +94,6 @@ endfunc plat_secondary_cold_boot_setup
 	 * -----------------------------------------------------
 	 */
 
-/*
-func platform_get_entrypoint
-	mov	x9, x30 // lr
-	mov	x2, x0
-	ldr	x1, =PWRC_BASE
-	str	w2, [x1, #PSYSR_OFF]
-	ldr	w2, [x1, #PSYSR_OFF]
-	ubfx	w2, w2, #PSYSR_WK_SHIFT, #PSYSR_WK_MASK
-	cmp	w2, #WKUP_PPONR
-	beq	warm_reset
-	cmp	w2, #WKUP_GICREQ
-	beq	warm_reset
-	mov	x0, #0
-	b	exit
-*/
-
 func platform_get_entrypoint
 	mov	x9, x30 // lr
 
@@ -138,6 +127,12 @@ exit:
 _panic:	b	_panic
 endfunc platform_get_entrypoint
 
+#if !ENALBE_PLAT_COMPAT
+func plat_get_my_entrypoint
+        mrs     x0, mpidr_el1
+        b       platform_get_entrypoint
+endfunc plat_get_my_entrypoint
+#endif
 
 	/* -----------------------------------------------------
 	 * void platform_mem_init (void);
@@ -248,7 +243,6 @@ func write_cpuectlr
 	ret
 endfunc write_cpuectlr
 
-
 func platform_is_primary_cpu
 	and	x0, x0, #(MPIDR_CLUSTER_MASK | MPIDR_CPU_MASK)
 	cmp	x0, #FVP_PRIMARY_CPU
@@ -256,6 +250,24 @@ func platform_is_primary_cpu
 	ret
 endfunc platform_is_primary_cpu
 
+#if !ENABLE_PLAT_COMPAT
+func plat_is_my_cpu_primary
+	mrs     x0, mpidr_el1
+	b       platform_is_primary_cpu
+endfunc plat_is_my_cpu_primary
+
+func plat_my_core_pos
+	mrs     x0, mpidr_el1
+	b       platform_get_core_pos
+endfunc plat_my_core_pos
+
+func platform_get_core_pos
+	and     x1, x0, #MPIDR_CPU_MASK
+	and     x0, x0, #MPIDR_CLUSTER_MASK
+	add     x0, x1, x0, LSR #6
+	ret
+endfunc platform_get_core_pos
+#endif
 	.data
 first_boot:
 	.long	0x1

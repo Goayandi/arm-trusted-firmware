@@ -225,7 +225,7 @@ int gic_populate_rdist(unsigned int *rdist_base)
 	unsigned int reg = 0;
 	unsigned int base = 0;
 
-	cpuid = platform_get_core_pos(read_mpidr());
+	cpuid = plat_core_pos_by_mpidr(read_mpidr());
 	reg = gicd_v3_read_pidr2(MT_GIC_BASE) & GIC_V3_PIDR2_ARCH_MASK;
 
 	if ((reg != GIC_V3_PIDR2_ARCH_GICv3) && (reg != GIC_V3_PIDR2_ARCH_GICv4)) {
@@ -317,7 +317,7 @@ void gic_rdist_save(void)
 	gic_data[0].saved_group[0] = mmio_read_32(rdist_base + GICD_IGROUPR);
 	gic_data[0].saved_grpmod[0] = mmio_read_32(rdist_base + GICE_V3_IGRPMOD0);
 
-	rdist_has_saved[platform_get_core_pos(read_mpidr())] = 1;
+	rdist_has_saved[plat_core_pos_by_mpidr(read_mpidr())] = 1;
 }
 
 /* TODO: check all registers to restore */
@@ -388,7 +388,7 @@ void gic_rdist_restore(void)
 {
 	unsigned int rdist_sgi_base;
 
-	if (rdist_has_saved[platform_get_core_pos(read_mpidr())] == 0)
+	if (rdist_has_saved[plat_core_pos_by_mpidr(read_mpidr())] == 0)
 		return;
 
 	/* get the base of redistributor first */
@@ -721,7 +721,7 @@ int gic_cpuif_init(void)
 
 	/* init mpidr table for this cpu for later sgi usage */
 	mpidr = read_mpidr();
-	cpu = platform_get_core_pos(mpidr);
+	cpu = plat_core_pos_by_mpidr(mpidr);
 	if (cpu < PLATFORM_CORE_COUNT)
 		cpu_logical_map[cpu] = mpidr;
 
@@ -1031,7 +1031,7 @@ uint64_t mt_irq_dump_status(uint32_t irq)
 
 int mt_fiq_smp_call_function(inter_cpu_call_func_t func, void *info, int wait)
 {
-	uint8_t cpuid = platform_get_core_pos(read_mpidr());
+	uint8_t cpuid = plat_core_pos_by_mpidr(read_mpidr());
 
 	/* ask all cores except current one to do 'func' */
 	return fiq_smp_call_function(0x3ff & (~(1<<cpuid)), func, info, wait);

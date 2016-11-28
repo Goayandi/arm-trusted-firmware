@@ -55,7 +55,7 @@ extern void gic_rdist_restore(void);
 unsigned long g_dormant_log_base = 0;
 void dormant_log(int tag)
 {
-        int cpuid = platform_get_core_pos(read_mpidr());
+        int cpuid = plat_core_pos_by_mpidr(read_mpidr());
 
         if (g_dormant_log_base == 0)
                 return;
@@ -197,13 +197,14 @@ static void plat_program_mailbox(uint64_t mpidr, uint64_t address)
 	uint64_t linear_id;
 	mailbox_t *plat_mboxes;
 
-	linear_id = platform_get_core_pos(mpidr);
+	linear_id = plat_core_pos_by_mpidr(mpidr);
 	plat_mboxes = (mailbox_t *)MBOX_BASE;
 	plat_mboxes[linear_id].value = address;
 	flush_dcache_range((unsigned long) &plat_mboxes[linear_id],
 			   sizeof(unsigned long));
 }
 
+#if	ENABLE_PLAT_COMPAT
 /*******************************************************************************
  * Private FVP function which is used to determine if any platform actions
  * should be performed for the specified affinity instance given its
@@ -266,7 +267,7 @@ int32_t plat_affinst_on(uint64_t mpidr,
 
 	plat_program_mailbox(mpidr, sec_entrypoint);
 
-	linear_id = platform_get_core_pos(mpidr);
+	linear_id = plat_core_pos_by_mpidr(mpidr);
 	extern void bl31_warm_entrypoint(void);
 
 	if (linear_id >= 8) {
@@ -343,7 +344,7 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 	/*
 	 *
 	 */
-	unsigned int linear_id = platform_get_core_pos(mpidr);
+	unsigned int linear_id = plat_core_pos_by_mpidr(mpidr);
 	pend_off = linear_id;
 
 #if SPMC_SPARK2
@@ -398,7 +399,7 @@ void plat_affinst_suspend(unsigned long sec_entrypoint,
 #if SPMC_SPARK2
 	uint64_t linear_id;
 
-	linear_id = platform_get_core_pos(mpidr);
+	linear_id = plat_core_pos_by_mpidr(mpidr);
 
 	set_cpu_retention_control(0);
 
@@ -521,7 +522,7 @@ void plat_affinst_suspend_finish(unsigned int afflvl, unsigned int state)
 #if SPMC_SPARK2
 	uint64_t linear_id;
 
-	linear_id = platform_get_core_pos(mpidr);
+	linear_id = plat_core_pos_by_mpidr(mpidr);
 	little_spark2_setldo(linear_id);
 	little_spark2_core(linear_id, 1);
 
@@ -605,3 +606,251 @@ int platform_setup_pm(const plat_pm_ops_t **plat_ops)
 	*plat_ops = &plat_plat_pm_ops;
 	return 0;
 }
+#else
+
+#define	MTK_PWR_LVL0	0
+#define	MTK_PWR_LVL1	1
+#define	MTK_PWR_LVL2	2
+
+/* Macros to read the MTK power domain state */
+#define	MTK_CORE_PWR_STATE(state)	(state)->pwr_domain_state[MTK_PWR_LVL0]
+#define	MTK_CLUSTER_PWR_STATE(state)	(state)->pwr_domain_state[MTK_PWR_LVL1]
+#define	MTK_SYSTEM_PWR_STATE(state)	((PLAT_MAX_PWR_LVL > MTK_PWR_LVL1) ? \
+				 (state)->pwr_domain_state[MTK_PWR_LVL2] : 0)
+
+extern void gic_dist_save(void);
+extern void gic_dist_restore(void);
+
+void platform_cpu_standby(plat_local_state_t cpu_state)
+{
+#if 0
+	unsigned int scr;
+
+	scr = read_scr_el3();
+	write_scr_el3(scr | SCR_IRQ_BIT);
+	isb();
+	dsb();
+	wfi();
+	write_scr_el3(scr);
+#endif
+}
+
+static uintptr_t secure_entrypoint;
+int platform_pwr_domain_on(u_register_t mpidr)
+{
+	int rc = PSCI_E_SUCCESS;
+	unsigned long linear_id;
+
+	plat_program_mailbox(mpidr, secure_entrypoint);
+
+	linear_id = plat_core_pos_by_mpidr(mpidr);
+	extern void bl31_warm_entrypoint(void);
+
+	if (linear_id >= 8) {
+#if SPMC_SW_MODE
+		rc  = big_spmc_sw_pwr_on(1<<(linear_id-8));
+#else
+		rc = power_on_big(linear_id);
+#endif
+		printf("Yes, rc = %d\n", rc);
+		return rc;
+	} else if (linear_id >= 4) {
+		if(!(little_on & 0xF0)){
+			printf("Enable CPUSYS1\n");
+			power_on_little_cl(1);
+		}
+		mmio_write_32(MP1_MISC_CONFIG3, mmio_read_32(MP1_MISC_CONFIG3) | 0x0000F000);
+		mmio_write_32(MP1_MISC_CONFIG_BOOT_ADDR(linear_id-4), (unsigned long) bl31_warm_entrypoint);
+		printf("mt_on_1, entry %x\n", mmio_read_32(MP1_MISC_CONFIG_BOOT_ADDR(linear_id-4)));
+	} else {
+		if (!(little_on & 0x0F)) {
+			printf("Enable CPUSYS0\n");
+			power_on_little_cl(0);
+		}
+		mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | 0x0000F000);
+		mmio_write_32(MP0_MISC_CONFIG_BOOT_ADDR(linear_id), (unsigned long) bl31_warm_entrypoint);
+		INFO("mt_on_0, entry %x\n", mmio_read_32(MP0_MISC_CONFIG_BOOT_ADDR(linear_id)));
+	}
+
+	/* control CPU power */
+	INFO("... power on CPU%ld ...\n", linear_id);
+	power_on_little(linear_id);
+
+	return rc;
+}
+
+void platform_pwr_domain_off(const psci_power_state_t *state)
+{
+}
+
+void platform_pwr_domain_suspend(const psci_power_state_t *state)
+{
+
+	mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | (1<<12));
+
+        unsigned long mpidr = read_mpidr_el1();
+#if SPMC_SPARK2
+	uint64_t linear_id;
+
+	linear_id = plat_core_pos_by_mpidr(mpidr);
+
+	set_cpu_retention_control(0);
+
+	little_spark2_core(linear_id, 0);
+	while(mmio_read_32(SPM_CPU_RET_STATUS) & (1 << linear_id));
+#endif
+
+	/* Program the jump address for the target cpu */
+	plat_program_mailbox(read_mpidr_el1(), secure_entrypoint);
+
+	/* Perform the common cluster specific operations */
+	// if (afflvl != MPIDR_AFFLVL0) {
+	if ((MTK_CLUSTER_PWR_STATE(state) == MTK_LOCAL_STATE_OFF) ||
+		(MTK_SYSTEM_PWR_STATE(state) == MTK_LOCAL_STATE_OFF)) {
+
+		gic_cpuif_deactivate(BASE_GICC_BASE);
+		plat_cci_disable();
+
+		disable_scu(mpidr);
+		plat_save_el3_dormant_data();
+		generic_timer_backup();
+		gic_dist_save();
+		gic_rdist_save();
+	}
+
+	return;
+}
+
+void platform_pwr_domain_on_finish(const psci_power_state_t *target_state)
+{
+}
+
+void platform_pwr_domain_suspend_finish(const psci_power_state_t *state)
+{
+	unsigned long mpidr = read_mpidr_el1();
+
+	if ((MTK_CLUSTER_PWR_STATE(state) == MTK_LOCAL_STATE_OFF) ||
+		(MTK_SYSTEM_PWR_STATE(state) == MTK_LOCAL_STATE_OFF)) {
+		plat_restore_el3_dormant_data();
+		dfd_setup();
+		gic_setup();
+		gic_dist_restore();
+		gic_rdist_restore();
+
+		enable_scu(mpidr);
+
+		/* Enable coherency if this cluster was off */
+		plat_cci_enable();
+
+		/* Enable the gic cpu interface */
+		// arm_gic_cpuif_setup();
+		// gic_cpuif_setup(get_plat_config()->gicc_base);
+	}
+
+#if SPMC_SPARK2
+	uint64_t linear_id;
+
+	linear_id = plat_core_pos_by_mpidr(mpidr);
+	little_spark2_setldo(linear_id);
+	little_spark2_core(linear_id, 1);
+
+	/* ---------------------------------------------
+	 * CPU retention control.
+	 * Set the CPUECTLR[2:0] = 0x01
+	 * ---------------------------------------------
+	 */
+	set_cpu_retention_control(0x1);
+#endif
+	/*
+	 * Ignore the state passed for a cpu. It could only have
+	 * been off if we are here.
+	 */
+#if ERRATA_A53_836870
+	workaround_836870(mpidr);
+#endif
+
+	/*
+	 * clear CNTVOFF, for slave cores
+	 */
+	clear_cntvoff(mpidr);
+
+	/* Zero the jump address in the mailbox for this cpu */
+	plat_program_mailbox(read_mpidr_el1(), 0);
+
+	enable_ns_access_to_cpuectlr();
+
+	return;
+}
+
+__dead2 void platform_system_off(void)
+{
+	mmio_write_32(VE_SYSREGS_BASE + V2M_SYS_CFGCTRL,
+		CFGCTRL_START | CFGCTRL_RW | CFGCTRL_FUNC(FUNC_SHUTDOWN));
+	wfi();
+	ERROR("MT6797 System Off: operation not handled.\n");
+	panic();
+}
+
+__dead2 void platform_system_reset(void)
+{
+	INFO("MT6797 System Reset\n");
+	mmio_clrsetbits_32(MTK_WDT_BASE,
+		(MTK_WDT_MODE_DUAL_MODE | MTK_WDT_MODE_IRQ),
+		MTK_WDT_MODE_KEY);
+
+	mmio_setbits_32(MTK_WDT_BASE, (MTK_WDT_MODE_KEY | MTK_WDT_MODE_EXTEN));
+	mmio_setbits_32(MTK_WDT_SWRST, MTK_WDT_SWRST_KEY);
+
+	wfi();
+	ERROR("MT6797 System Reset: operation not handled.\n");
+	panic();
+}
+
+int32_t platform_validate_power_state(unsigned int power_state,
+                                   psci_power_state_t *req_state)
+{
+	return PSCI_E_SUCCESS;
+}
+
+int platform_validate_ns_entrypoint(uintptr_t entrypoint)
+{
+	return PSCI_E_SUCCESS;
+}
+
+void platform_get_sys_suspend_power_state(psci_power_state_t *req_state)
+{
+}
+
+/*******************************************************************************
+ * Export the platform handlers to enable psci to invoke them
+ ******************************************************************************/
+static const plat_psci_ops_t mt_plat_psci_ops = {
+        .cpu_standby                    = platform_cpu_standby,
+        .pwr_domain_on                  = platform_pwr_domain_on,
+        .pwr_domain_off                 = platform_pwr_domain_off,
+        .pwr_domain_suspend             = platform_pwr_domain_suspend,
+        .pwr_domain_on_finish           = platform_pwr_domain_on_finish,
+        .pwr_domain_suspend_finish      = platform_pwr_domain_suspend_finish,
+        .system_off                     = platform_system_off,
+        .system_reset                   = platform_system_reset,
+        .validate_power_state           = platform_validate_power_state,
+        .validate_ns_entrypoint         = platform_validate_ns_entrypoint,
+        .get_sys_suspend_power_state    = platform_get_sys_suspend_power_state,
+};
+
+/*******************************************************************************
+ * Export the platform specific power ops and initialize Power Controller
+ ******************************************************************************/
+int plat_setup_psci_ops(uintptr_t sec_entrypoint,
+                        const plat_psci_ops_t **psci_ops)
+{
+	/*
+	 * Initialize PSCI ops struct
+	 */
+        *psci_ops = &mt_plat_psci_ops;
+        secure_entrypoint = sec_entrypoint;
+
+        return 0;
+}
+
+#endif
