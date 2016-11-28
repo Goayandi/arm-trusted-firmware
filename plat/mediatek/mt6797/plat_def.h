@@ -262,8 +262,8 @@
 #define IRQ_SEC_SGI_7			15
 #define IRQ_SEC_SGI_8			16
 
-#define IO_PHYS			(0x10000000)
-#define PAGE_ADDR_MASK          (0xFFF00000)
+#define IO_PHYS				0x10000000
+#define PAGE_ADDR_MASK			(0xFFF00000)
 
 #define UART0_BASE		(IO_PHYS + 0x01002000)
 #define UART1_BASE		(IO_PHYS + 0x01003000)

@@ -14,7 +14,6 @@
 
 #define RETRY_TIME_USEC   (10)
 
-#define SPMC_DEBUG	1
 #if SPMC_DEBUG
 #define PRINTF_SPMC	INFO
 #else
@@ -24,8 +23,8 @@ void __null_error(const char *fmt, ...) { }
 
 int pend_off=-1;
 extern unsigned long for_delay;
-char big_on = 0;//at most 4 cores
-char little_on = 0x1; //[7:0] = core7~core0, core 0 is power-on in defualt
+char big_on = 0;	// at most 4 cores
+char little_on = 0x1;	// [7:0] = core7~core0, core 0 is powered-on by defualt
 int dummy=0;
 
 void power_off_little_cl(unsigned int cl_idx);
@@ -39,7 +38,6 @@ void big_spmc_info()
 int power_on_big(const unsigned int linear_id)
 {
 	unsigned int tmp;
-	// unsigned long i;
 	extern void bl31_warm_entrypoint(void);
 #if FPGA
 	if (!dummy)
@@ -79,19 +77,19 @@ int power_on_big(const unsigned int linear_id)
 	mmio_write_32(MP2_MISC_CONFIG_BOOT_ADDR_H(linear_id-8), 0);
 
 	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<0);
-	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//assert CPUx_PWR_RST_B
+	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp); // assert CPUx_PWR_RST_B
 
 	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) | (1<<2);
-	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//Assert PWR_ON_CPUx
+	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp); // Assert PWR_ON_CPUx
 
 	udelay(2);
 
-	while (!(mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<(7-(linear_id-8))))); //PWR_ON_ACK_CPU0, wait for 1
+	while (!(mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<(7-(linear_id-8))))); // PWR_ON_ACK_CPU0, wait for 1
 	if (!(mmio_read_32(PTP3_CPU0_SPMC + ((linear_id-8)<<2)) & (1<<17)))
 		PRINTF_SPMC("SPMC and SPM are dismathed\n");
-	while (!(mmio_read_32(PTP3_CPU0_SPMC + ((linear_id-8)<<2)) & (1<<17))); //double check
+	while (!(mmio_read_32(PTP3_CPU0_SPMC + ((linear_id-8)<<2)) & (1<<17))); // double check
 	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) | (1<<0);
-	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//Release CPU0_PWR_RST_B
+	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp); // Release CPU0_PWR_RST_B
 
 	big_on = big_on | (1<<(linear_id-8));
 	PRINTF_SPMC("%s linear_id:%d done big_on:%x\n", __FUNCTION__, linear_id, big_on);
@@ -117,7 +115,8 @@ int power_on_big(const unsigned int linear_id)
 	return PSCI_E_SUCCESS;
 }
 
-int power_off_big(const unsigned int linear_id){
+int power_off_big(const unsigned int linear_id)
+{
 	unsigned int tmp;
 	dummy=1;
 	unsigned int x = read_mpidr_el1();
@@ -139,7 +138,7 @@ int power_off_big(const unsigned int linear_id){
 	PRINTF_SPMC("debug monitor 0x10222404=%x\n",mmio_read_32(0x10222404));
 
 	PRINTF_SPMC("Wait CPU%d's WFI\n",linear_id);
-	//SCOTT
+	// SCOTT
 	while (!(mmio_read_32(SPM_CPU_IDLE_STA2)&(1<<(linear_id+2)))) {
 		PRINTF_SPMC("idle sta2 = %x, %x\r", mmio_read_32(SPM_CPU_IDLE_STA2), (1<<(linear_id+2)));
 	}
@@ -214,13 +213,13 @@ int power_on_cl3(void)
 	 */
 pll_retry:
 	tmp = mmio_read_32(SPM_MP2_CPUSYS_PWR_CON) | (1<<2);
-	mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp); //PWR_ON_CA15MCPUTOP 
+	mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp); // PWR_ON_CA15MCPUTOP
 	udelay(2);
 
-	while (!(mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<17))); //wait PWR_ON_ACK_CA15MCPUTOP, wait for 1
+	while (!(mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<17))); // wait PWR_ON_ACK_CA15MCPUTOP, wait for 1
 	if (!(mmio_read_32(PTP3_CPUTOP_SPMC) & (1<<17)))
 		PRINTF_SPMC("SPMC and SPM are dismatched\n");
-	while (!(mmio_read_32(PTP3_CPUTOP_SPMC) & (1<<17))); //double check
+	while (!(mmio_read_32(PTP3_CPUTOP_SPMC) & (1<<17))); // double check
 
 #if 1
 	// print PLL registers
@@ -232,7 +231,7 @@ pll_retry:
 #endif
 
 	tmp = mmio_read_32(SPM_MP2_CPUSYS_PWR_CON) & ~(1<<4);
-	mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp);	//Release clk_dis
+	mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp);	// Release clk_dis
 
 	if (init != 0)
 		mmio_write_32(0x102224A4, 0xA6800000); // Change PLL to 1GHz
@@ -240,17 +239,17 @@ pll_retry:
 	udelay(20);
 
 	/* SW toggle armpll pos div before enable */
-	mmio_write_32(ARMPLL_CON0, 0x00ff0100); //ARMPLL_CON0[0], toggle pos div = 0
+	mmio_write_32(ARMPLL_CON0, 0x00ff0100); // ARMPLL_CON0[0], toggle pos div = 0
 	udelay(1);
 
 	/* tmp = mmio_read_32(ARMPLL_CON0) | (1<<0);
-	   mmio_write_32(ARMPLL_CON0, tmp); //ARMPLL_CON0[0], Enable PLL 
+	   mmio_write_32(ARMPLL_CON0, tmp); // ARMPLL_CON0[0], Enable PLL 
 	 */
-	mmio_write_32(ARMPLL_CON0, 0x00ff0101); //ARMPLL_CON0[0], pos div = 0, Enable PLL
+	mmio_write_32(ARMPLL_CON0, 0x00ff0101); // ARMPLL_CON0[0], pos div = 0, Enable PLL
 	udelay(10);
 
 	/* SW toggle armpll pos div again */
-	mmio_write_32(ARMPLL_CON0, 0x00ff1101); //ARMPLL_CON0[0], toggle pos div = 1
+	mmio_write_32(ARMPLL_CON0, 0x00ff1101); // ARMPLL_CON0[0], toggle pos div = 1
 	udelay(30);
 
 	/*
@@ -267,7 +266,7 @@ pll_retry:
 	mmio_write_32(HW_SEM_ENABLE_WORKAROUND_1axxx, 0x0b160001);
 	do {
 		mmio_write_32(HW_SEM_WORKAROUND_1axxx, 0x1);
-	} while(!(mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
+	} while (!(mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
 
 	tmp = mmio_read_32(PLL_DIV_MUXL_SEL) | (1<<0);
 	mmio_write_32(PLL_DIV_MUXL_SEL, tmp); //pll_div_mux1_sel = 01 = pll clock
@@ -337,7 +336,7 @@ pll_retry:
 		mmio_write_32(HW_SEM_ENABLE_WORKAROUND_1axxx, 0x0b160001);
 		do {
 			mmio_write_32(HW_SEM_WORKAROUND_1axxx, 0x1);
-		} while(! (mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
+		} while (!(mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
 
 		tmp = mmio_read_32(PLL_DIV_MUXL_SEL) & ~(0x3);
 		mmio_write_32(PLL_DIV_MUXL_SEL, tmp); //pll_div_mux1_sel = 00 = 26MHz
@@ -353,7 +352,7 @@ pll_retry:
 		// Step3: Power off Cluster2
 		tmp = mmio_read_32(SPM_MP2_CPUSYS_PWR_CON) & ~(1<<2);
 		mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp);//De-assert PWR_ON_CA15MCPUTOP
-		while((mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<17)));//wait PWR_ON_ACK_CA15MCPUTOP, wait for 0
+		while ((mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<17)));//wait PWR_ON_ACK_CA15MCPUTOP, wait for 0
 
 		// DoE 1.5: For External ISO re-assert
 		tmp = mmio_read_32(SPM_CPU_EXT_BUCK_ISO) | (0x2);
@@ -366,19 +365,18 @@ pll_retry:
 
 		udelay(240);
 
-
 		// Step4: Retry Power-on cluster2
 		goto pll_retry;
 	}
-	//try to get HW SEM
+	// try to get HW SEM
 	mmio_write_32(HW_SEM_ENABLE_WORKAROUND_1axxx, 0x0b160001);
 	do {
 		mmio_write_32(HW_SEM_WORKAROUND_1axxx, 0x1);
-	} while (! (mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
+	} while (!(mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
 	mmio_write_32(ARMPLL_K1, 0xFFFFFFFF);
 	mmio_write_32(ARMDIV_MON_EN, 0x00000000);
 	udelay(1);
-	//Release HW SEM
+	// Release HW SEM
 	mmio_write_32(HW_SEM_WORKAROUND_1axxx, 0x1);
 
 #endif
@@ -387,17 +385,17 @@ pll_retry:
 	DSB;
 	tmp = (1<<2)|(1<<6)|(1<<10);
 	while (mmio_read_32(INFRA_TOPAXI_PROTEXTSTA3) & tmp); //wait all of them be 0*/
-	//MP2_AXI_CONFIG, difference from MP0/1
+	// MP2_AXI_CONFIG, difference from MP0/1
 	tmp = mmio_read_32(MISCDBG) & ~(0x1);
 	mmio_write_32(MISCDBG, tmp);
-	//CCI400, enable S5
+	// CCI400, enable S5
 	tmp = mmio_read_32(MP2_SNOOP_CTRL) | 0x3 | ((caller+1)<<4);
 	mmio_write_32(MP2_SNOOP_CTRL, tmp);
-	while(mmio_read_32(MP2_SNOOP_STATUS) & 1); //wait to 0
+	while (mmio_read_32(MP2_SNOOP_STATUS) & 1); //wait to 0
 	PRINTF_SPMC("%s after top:%x c0:%x c1:%x\n",__FUNCTION__, big_spmc_status(0x10), big_spmc_status(0x01),big_spmc_status(0x02));
 	udelay(2);
 
-	//A setting for disabling clock shaper
+	// A setting for disabling clock shaper
 	tmp = mmio_read_32(0x10222590) | 0x10000;
 	mmio_write_32(0x10222590, tmp);
 	PRINTF_SPMC("%s disabling clock shaper, REG 0x10222590:0x%x\n",__FUNCTION__, tmp);
@@ -413,14 +411,14 @@ int power_off_cl3(void)
 	int caller = plat_core_pos_by_mpidr(read_mpidr_el1());
 	tmp = (mmio_read_32(MP2_SNOOP_CTRL) & ~0x3) | ((caller+1)<<4);
 	mmio_write_32(MP2_SNOOP_CTRL, tmp);
-	while(mmio_read_32(MP2_SNOOP_STATUS) & 1); //wait to 0
+	while (mmio_read_32(MP2_SNOOP_STATUS) & 1); //wait to 0
 	assert((mmio_read_32(MP2_SNOOP_CTRL) & 0x3) == 0);
 
 	tmp = mmio_read_32(MISCDBG) | (1<<0) |(1<<4);
 	mmio_write_32(MISCDBG, tmp);
 
 	PRINTF_SPMC("Wait CL3's WFI\n");
-	while(!(mmio_read_32(SPM_CPU_IDLE_STA2)&(1<<(20))));
+	while (!(mmio_read_32(SPM_CPU_IDLE_STA2)&(1<<(20))));
 	PRINTF_SPMC("CL3 is in WFI\n");
 
 	mask = (1<<2) | (1<<6) | (1<<10);
@@ -485,7 +483,7 @@ static unsigned int select_spmc_base(int select, unsigned int *nb_srampd)
 	case 0x10:
 		addr_spmc = PTP3_CPUTOP_SPMC;
 		if (nb_srampd)
-		*nb_srampd = 32;
+			*nb_srampd = 32;
 		break;
 	default:
 		PRINTF_SPMC("Should be not here\n");
@@ -530,19 +528,19 @@ int big_spmc_sw_pwr_seq_en(int select)
 	PRINTF_SPMC("SwPsqE Sel:0x%X Reg:0x%X\n", select, addr_spmc);//big sw power sequence error FSM
 
 	if ((mmio_read_32(addr_spmc) & FSM_STATE_OUT_MASK)==FSM_ON) {
-		//FSM_out is not zero
+		// FSM_out is not zero
 		PRINTF_SPMC("SwPsqE ESt1\n");//big sw power sequence error FSM
 		return -3; //-2: fsm_state_out=1
 	}
 
 	if ((mmio_read_32(addr_spmc) & SW_FSM_OVERRIDE)) {
-		//FSM_out is not zero
+		// FSM_out is not zero
 		PRINTF_SPMC("SwPsqE EFO1\n");
 		return -2; //-1: sw_fsm_override=1
 	}
 
 	if (select == 0x10) {
-		//Enable buck first
+		// Enable buck first
 		tmp = mmio_read_32(SPM_MP2_CPUSYS_PWR_CON) | (1<<0);
 		mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp);//Release pwr_rst_b
 
@@ -555,7 +553,7 @@ int big_spmc_sw_pwr_seq_en(int select)
 		tmp = (mmio_read_32(WDT_SWSYSRST) & ~(0x0800)) | 0x88000000;
 		mmio_write_32(WDT_SWSYSRST, tmp);
 
-		//TOP
+		// TOP
 		tmp = mmio_read_32(addr_spmc) & ~((0x3f<<SRAMPD_OFFSET) | SW_LOGIC_PDB | SW_LOGIC_PRE1_PDB | SW_LOGIC_PRE2_PDB| SW_SRAM_SLEEPB | SW_SRAM_ISOINTB);
 		tmp |= (SW_ISO | SW_HOT_PLUG_RESET);
 		mmio_write_32(addr_spmc,tmp);
@@ -578,9 +576,9 @@ int big_spmc_sw_pwr_seq_en(int select)
 			PRINTF_SPMC("SwPsqE ETopTO\n");//TO=timeout
 			return -4;//timeout
 		}
-		//         while(!((mmio_read_32(PTP3_CPUTOP_SPMC) & FSM_STATE_OUT_MASK)==FSM_ON));
+		// while(!((mmio_read_32(PTP3_CPUTOP_SPMC) & FSM_STATE_OUT_MASK)==FSM_ON));
 	} else if (select == 0x1 || select == 0x2) {
-		//core 0
+		// core 0
 		tmp = mmio_read_32(addr_spmc) & ~((0x1f<<SRAMPD_OFFSET) |SW_LOGIC_PDB | SW_LOGIC_PRE1_PDB | SW_LOGIC_PRE2_PDB| SW_SRAM_SLEEPB | SW_SRAM_ISOINTB);
 		tmp |= (SW_ISO | SW_HOT_PLUG_RESET);
 		mmio_write_32(addr_spmc, tmp);
@@ -589,7 +587,7 @@ int big_spmc_sw_pwr_seq_en(int select)
 		tmp = mmio_read_32(addr_spmc) | SW_FSM_OVERRIDE;
 		mmio_write_32(addr_spmc, tmp);
 
-		// while(!((mmio_read_32(PTP3_CPU0_SPMC) & FSM_STATE_OUT_MASK) == FSM_ON));
+		// while (!((mmio_read_32(PTP3_CPU0_SPMC) & FSM_STATE_OUT_MASK) == FSM_ON));
 		// return 0;
 		result = 0;
 		for (retry=10;retry>0;retry--) {
@@ -615,7 +613,7 @@ int big_spmc_sw_pwr_seq_en(int select)
  */
 /*
    "1. if Select invalid, exit/return error -1
-   2. if Select = CPU0, CPU1, or ALLCPU, read TOP SPMC Status. If not powered on, Power  on TOP first
+    2. if Select = CPU0, CPU1, or ALLCPU, read TOP SPMC Status. If not powered on, Power on TOP first
    For each Select:
    3. Read sw_fsm_override & sw_pwr_on_override_en & pwr state
    4. If already power on, continue to next Select.
@@ -642,10 +640,12 @@ char sw_pd_cmd[32]={0x01,0x03,0x02,0x06,0x07,0x05,0x04,0x0c,0x0d,0x0f,
 	0x1f,0x1d,0x1c,0x14,0x15,0x17,0x16,0x12,0x13,0x11,
 	0x10,0x30};
 
-int big_sw_on_seq(int select){
+int big_sw_on_seq(int select)
+{
 	PRINTF_SPMC("%s select:%x\n",__FUNCTION__,select);
 	unsigned int addr_spmc, tmp;
 	unsigned int nb_srampd;
+
 	addr_spmc = select_spmc_base(select, &nb_srampd);
 	if (!addr_spmc) {
 		PRINTF_SPMC("SwOn Inv");
@@ -659,7 +659,7 @@ int big_sw_on_seq(int select){
 
 	if (!(mmio_read_32(addr_spmc) & SW_FSM_OVERRIDE)) {
 		tmp = mmio_read_32(addr_spmc);
-		if(!( tmp & SW_PWR_ON_OVERRIDE_EN)){
+		if (!( tmp & SW_PWR_ON_OVERRIDE_EN)){
 			tmp |= SW_PWR_ON_OVERRIDE_EN;
 			mmio_write_32(addr_spmc,tmp);
 		}
@@ -682,19 +682,19 @@ int big_sw_on_seq(int select){
 
 	if (select == 0x1) {
 		tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((0)<<2)) | (1<<0);
-		mmio_write_32(SPM_MP2_CPU0_PWR_CON+((0)<<2), tmp); //Release CPU0_PWR_RST_B
+		mmio_write_32(SPM_MP2_CPU0_PWR_CON+((0)<<2), tmp); // Release CPU0_PWR_RST_B
 	} else if (select == 0x2) {
 		tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((1)<<2)) | (1<<0);
-		mmio_write_32(SPM_MP2_CPU0_PWR_CON+((1)<<2), tmp); //Release CPU0_PWR_RST_B
+		mmio_write_32(SPM_MP2_CPU0_PWR_CON+((1)<<2), tmp); // Release CPU0_PWR_RST_B
 	} else if (select == 0x10) {
 		tmp = mmio_read_32(SPM_MP2_CPUSYS_PWR_CON) & ~(1<<4);
-		mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp); //Release clk_dis
+		mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp); // Release clk_dis
 		tmp = mmio_read_32(SPM_MP2_CPUSYS_PWR_CON) | (1<<0);
-		mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp); //Release pwr_rst_b
+		mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp); // Release pwr_rst_b
 	} else
 		return -1;
 
-	//power on SRAM
+	// power on SRAM
 	int i;
 	unsigned int orig_sram_pd = mmio_read_32(addr_spmc) & 0xFFFF03FF;
 
@@ -759,7 +759,8 @@ int big_sw_on_seq(int select){
 	return 0;
 }
 
-int big_spmc_sw_pwr_on(int select){
+int big_spmc_sw_pwr_on(int select)
+{
 	//power on a core before power on the TOP, we power on TOP automatically
 	extern void bl31_warm_entrypoint(void);
 	PRINTF_SPMC("SwPsqOn Sel:%d on:%x\n",select,big_on);
@@ -870,7 +871,8 @@ Sequence:
 4. sw_hot_plug_reset=1"
 
  */
-void big_sw_off_seq(int select){
+void big_sw_off_seq(int select)
+{
 	unsigned int addr_spmc, tmp;
 
 	switch (select) {
@@ -942,8 +944,9 @@ void big_sw_off_seq(int select){
 	}
 }
 
-int big_spmc_sw_pwr_off(int select){
-	switch(select){
+int big_spmc_sw_pwr_off(int select)
+{
+	switch (select) {
 	case 0x1:
 	case 0x2:
 #if SPMC_DVT
@@ -1392,7 +1395,8 @@ void power_off_little_cl(unsigned int cl_idx){
 
  */
 //switch 0:off 1:on
-void big_spark2_setldo(unsigned int cpu0_amuxsel, unsigned int cpu1_amuxsel){
+void big_spark2_setldo(unsigned int cpu0_amuxsel, unsigned int cpu1_amuxsel)
+{
 	unsigned int tmp;
 	unsigned int sparkvretcntrl = 0x3f;
 
@@ -1404,7 +1408,8 @@ void big_spark2_setldo(unsigned int cpu0_amuxsel, unsigned int cpu1_amuxsel){
 	mmio_write_32(SPARK2LDO,tmp);
 }
 
-int big_spark2_core(unsigned int core, unsigned int sw){
+int big_spark2_core(unsigned int core, unsigned int sw)
+{
 	unsigned int tmp;
 	if (sw>1 || core <8 || core>9)
 		return -1;

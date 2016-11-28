@@ -32,7 +32,6 @@
 #include <arch_helpers.h>
 #include <arm_gic.h>
 #include <assert.h>
-#include <bakery_lock.h>
 #include <cci.h>
 #include <debug.h>
 #include <mmio.h>
@@ -391,7 +390,7 @@ void plat_affinst_suspend(unsigned long sec_entrypoint,
 	if (plat_do_plat_actions(afflvl, state) == -EAGAIN)
 		return;
 
-	//set cpu0 as aa64 for cpu reset
+	// set cpu0 as aa64 for cpu reset
 	mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | (1<<12));
 
         unsigned long mpidr = read_mpidr_el1();
@@ -617,21 +616,190 @@ int platform_setup_pm(const plat_pm_ops_t **plat_ops)
 #define	MTK_SYSTEM_PWR_STATE(state)	((PLAT_MAX_PWR_LVL > MTK_PWR_LVL1) ? \
 				 (state)->pwr_domain_state[MTK_PWR_LVL2] : 0)
 
+struct core_context {
+	unsigned long timer_data[8];
+	unsigned int count;
+	unsigned int rst;
+	unsigned int abt;
+	unsigned int brk;
+};
+
+struct cluster_context {
+	struct core_context core[PLATFORM_MAX_CPUS_PER_CLUSTER];
+};
+
+/*
+ * Top level structure to hold the complete context of a multi cluster system
+ */
+struct system_context {
+	struct cluster_context cluster[PLATFORM_CLUSTER_COUNT];
+};
+
+/*
+ * Top level structure which encapsulates the context of the entire system
+ */
+static struct system_context dormant_data[1];
+
+static inline struct cluster_context *system_cluster(
+						struct system_context *system,
+						uint32_t clusterid)
+{
+	return &system->cluster[clusterid];
+}
+
+static inline struct core_context *cluster_core(struct cluster_context *cluster,
+						uint32_t cpuid)
+{
+	return &cluster->core[cpuid];
+}
+
+static struct cluster_context *get_cluster_data(unsigned long mpidr)
+{
+	uint32_t clusterid;
+
+	clusterid = (mpidr & MPIDR_CLUSTER_MASK) >> MPIDR_AFFINITY_BITS;
+
+	return system_cluster(dormant_data, clusterid);
+}
+
+static struct core_context *get_core_data(unsigned long mpidr)
+{
+	struct cluster_context *cluster;
+	uint32_t cpuid;
+
+	cluster = get_cluster_data(mpidr);
+	cpuid = mpidr & MPIDR_CPU_MASK;
+
+	return cluster_core(cluster, cpuid);
+}
+
+static void mt_save_generic_timer(unsigned long *container)
+{
+	uint64_t ctl;
+	uint64_t val;
+
+	__asm__ volatile("mrs	%x0, cntkctl_el1\n\t"
+			 "mrs	%x1, cntp_cval_el0\n\t"
+			 "stp	%x0, %x1, [%2, #0]"
+			 : "=&r" (ctl), "=&r" (val)
+			 : "r" (container)
+			 : "memory");
+
+	__asm__ volatile("mrs	%x0, cntp_tval_el0\n\t"
+			 "mrs	%x1, cntp_ctl_el0\n\t"
+			 "stp	%x0, %x1, [%2, #16]"
+			 : "=&r" (val), "=&r" (ctl)
+			 : "r" (container)
+			 : "memory");
+
+	__asm__ volatile("mrs	%x0, cntv_tval_el0\n\t"
+			 "mrs	%x1, cntv_ctl_el0\n\t"
+			 "stp	%x0, %x1, [%2, #32]"
+			 : "=&r" (val), "=&r" (ctl)
+			 : "r" (container)
+			 : "memory");
+}
+
+static void mt_restore_generic_timer(unsigned long *container)
+{
+	uint64_t ctl;
+	uint64_t val;
+
+	__asm__ volatile("ldp	%x0, %x1, [%2, #0]\n\t"
+			 "msr	cntkctl_el1, %x0\n\t"
+			 "msr	cntp_cval_el0, %x1"
+			 : "=&r" (ctl), "=&r" (val)
+			 : "r" (container)
+			 : "memory");
+
+	__asm__ volatile("ldp	%x0, %x1, [%2, #16]\n\t"
+			 "msr	cntp_tval_el0, %x0\n\t"
+			 "msr	cntp_ctl_el0, %x1"
+			 : "=&r" (val), "=&r" (ctl)
+			 : "r" (container)
+			 : "memory");
+
+	__asm__ volatile("ldp	%x0, %x1, [%2, #32]\n\t"
+			 "msr	cntv_tval_el0, %x0\n\t"
+			 "msr	cntv_ctl_el0, %x1"
+			 : "=&r" (val), "=&r" (ctl)
+			 : "r" (container)
+			 : "memory");
+}
+
+static inline uint64_t read_cntpctl(void)
+{
+	uint64_t cntpctl;
+
+	__asm__ volatile("mrs	%x0, cntp_ctl_el0"
+			 : "=r" (cntpctl) : : "memory");
+
+	return cntpctl;
+}
+
+static inline void write_cntpctl(uint64_t cntpctl)
+{
+	__asm__ volatile("msr	cntp_ctl_el0, %x0" : : "r"(cntpctl));
+}
+
+static void stop_generic_timer(void)
+{
+	/*
+	 * Disable the timer and mask the irq to prevent
+	 * suprious interrupts on this cpu interface. It
+	 * will bite us when we come back if we don't. It
+	 * will be replayed on the inbound cluster.
+	 */
+	uint64_t cntpctl = read_cntpctl();
+
+	write_cntpctl(clr_cntp_ctl_enable(cntpctl));
+}
+
+static void mt_cpu_save(unsigned long mpidr)
+{
+	struct core_context *core;
+
+	core = get_core_data(mpidr);
+	mt_save_generic_timer(core->timer_data);
+
+	/* disable timer irq, and upper layer should enable it again. */
+	stop_generic_timer();
+}
+
+static void mt_cpu_restore(unsigned long mpidr)
+{
+	struct core_context *core;
+
+	core = get_core_data(mpidr);
+	mt_restore_generic_timer(core->timer_data);
+}
+
+static void mt_platform_save_context(unsigned long mpidr)
+{
+	/* mcusys_save_context: */
+	mt_cpu_save(mpidr);
+}
+
+static void mt_platform_restore_context(unsigned long mpidr)
+{
+	/* mcusys_restore_context: */
+	mt_cpu_restore(mpidr);
+}
+
 extern void gic_dist_save(void);
 extern void gic_dist_restore(void);
 
 void platform_cpu_standby(plat_local_state_t cpu_state)
 {
-#if 0
 	unsigned int scr;
 
+	INFO("%s\n", __FUNCTION__);
 	scr = read_scr_el3();
 	write_scr_el3(scr | SCR_IRQ_BIT);
 	isb();
 	dsb();
 	wfi();
 	write_scr_el3(scr);
-#endif
 }
 
 extern void bl31_warm_entrypoint(void);
@@ -723,8 +891,10 @@ void platform_pwr_domain_off(const psci_power_state_t *state)
 void platform_pwr_domain_suspend(const psci_power_state_t *state)
 {
 
+	// set cpu0 as aa64 for cpu reset
 	mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | (1<<12));
 
+	INFO("%s: beginning\n", __FUNCTION__); 
         unsigned long mpidr = read_mpidr_el1();
 #if SPMC_SPARK2
 	uint64_t linear_id;
@@ -734,11 +904,13 @@ void platform_pwr_domain_suspend(const psci_power_state_t *state)
 	set_cpu_retention_control(0);
 
 	little_spark2_core(linear_id, 0);
-	while(mmio_read_32(SPM_CPU_RET_STATUS) & (1 << linear_id));
+	while (mmio_read_32(SPM_CPU_RET_STATUS) & (1 << linear_id));
+	INFO("%s: after spark2 setting\n", __FUNCTION__); 
 #endif
 
 	/* Program the jump address for the target cpu */
-	plat_program_mailbox(read_mpidr_el1(), secure_entrypoint);
+	plat_program_mailbox(mpidr, secure_entrypoint);
+	mt_platform_save_context(mpidr);
 
 	/* Perform the common cluster specific operations */
 	// if (afflvl != MPIDR_AFFLVL0) {
@@ -855,6 +1027,8 @@ void platform_pwr_domain_suspend_finish(const psci_power_state_t *state)
 
 	/* Zero the jump address in the mailbox for this cpu */
 	plat_program_mailbox(read_mpidr_el1(), 0);
+
+	mt_platform_restore_context(mpidr);
 
 	enable_ns_access_to_cpuectlr();
 
