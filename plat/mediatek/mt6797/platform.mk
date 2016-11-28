@@ -103,6 +103,7 @@ ERRATA_A53_836870       :=      0
 
 DEBUG			:=	1
 RESET_TO_BL31		:=	1
+ENABLE_PLAT_COMPAT	:=	0
 
 # MSCI-A has move slave port than CCI-400
 ARM_CCI_PRODUCT_ID	:=	500

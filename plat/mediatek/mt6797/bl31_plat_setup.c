@@ -426,9 +426,9 @@ void bl31_plat_arch_setup(void)
 	/* Enable non-secure access to CCI-400 registers */
 	mmio_write_32(CCI400_BASE + CCI_SEC_ACCESS_OFFSET , 0x1);
 	/* set secondary CPUs to AArch64 */
-	INFO("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
+	INFO("###@@@ MP0_MISC_CONFIG3:0x%x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
 	mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | 0x0000E000);
-	INFO("###@@@ MP0_MISC_CONFIG3:0x%08x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
+	INFO("###@@@ MP0_MISC_CONFIG3:0x%x @@@###\n", mmio_read_32(MP0_MISC_CONFIG3));
 
 	{
 		// atf_arg_t_ptr teearg = (atf_arg_t_ptr)(uintptr_t)TEE_BOOT_INFO_ADDR;

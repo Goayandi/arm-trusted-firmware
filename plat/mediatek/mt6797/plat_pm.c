@@ -276,26 +276,26 @@ int32_t plat_affinst_on(uint64_t mpidr,
 #else
 		rc = power_on_big(linear_id);
 #endif
-		printf("Yes, rc = %d\n", rc);
+		INFO("Yes, rc = %d\n", rc);
 		return rc;
 	} else if (linear_id >= 4) {
-		if(!(little_on & 0xF0)){
-			printf("Enable CPUSYS1\n");
+		if (!(little_on & 0xF0)){
+			INFO("Enable CPUSYS1\n");
 			power_on_little_cl(1);
 		}
 		mmio_write_32(MP1_MISC_CONFIG3, mmio_read_32(MP1_MISC_CONFIG3) | 0x0000F000);
 		// mmio_write_32(MP1_MISC_CONFIG_BOOT_ADDR(linear_id-4), (unsigned long)bl31_on_entrypoint);
 		mmio_write_32(MP1_MISC_CONFIG_BOOT_ADDR(linear_id-4), (unsigned long) bl31_warm_entrypoint);
-		printf("mt_on_1, entry %x\n", mmio_read_32(MP1_MISC_CONFIG_BOOT_ADDR(linear_id-4)));
+		INFO("mt_on_1, entry %x\n", mmio_read_32(MP1_MISC_CONFIG_BOOT_ADDR(linear_id-4)));
 	} else {
 		if(!(little_on & 0x0F)) {
-			printf("Enable CPUSYS0\n");
+			INFO("Enable CPUSYS0\n");
 			power_on_little_cl(0);
 		}
 		mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | 0x0000F000);
 		// mmio_write_32(MP0_MISC_CONFIG_BOOT_ADDR(linear_id), (unsigned long)bl31_on_entrypoint);
 		mmio_write_32(MP0_MISC_CONFIG_BOOT_ADDR(linear_id), (unsigned long) bl31_warm_entrypoint);
-		printf("mt_on_0, entry %x\n", mmio_read_32(MP0_MISC_CONFIG_BOOT_ADDR(linear_id)));
+		INFO("mt_on_0, entry %x\n", mmio_read_32(MP0_MISC_CONFIG_BOOT_ADDR(linear_id)));
 	}
 
 	/* control CPU power */
@@ -348,7 +348,7 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 	pend_off = linear_id;
 
 #if SPMC_SPARK2
-	printf("%s core:%d(callee) disable SPARK-core-side\n",__FUNCTION__, linear_id);
+	INFO("%s core:%d(callee) disable SPARK-core-side\n",__FUNCTION__, linear_id);
 	// turn off spark2 cpu-side by callee
 	set_cpu_retention_control(0);
 #endif
@@ -366,9 +366,9 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 		if (linear_id < 8) {
 			/* move to power_off_big() if (linear_id >= 8) */
 			plat_cci_disable();
-			printf("%s: cci_disable_cluster_coherency(%d)\n", __FUNCTION__, linear_id);
+			INFO("%s: cci_disable_cluster_coherency(%d)\n", __FUNCTION__, linear_id);
 			disable_scu(mpidr);
-			printf("%s: disable_scu(%d)\n", __FUNCTION__, linear_id);
+			INFO("%s: disable_scu(%d)\n", __FUNCTION__, linear_id);
 		}
 	}
 }
@@ -635,7 +635,10 @@ void platform_cpu_standby(plat_local_state_t cpu_state)
 #endif
 }
 
+extern void bl31_warm_entrypoint(void);
+
 static uintptr_t secure_entrypoint;
+
 int platform_pwr_domain_on(u_register_t mpidr)
 {
 	int rc = PSCI_E_SUCCESS;
@@ -644,7 +647,6 @@ int platform_pwr_domain_on(u_register_t mpidr)
 	plat_program_mailbox(mpidr, secure_entrypoint);
 
 	linear_id = plat_core_pos_by_mpidr(mpidr);
-	extern void bl31_warm_entrypoint(void);
 
 	if (linear_id >= 8) {
 #if SPMC_SW_MODE
@@ -652,19 +654,19 @@ int platform_pwr_domain_on(u_register_t mpidr)
 #else
 		rc = power_on_big(linear_id);
 #endif
-		printf("Yes, rc = %d\n", rc);
+		INFO("Yes, rc = %d\n", rc);
 		return rc;
 	} else if (linear_id >= 4) {
-		if(!(little_on & 0xF0)){
-			printf("Enable CPUSYS1\n");
+		if (!(little_on & 0xF0)) {
+			INFO("Enable CPUSYS1\n");
 			power_on_little_cl(1);
 		}
 		mmio_write_32(MP1_MISC_CONFIG3, mmio_read_32(MP1_MISC_CONFIG3) | 0x0000F000);
 		mmio_write_32(MP1_MISC_CONFIG_BOOT_ADDR(linear_id-4), (unsigned long) bl31_warm_entrypoint);
-		printf("mt_on_1, entry %x\n", mmio_read_32(MP1_MISC_CONFIG_BOOT_ADDR(linear_id-4)));
+		INFO("mt_on_1, entry %x\n", mmio_read_32(MP1_MISC_CONFIG_BOOT_ADDR(linear_id-4)));
 	} else {
 		if (!(little_on & 0x0F)) {
-			printf("Enable CPUSYS0\n");
+			INFO("Enable CPUSYS0\n");
 			power_on_little_cl(0);
 		}
 		mmio_write_32(MP0_MISC_CONFIG3, mmio_read_32(MP0_MISC_CONFIG3) | 0x0000F000);
@@ -721,8 +723,50 @@ void platform_pwr_domain_suspend(const psci_power_state_t *state)
 	return;
 }
 
-void platform_pwr_domain_on_finish(const psci_power_state_t *target_state)
+void platform_pwr_domain_on_finish(const psci_power_state_t *state)
 {
+	unsigned long mpidr = read_mpidr_el1();
+
+	/* Perform the common cluster specific operations */
+	if ((MTK_CLUSTER_PWR_STATE(state) == MTK_LOCAL_STATE_OFF) ||
+		(MTK_SYSTEM_PWR_STATE(state) == MTK_LOCAL_STATE_OFF)) {
+		enable_scu(mpidr);
+		INFO("%s: enable_scu()\n", __FUNCTION__);
+
+		/* Enable coherency if this cluster was off */
+		plat_cci_enable();
+		INFO("%s: plat_cci_enable()\n", __FUNCTION__);
+	}
+
+#if SPMC_SPARK2
+	/* ---------------------------------------------
+	 * CPU retention control.
+	 * Set the CPUECTLR[2:0] = 0x01
+	 * ---------------------------------------------
+	 */
+	set_cpu_retention_control(0x1);
+#endif
+
+	/*
+	 * Ignore the state passed for a cpu. It could only have
+	 * been off if we are here.
+	 */
+#if ERRATA_A53_836870
+	workaround_836870(mpidr);
+#endif
+
+	/*
+	 * clear CNTVOFF, for slave cores
+	 */
+	clear_cntvoff(mpidr);
+
+	/* Zero the jump address in the mailbox for this cpu */
+	plat_program_mailbox(read_mpidr_el1(), 0);
+
+	gic_cpuif_init();
+	gic_rdist_restore();
+
+	// enable_ns_access_to_cpuectlr();
 }
 
 void platform_pwr_domain_suspend_finish(const psci_power_state_t *state)
@@ -809,6 +853,38 @@ __dead2 void platform_system_reset(void)
 int32_t platform_validate_power_state(unsigned int power_state,
                                    psci_power_state_t *req_state)
 {
+	int pstate = psci_get_pstate_type(power_state);
+	int pwr_lvl = psci_get_pstate_pwrlvl(power_state);
+	int i;
+
+	assert(req_state);
+
+	if (pwr_lvl > PLAT_MAX_PWR_LVL)
+		return PSCI_E_INVALID_PARAMS;
+
+	/* Sanity check the requested state */
+	if (pstate == PSTATE_TYPE_STANDBY) {
+		/*
+		 * It's possible to enter standby only on power level 0
+		 * Ignore any other power level.
+		 */
+		if (pwr_lvl != 0)
+			return PSCI_E_INVALID_PARAMS;
+
+		req_state->pwr_domain_state[MTK_PWR_LVL0] =
+					MTK_LOCAL_STATE_RET;
+	} else {
+		for (i = 0; i <= pwr_lvl; i++)
+			req_state->pwr_domain_state[i] =
+					MTK_LOCAL_STATE_OFF;
+	}
+
+	/*
+	 * We expect the 'state id' to be zero.
+	 */
+	if (psci_get_pstate_id(power_state))
+		return PSCI_E_INVALID_PARAMS;
+
 	return PSCI_E_SUCCESS;
 }
 

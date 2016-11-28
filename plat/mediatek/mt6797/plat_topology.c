@@ -281,7 +281,6 @@ const unsigned char mtk_power_domain_tree_desc[] = {
  ******************************************************************************/
 const unsigned char *plat_get_power_domain_tree_desc(void)
 {
-	INFO("%s\n", __FUNCTION__);
         return mtk_power_domain_tree_desc;
 }
 
@@ -295,9 +294,7 @@ int plat_core_pos_by_mpidr(u_register_t mpidr)
 {
 	unsigned int cluster_id, cpu_id;
 
-	INFO("%s\n", __FUNCTION__);
 	mpidr &= MPIDR_AFFINITY_MASK;
-
 	if (mpidr & ~(MPIDR_CLUSTER_MASK | MPIDR_CPU_MASK))
 		return -1;
 
@@ -321,7 +318,7 @@ plat_local_state_t plat_get_target_pwr_state(unsigned int lvl,
 					     const plat_local_state_t *states,
 					     unsigned int ncpu)
 {
-	INFO("%s\n", __FUNCTION__);
+	INFO("%s lvl = %u ncpu = %u\n", __FUNCTION__, lvl, ncpu);
 	plat_local_state_t target = PLAT_MAX_OFF_STATE, temp;
 
 	assert(ncpu);

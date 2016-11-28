@@ -94,8 +94,8 @@ int power_on_big(const unsigned int linear_id)
 	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp);//Release CPU0_PWR_RST_B
 
 	big_on = big_on | (1<<(linear_id-8));
-	PRINTF_SPMC("%s linear_id:%d done big_on:%x\n",__FUNCTION__,linear_id,big_on);
-	PRINTF_SPMC("%s after top:%x c0:%x c1:%x\n",__FUNCTION__, big_spmc_status(0x10), big_spmc_status(0x01),big_spmc_status(0x02));
+	PRINTF_SPMC("%s linear_id:%d done big_on:%x\n", __FUNCTION__, linear_id, big_on);
+	PRINTF_SPMC("%s after top:%x c0:%x c1:%x\n", __FUNCTION__, big_spmc_status(0x10), big_spmc_status(0x01), big_spmc_status(0x02));
 
 #if SPMC_DVT
 	udelay(SPMC_DVT_UDELAY);
@@ -109,7 +109,7 @@ int power_on_big(const unsigned int linear_id)
 
 #if SPMC_DVT
 	// udelay(SPMC_DVT_UDELAY);
-	while(!(mmio_read_32(SPM_CPU_RET_STATUS) & (1<<linear_id)));
+	while (!(mmio_read_32(SPM_CPU_RET_STATUS) & (1<<linear_id)));
 	PRINTF_SPMC("core %d is in retention\n",linear_id);
 	udelay(SPMC_DVT_UDELAY);
 	big_spmc_info();
@@ -123,7 +123,7 @@ int power_off_big(const unsigned int linear_id){
 	unsigned int x = read_mpidr_el1();
 
 	PRINTF_SPMC("[%x] %s linear_id:%d big_on:%x\n",
-			x, __FUNCTION__, linear_id,big_on);
+			x, __FUNCTION__, linear_id, big_on);
 
 	if (linear_id > 9) {
 		PRINTF_SPMC("The required Big core:%d is not existed\n", linear_id);
@@ -335,9 +335,9 @@ pll_retry:
 		// Step1: Switch Clock Muxed to 26 MHz
 		// try to get HW SEM
 		mmio_write_32(HW_SEM_ENABLE_WORKAROUND_1axxx, 0x0b160001);
-		do{
+		do {
 			mmio_write_32(HW_SEM_WORKAROUND_1axxx, 0x1);
-		}while(! (mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
+		} while(! (mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
 
 		tmp = mmio_read_32(PLL_DIV_MUXL_SEL) & ~(0x3);
 		mmio_write_32(PLL_DIV_MUXL_SEL, tmp); //pll_div_mux1_sel = 00 = 26MHz
@@ -374,7 +374,7 @@ pll_retry:
 	mmio_write_32(HW_SEM_ENABLE_WORKAROUND_1axxx, 0x0b160001);
 	do {
 		mmio_write_32(HW_SEM_WORKAROUND_1axxx, 0x1);
-	} while(! (mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
+	} while (! (mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
 	mmio_write_32(ARMPLL_K1, 0xFFFFFFFF);
 	mmio_write_32(ARMDIV_MON_EN, 0x00000000);
 	udelay(1);
@@ -1215,34 +1215,38 @@ void power_on_little(unsigned int id){
 	unsigned int seq_value[14]={0, 0, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1};
 	for (i = 0; i < 14; i++) {
 		pwr_set_bit(reg_offset, seq_bit[i], seq_value[i]);
-		if (i==3) {
-			for(;;){
+		switch (i) {
+		case 3:
+			for(;;) {
 				PRINTF_SPMC("MEM_PWR_ACK=%u\n", pwr_get_bit(reg_offset, 12));
-				if(pwr_get_bit(reg_offset, 12))
+				if (pwr_get_bit(reg_offset, 12))
 					break;
 			}
 			PRINTF_SPMC("Commnet out PWR_ACK\n");
-		}
-		if (i==5) {
-			for(;;){
+			break;
+		case 5:
+			for(;;) {
 				PRINTF_SPMC("MEM_PWR_ACK=%u\n", pwr_get_bit(reg_offset, 12));
-				if(!pwr_get_bit(reg_offset, 12))
+				if (!pwr_get_bit(reg_offset, 12))
 					break;
 			}
-		}
-		if (i==6) {
+			break;
+		case 6:
 			PRINTF_SPMC("Delay for PWR_ACK\n");
 			udelay(1);
-			while(!(mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<(15-id)))); //wait mp0_cpu_pwr_ack==1
-		}
-		if (i==7) {
+			while (!(mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<(15-id)))); //wait mp0_cpu_pwr_ack==1
+			break;
+		case 7:
 			PRINTF_SPMC("Delay for PWR_ACK_2nd\n");
 			udelay(1);//for safe,it can be removed
-			while(!(mmio_read_32(SPM_CPU_PWR_STATUS_2ND) & (1<<(15-id)))); //wait mp0_cpu_pwr_ack==1
-		}
-		if (i==10) {
+			while (!(mmio_read_32(SPM_CPU_PWR_STATUS_2ND) & (1<<(15-id)))); //wait mp0_cpu_pwr_ack==1
+			break;
+		case 10:
 			PRINTF_SPMC("Delay for memory power ready\n");
 			udelay(1);
+			break;
+		default:
+			break;
 		}
 	}
 #if SPMC_SPARK2
@@ -1250,18 +1254,20 @@ void power_on_little(unsigned int id){
 	little_spark2_core(id,1);
 #endif
 	little_on |= (1<<id);
-	PRINTF_SPMC("Little power on:0x%X\n",little_on);
+	PRINTF_SPMC("Little power on:0x%x\n", little_on);
 }
 
 void power_off_little(unsigned int id){
-	PRINTF_SPMC("[%lx] %s linear_id:%d\n",read_mpidr_el1(),__FUNCTION__,id);
+	PRINTF_SPMC("[%lx] %s linear_id:%d\n",
+		read_mpidr_el1(), __FUNCTION__, id);
 
 	if( id > 7 ){
-		PRINTF_SPMC("%s : wrong CPUID :%d\n",__FUNCTION__,id);
+		PRINTF_SPMC("%s : wrong CPUID :%d\n", __FUNCTION__, id);
 		return;
 	}
 	if (!(little_on & (1<<id))) {
-		PRINTF_SPMC("%s : core :%d was turned off already\n",__FUNCTION__,id);
+		PRINTF_SPMC("%s : core :%d was turned off already\n",
+			__FUNCTION__, id);
 		return;
 	}
 
@@ -1281,7 +1287,7 @@ void power_off_little(unsigned int id){
 #if SPMC_SPARK2
 	little_spark2_core(id, 0);
 
-	//confirm the core is not in the retention mode, bit[x]:core x, wait 0
+	// confirm the core is not in the retention mode, bit[x]:core x, wait 0
 	PRINTF_SPMC("Watiing spark2 exiting\n");
 	while (mmio_read_32(SPM_CPU_RET_STATUS) & (1<<id));
 	PRINTF_SPMC("spark2 exiting\n");
@@ -1309,6 +1315,7 @@ void power_off_little(unsigned int id){
 
 	little_on &= ~(1<<id);
 	PRINTF_SPMC("Little power on:0x%X\n",little_on);
+
 	if ((!(little_on & 0xF0)) && id>=4)
 		power_off_little_cl(1);
 	else if ((!(little_on & 0xF)) && (id<4))
