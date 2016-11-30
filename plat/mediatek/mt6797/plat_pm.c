@@ -365,7 +365,7 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 			/* move to power_off_big() if (linear_id >= 8) */
 			plat_cci_disable();
 			INFO("%s: cci_disable_cluster_coherency(%d)\n", __FUNCTION__, linear_id);
-			disable_scu(mpidr);
+			disable_scu(linear_id);
 			INFO("%s: disable_scu(%d)\n", __FUNCTION__, linear_id);
 		}
 	}
@@ -417,7 +417,7 @@ void plat_affinst_suspend(unsigned long sec_entrypoint,
 		gic_cpuif_deactivate(BASE_GICC_BASE);
 		plat_cci_disable();
 
-		disable_scu(mpidr);
+		disable_scu(linear_id);
 		plat_save_el3_dormant_data();
 		generic_timer_backup();
 		gic_dist_save();
@@ -882,7 +882,7 @@ void platform_pwr_domain_off(const psci_power_state_t *state)
 			/* move to power_off_big() if (linear_id >= 8) */
 			plat_cci_disable();
 			INFO("%s: cci_disable_cluster_coherency(%d)\n", __FUNCTION__, linear_id);
-			disable_scu(mpidr);
+			disable_scu(linear_id);
 			INFO("%s: disable_scu(%d)\n", __FUNCTION__, linear_id);
 		}
 	}
@@ -920,7 +920,7 @@ void platform_pwr_domain_suspend(const psci_power_state_t *state)
 		gic_cpuif_deactivate(BASE_GICC_BASE);
 		plat_cci_disable();
 
-		disable_scu(mpidr);
+		disable_scu(linear_id);
 		plat_save_el3_dormant_data();
 		generic_timer_backup();
 		gic_dist_save();

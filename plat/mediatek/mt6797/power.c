@@ -1,16 +1,17 @@
-#include <platform_def.h>
-#include <stdio.h>
-#include <stdarg.h>
-#include <mmio.h>
+#include <arch_helpers.h>
+#include <assert.h>
 #include <cci.h>
 #include <debug.h>
-#include <assert.h>
-#include "power.h"
+#include <mmio.h>
 #include <psci.h>
-#include <arch_helpers.h>
-#include "mt_cpuxgpt.h"
+#include <platform_def.h>
 #include <platform.h>
+#include <stdio.h>
+#include <stdarg.h>
 
+#include <mt_cpuxgpt.h>
+#include <power.h>
+#include <scu.h>
 
 #define RETRY_TIME_USEC   (10)
 
@@ -71,7 +72,7 @@ int power_on_big(const unsigned int linear_id)
 	}
 
 	PRINTF_SPMC("%s before top:%x c0:%x c1:%x\n",__FUNCTION__, big_spmc_status(0x10), big_spmc_status(0x01),big_spmc_status(0x02));
-	mmio_write_32(0x10222208, 0xf<<16);//set BIG poweup on AARCH64
+	mmio_write_32(CPUCFG, 0xf<<16);	//set BIG poweup on AARCH64
 
 	mmio_write_32(MP2_MISC_CONFIG_BOOT_ADDR_L(linear_id-8), (unsigned long)bl31_warm_entrypoint);
 	mmio_write_32(MP2_MISC_CONFIG_BOOT_ADDR_H(linear_id-8), 0);
@@ -138,7 +139,7 @@ int power_off_big(const unsigned int linear_id)
 	PRINTF_SPMC("debug monitor 0x10222404=%x\n",mmio_read_32(0x10222404));
 
 	PRINTF_SPMC("Wait CPU%d's WFI\n",linear_id);
-	// SCOTT
+
 	while (!(mmio_read_32(SPM_CPU_IDLE_STA2)&(1<<(linear_id+2)))) {
 		PRINTF_SPMC("idle sta2 = %x, %x\r", mmio_read_32(SPM_CPU_IDLE_STA2), (1<<(linear_id+2)));
 	}
@@ -174,9 +175,7 @@ int power_off_big(const unsigned int linear_id)
 	// no big core is online, turn off the cluster 3
 	if (!big_on) {
 		cci_disable_snoop_dvm_reqs(MPIDR_AFFLVL1_VAL(0x80000200));
-
-		/* disable_scu(mpidr); */
-		mmio_write_32(0x1022220C, mmio_read_32(0x1022220C) | ACINACTM | (1 << 0));
+		disable_scu(linear_id);
 		power_off_cl3();
 	}
 
@@ -384,7 +383,7 @@ pll_retry:
 	mmio_write_32(INFRA_TOPAXI_PROTECTEN1, tmp);
 	DSB;
 	tmp = (1<<2)|(1<<6)|(1<<10);
-	while (mmio_read_32(INFRA_TOPAXI_PROTEXTSTA3) & tmp); //wait all of them be 0*/
+	while (mmio_read_32(INFRA_TOPAXI_PROTEXTSTA3) & tmp); // wait all of them be 0*/
 	// MP2_AXI_CONFIG, difference from MP0/1
 	tmp = mmio_read_32(MISCDBG) & ~(0x1);
 	mmio_write_32(MISCDBG, tmp);

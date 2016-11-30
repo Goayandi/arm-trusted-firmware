@@ -166,10 +166,10 @@
 /*******************************************************************************
  * SCU Related Registers
  ******************************************************************************/
-#define MP0_AXI_CONFIG		(MCUCFG_BASE + 0x002C)
-#define MP1_AXI_CONFIG		(MCUCFG_BASE + 0x022C)
-#define MP2_AXI_CONFIG		(MCUCFG_BASE + 0x222C)
-#define ACINACTM		(1U << 4)
+#define MP0_AXI_CONFIG				(MCUCFG_BASE + 0x002C)
+#define MP1_AXI_CONFIG				(MCUCFG_BASE + 0x022C)
+#define MP2_AXI_CONFIG				(MCUCFG_BASE + 0x220C)
+#define ACINACTM				(1U << 4)
 
 /*******************************************************************************
  * Declarations and constants to access the mailboxes safely. Each mailbox is
