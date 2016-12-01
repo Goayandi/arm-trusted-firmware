@@ -145,7 +145,7 @@ void udelay(unsigned long us)
 {
 	unsigned long long loops;
 
-	if(us<2000) {
+	if (us < 2000) {
 		loops = us * 13; /*arch timer's freq is 13MHz*/
 		__delay(loops);
 	}
@@ -156,7 +156,7 @@ void mdelay(unsigned long ms)
 	unsigned long loops;
 
 	loops = ms;
-	while(loops != 0) {
+	while (loops != 0) {
 		udelay(1000);
 		loops--;
 	}
@@ -164,11 +164,12 @@ void mdelay(unsigned long ms)
 
 void setup_syscnt(void) 
 {
-   //set cpuxgpt free run,cpuxgpt always free run & oneshot no need to set
-   //set cpuxgpt 13Mhz clock
-   set_cpuxgpt_clk(CLK_DIV2);
-   // enable cpuxgpt
-   enable_cpuxgpt();
+	// set cpuxgpt free run,cpuxgpt always free run & oneshot no need to set
+	// set cpuxgpt 13Mhz clock
+	set_cpuxgpt_clk(CLK_DIV2);
+
+	// enable cpuxgpt
+	enable_cpuxgpt();
 }
 
 #else

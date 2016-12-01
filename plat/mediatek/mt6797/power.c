@@ -88,8 +88,8 @@ int power_on_big(const unsigned int linear_id)
 #endif
 	}
 
-	PRINTF_SPMC("%s before top:%x c0:%x c1:%x\n",__FUNCTION__, big_spmc_status(0x10), big_spmc_status(0x01),big_spmc_status(0x02));
-	mmio_write_32(CPUCFG, 0xf<<16);	//set BIG poweup on AARCH64
+	PRINTF_SPMC("%s before top:%x c0:%x c1:%x\n", __FUNCTION__,  big_spmc_status(0x10), big_spmc_status(0x01), big_spmc_status(0x02));
+	mmio_write_32(CPUCFG, 0xf<<16);	// set BIG poweup on AARCH64
 
 	mmio_write_32(MP2_MISC_CONFIG_BOOT_ADDR_L(linear_id-8), (unsigned long)bl31_warm_entrypoint);
 	mmio_write_32(MP2_MISC_CONFIG_BOOT_ADDR_H(linear_id-8), 0);
@@ -177,7 +177,7 @@ int power_off_big(const unsigned int linear_id)
 	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<0);
 	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp); // assert CPUx_PWR_RST_B
 #else
-	//big_spark2_core(linear_id,0); // With the SPMC, the action should be unnecessary
+	// big_spark2_core(linear_id,0); // With the SPMC, the action should be unnecessary
 	tmp = mmio_read_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2)) & ~(1<<2);
 	PRINTF_SPMC("%s set %x to %x\n",__FUNCTION__,SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2),tmp);
 	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp); // De-assert PWR_ON_CPUx
@@ -189,11 +189,11 @@ int power_off_big(const unsigned int linear_id)
 	mmio_write_32(SPM_MP2_CPU0_PWR_CON+((linear_id-8)<<2), tmp); // assert CPUx_PWR_RST_B
 #endif
 	big_on &= ~(1<<(linear_id-8));
-	PRINTF_SPMC("%s big_on:%x\n",__FUNCTION__,big_on);
+	PRINTF_SPMC("%s big_on:%x\n", __FUNCTION__, big_on);
 
 	// no big core is online, turn off the cluster 3
 	if (!big_on) {
-		cci_disable_snoop_dvm_reqs(MPIDR_AFFLVL1_VAL(0x80000200));
+		cci_disable_snoop_dvm_reqs(2);
 		disable_scu(linear_id);
 		power_off_cl3();
 	}
@@ -301,9 +301,9 @@ pll_retry:
 #define CLK_DBG_CFG		0x1000010C
 #define CLK26CALI_0		0x10000220
 #define CLK26CALI_1		0x10000224
-#define CLK_MISC_CFG_0	0x10000104
+#define CLK_MISC_CFG_0		0x10000104
 #define ARMPLL_K1		0x1001A27C
-#define ARMDIV_MON_EN	0x1001A284
+#define ARMDIV_MON_EN		0x1001A284
 
 	// try to get HW SEM
 	mmio_write_32(HW_SEM_ENABLE_WORKAROUND_1axxx, 0x0b160001);
@@ -407,7 +407,7 @@ pll_retry:
 	mmio_write_32(MISCDBG, tmp);
 
 	// CCI400, enable S5
-	cci_enable_snoop_dvm_reqs(MPIDR_AFFLVL1_VAL(0x80000200));
+	cci_enable_snoop_dvm_reqs(2);
 
 	PRINTF_SPMC("%s after top:%x c0:%x c1:%x\n", __FUNCTION__, big_spmc_status(0x10), big_spmc_status(0x01), big_spmc_status(0x02));
 	udelay(2);
@@ -425,11 +425,14 @@ int power_off_cl3(void)
 {
 	PRINTF_SPMC("%s\n",__FUNCTION__);
 	unsigned int tmp, mask;
+
+#if 0
 	int caller = plat_core_pos_by_mpidr(read_mpidr_el1());
 	tmp = (mmio_read_32(MP2_SNOOP_CTRL) & ~0x3) | ((caller+1)<<4);
 	mmio_write_32(MP2_SNOOP_CTRL, tmp);
 	while (mmio_read_32(MP2_SNOOP_STATUS) & 1); //wait to 0
 	assert((mmio_read_32(MP2_SNOOP_CTRL) & 0x3) == 0);
+#endif
 
 	tmp = mmio_read_32(MISCDBG) | (1<<0) |(1<<4);
 	mmio_write_32(MISCDBG, tmp);
@@ -459,25 +462,24 @@ int power_off_cl3(void)
 	mmio_write_32(HW_SEM_WORKAROUND_1axxx, 0x1);
 
 	tmp = mmio_read_32(ARMPLL_CON0) & ~(1<<0);
-	mmio_write_32(ARMPLL_CON0, tmp); //ARMPLL_CON0[0], Disable PLL
+	mmio_write_32(ARMPLL_CON0, tmp); // ARMPLL_CON0[0], Disable PLL
 
-	tmp = mmio_read_32(ARMPLL_CON0);//A dummy for workaround
-	mmio_write_32((uintptr_t)&power_off_cl3_dummy, tmp);//dummy write, avoid optimization
-
+	tmp = mmio_read_32(ARMPLL_CON0); // A dummy for workaround
+	mmio_write_32((uintptr_t)&power_off_cl3_dummy, tmp); // dummy write, avoid optimization
 
 	tmp = mmio_read_32(SPM_MP2_CPUSYS_PWR_CON) | (1<<4);
-	mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp);//Release clk_dis
+	mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp); // Release clk_dis
 
 	tmp = mmio_read_32(SPM_MP2_CPUSYS_PWR_CON) & ~(1<<2);
-	mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp);//De-assert PWR_ON_CA15MCPUTOP
+	mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp); // De-assert PWR_ON_CA15MCPUTOP
 
-	while ((mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<17)));//wait PWR_ON_ACK_CA15MCPUTOP, wait for 0
+	while ((mmio_read_32(SPM_CPU_PWR_STATUS) & (1<<17))); // wait PWR_ON_ACK_CA15MCPUTOP, wait for 0
 
 	tmp = mmio_read_32(SPM_CPU_EXT_BUCK_ISO) | (0x2);
-	mmio_write_32(SPM_CPU_EXT_BUCK_ISO, tmp);//ISOLATE
+	mmio_write_32(SPM_CPU_EXT_BUCK_ISO, tmp); // ISOLATE
 
 	tmp = mmio_read_32(SPM_MP2_CPUSYS_PWR_CON) & ~(1<<0);
-	mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp);//Release pwr_rst_b
+	mmio_write_32(SPM_MP2_CPUSYS_PWR_CON, tmp); // Release pwr_rst_b
 
 	return PSCI_E_SUCCESS;
 }
@@ -1200,10 +1202,7 @@ void power_on_little_cl(unsigned int cl_idx)
 		DSB;
 
 		mcucfg_set_bit(0x002C, 4 ,0); // MP0_AXI_CONFIG
-
-		tmp = mmio_read_32(0x10395000) | 0x3;
-		mmio_write_32(0x10395000, tmp);
-		while (mmio_read_32(MP2_SNOOP_STATUS) & 1); //wait to 0
+		cci_enable_snoop_dvm_reqs(0);
 	} else {
 		tmp = mmio_read_32(INFRA_TOPAXI_PROTECTEN1) & ~(1<<9);
 		mmio_write_32(INFRA_TOPAXI_PROTECTEN1, tmp);
@@ -1221,10 +1220,7 @@ void power_on_little_cl(unsigned int cl_idx)
 		while (mmio_read_32(INFRA_TOPAXI_PROTEXTSTA3) & (1<<5));
 
 		mcucfg_set_bit(0x022C, 4 ,0); // MP1_AXI_CONFIG
-
-		tmp = mmio_read_32(0x10394000) | 0x3;
-		mmio_write_32(0x10394000, tmp);
-		while (mmio_read_32(MP2_SNOOP_STATUS) & 1); //wait to 0
+		cci_enable_snoop_dvm_reqs(1);
 	}
 
 	PRINTF_SPMC("after INFRA_TOPAXI_PROTECTEN1 (0x%x):0x%x\n", INFRA_TOPAXI_PROTECTEN1, mmio_read_32(INFRA_TOPAXI_PROTECTEN1));
@@ -1370,18 +1366,14 @@ void power_off_little_cl(unsigned int cl_idx){
 	unsigned int seq_value[8]={1, 1, 0, 1, 0, 1, 0, 0};
 
 	if (!cl_idx) {
-		tmp = mmio_read_32(0x10395000) & ~0x3;
-		mmio_write_32(0x10395000,tmp);
-		while (mmio_read_32(MP2_SNOOP_STATUS) & 1); // wait to 0
-		mcucfg_set_bit(0x002C, 4 , 1);	// MP1_AXI_CONFIG
+		cci_disable_snoop_dvm_reqs(0);
+		mcucfg_set_bit(0x002C, 4 , 1);	// MP0_AXI_CONFIG
 	} else {
-		tmp = mmio_read_32(0x10394000) & ~0x3;
-		mmio_write_32(0x10394000, tmp);
-		while (mmio_read_32(MP2_SNOOP_STATUS) & 1); // wait to 0
-		mcucfg_set_bit(0x022C, 4 ,1); // MP1_AXI_CONFIG
+		cci_disable_snoop_dvm_reqs(1);
+		mcucfg_set_bit(0x022C, 4 ,1);	// MP1_AXI_CONFIG
 	}
 
-	while ((mmio_read_32(0x10006174)&(1<<(20+cl_idx))) != (1<<(20+cl_idx)));//wait MP1_STANDBYWFIL2 to high
+	while ((mmio_read_32(0x10006174)&(1<<(20+cl_idx))) != (1<<(20+cl_idx))); // wait MP1_STANDBYWFIL2 to high
 
 	if (!cl_idx) {
 		tmp = mmio_read_32(INFRA_TOPAXI_PROTECTEN1) | ((1<<0)|(1<<4)|(1<<8)|(1<<11));
@@ -1389,14 +1381,14 @@ void power_off_little_cl(unsigned int cl_idx){
 		PRINTF_SPMC("INFRA_TOPAXI_PROTECTEN1 (0x%x):0x%x\n", INFRA_TOPAXI_PROTECTEN1, mmio_read_32(INFRA_TOPAXI_PROTECTEN1));
 		DSB;
 		tmp = (1<<0)|(1<<4)|(1<<8) |(1<<11);
-		while ((mmio_read_32(INFRA_TOPAXI_PROTEXTSTA3) & tmp) != tmp);//wait all of them be 1
+		while ((mmio_read_32(INFRA_TOPAXI_PROTEXTSTA3) & tmp) != tmp); // wait all of them be 1
 	} else {
 		tmp = mmio_read_32(INFRA_TOPAXI_PROTECTEN1) | ((1<<1)|(1<<5)|(1<<9));
 		mmio_write_32(INFRA_TOPAXI_PROTECTEN1, tmp);
 		PRINTF_SPMC("INFRA_TOPAXI_PROTECTEN1 (0x%x):0x%x\n", INFRA_TOPAXI_PROTECTEN1, mmio_read_32(INFRA_TOPAXI_PROTECTEN1));
 		DSB;
 		tmp = (1<<1)|(1<<5)|(1<<9);
-		while ((mmio_read_32(INFRA_TOPAXI_PROTEXTSTA3) & tmp) != tmp);//wait all of them be 1
+		while ((mmio_read_32(INFRA_TOPAXI_PROTEXTSTA3) & tmp) != tmp); // wait all of them be 1
 	}
 	DSB;
 	for (i = 0; i < 8; i++) {
