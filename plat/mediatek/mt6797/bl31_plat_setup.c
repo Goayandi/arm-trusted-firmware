@@ -40,14 +40,15 @@
 #include <mtk_plat_common.h>
 #include <platform.h>
 #include <plat_def.h>
-#include <plat_private.h>   //for kernel_info and related API
+#include <plat_private.h>
 #include <power.h>
 #include <stddef.h>
 #include <stdio.h>  
 #include <string.h> 
-#include <xlat_tables.h>	// for ATF log implementation, mmap_region_add
-#include "l2c.h"
-#include "mt_cpuxgpt.h" // for atf_sched_clock_init(normal_base, atf_base);
+#include <xlat_tables.h>
+
+#include <l2c.h>
+#include <mt_cpuxgpt.h>
 
 /*******************************************************************************
  * Declarations of linker defined symbols which will help us find the layout
@@ -392,6 +393,9 @@ void bl31_platform_setup(void)
 	/* Initialize the gic cpu and distributor interfaces */
 	gic_setup();
 
+	extern void spm_lock_init(void);
+	spm_lock_init();
+
 	/* */
 #if SPMC_SPARK2
 	little_spark2_core(0, 1);
@@ -500,7 +504,6 @@ CHIP_SW_VER mt_get_chip_sw_ver(void)
 {
 	CHIP_SW_VER sw_ver;
 	unsigned int ver;
-	// unsigned int hw_subcode = DRV_Reg32(APHW_SUBCODE);
 
 	ver = mmio_read_32(APSW_VER);
 	if (ver == 0x0)

@@ -95,7 +95,7 @@ static void plat_save_el3_dormant_data()
 	p->mp0_l2actlr_el1 = read_l2actlr();
 	p->mp0_l2ectlr_el1 = read_l2ectlr();
 
-	//backup L2RSTDISABLE and set as "not disable L2 reset"
+	// backup L2RSTDISABLE and set as "not disable L2 reset"
 	p->mp0_l2rstdisable = mmio_read_32(MP0_CA7L_CACHE_CONFIG);
 	mmio_write_32(MP0_CA7L_CACHE_CONFIG,
 		      mmio_read_32(MP0_CA7L_CACHE_CONFIG) & ~L2RSTDISABLE);
@@ -110,7 +110,7 @@ static void plat_restore_el3_dormant_data()
 	write_l2actlr(p->mp0_l2actlr_el1);
 	write_l2ectlr(p->mp0_l2ectlr_el1);
 
-	//restore L2RSTDIRSABLE
+	// restore L2RSTDIRSABLE
 	mmio_write_32(MP0_CA7L_CACHE_CONFIG,
 		      (mmio_read_32(MP0_CA7L_CACHE_CONFIG) & ~L2RSTDISABLE)
 		      | (p->mp0_l2rstdisable & L2RSTDISABLE));
@@ -167,24 +167,24 @@ int workaround_836870(unsigned long mpidr)
 
 int clear_cntvoff(unsigned long mpidr)
 {
-    unsigned int scr_val, val;
+	unsigned int scr_val, val;
 
-    /**
-     * Clear CNTVOFF in ATF for ARMv8 platform
-     **/
-    val = 0;
+	/**
+	 * Clear CNTVOFF in ATF for ARMv8 platform
+	 **/
+	val = 0;
 
-    /* set NS_BIT */
-    scr_val = read_scr();
-    write_scr(scr_val | SCR_NS_BIT);
+	/* set NS_BIT */
+	scr_val = read_scr();
+	write_scr(scr_val | SCR_NS_BIT);
 
-    write_cntvoff_el2(val);
+	write_cntvoff_el2(val);
 
-    /* write back the original value */
-    write_scr(scr_val);
+	/* write back the original value */
+	write_scr(scr_val);
 
-//    printf("[0x%X] cntvoff_el2=0x%x\n",mpidr, read_cntvoff_el2());
-    return val;
+	// printf("[0x%x] cntvoff_el2=0x%x\n",mpidr, read_cntvoff_el2());
+	return val;
 }
 
 /*******************************************************************************
@@ -203,7 +203,7 @@ static void plat_program_mailbox(uint64_t mpidr, uint64_t address)
 			   sizeof(unsigned long));
 }
 
-#if	ENABLE_PLAT_COMPAT
+#if ENABLE_PLAT_COMPAT
 /*******************************************************************************
  * Private FVP function which is used to determine if any platform actions
  * should be performed for the specified affinity instance given its
@@ -343,7 +343,6 @@ void plat_affinst_off(uint32_t afflvl, uint32_t state)
 	 *
 	 */
 	unsigned int linear_id = plat_core_pos_by_mpidr(mpidr);
-	pend_off = linear_id;
 
 #if SPMC_SPARK2
 	INFO("%s core:%d(callee) disable SPARK-core-side\n",__FUNCTION__, linear_id);
@@ -862,7 +861,6 @@ void platform_pwr_domain_off(const psci_power_state_t *state)
 	 *
 	 */
 	unsigned int linear_id = plat_core_pos_by_mpidr(mpidr);
-	pend_off = linear_id;
 
 #if SPMC_SPARK2
 	INFO("%s core:%d(callee) disable SPARK-core-side\n",__FUNCTION__, linear_id);
