@@ -45,6 +45,7 @@
 #include <platform_def.h>
 #include <power.h>
 #include <scu.h>
+#include <spm.h>
 
 extern void dfd_setup(void);
 extern void gic_cpuif_init(void);

@@ -41,7 +41,6 @@
 #include <platform.h>
 #include <plat_def.h>
 #include <plat_private.h>
-#include <power.h>
 #include <stddef.h>
 #include <stdio.h>  
 #include <string.h> 
@@ -49,6 +48,8 @@
 
 #include <l2c.h>
 #include <mt_cpuxgpt.h>
+#include <power.h>
+#include <spm.h>
 
 /*******************************************************************************
  * Declarations of linker defined symbols which will help us find the layout
@@ -393,7 +394,6 @@ void bl31_platform_setup(void)
 	/* Initialize the gic cpu and distributor interfaces */
 	gic_setup();
 
-	extern void spm_lock_init(void);
 	spm_lock_init();
 
 	/* */

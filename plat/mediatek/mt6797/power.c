@@ -1,6 +1,5 @@
 #include <arch_helpers.h>
 #include <assert.h>
-#include <bakery_lock.h>
 #include <cci.h>
 #include <debug.h>
 #include <mmio.h>
@@ -13,8 +12,7 @@
 #include <mt_cpuxgpt.h>
 #include <power.h>
 #include <scu.h>
-
-DEFINE_BAKERY_LOCK(spm_lock);
+#include <spm.h>
 
 #define RETRY_TIME_USEC   (10)
 
@@ -30,21 +28,6 @@ char little_on = 0x1;	// [7:0] = core7~core0, core 0 is powered-on by defualt
 int dummy=0;
 
 void power_off_little_cl(unsigned int cl_idx);
-
-void spm_lock_init(void)
-{
-	bakery_lock_init(&spm_lock);
-}
-
-void spm_lock_get(void)
-{
-	bakery_lock_get(&spm_lock);
-}
-
-void spm_lock_release(void)
-{
-	bakery_lock_release(&spm_lock);
-}
 
 void big_spmc_info()
 {
@@ -286,7 +269,7 @@ pll_retry:
 	} while (!(mmio_read_32(HW_SEM_WORKAROUND_1axxx) & 0x1));
 
 	tmp = mmio_read_32(PLL_DIV_MUXL_SEL) | (1<<0);
-	mmio_write_32(PLL_DIV_MUXL_SEL, tmp); //pll_div_mux1_sel = 01 = pll clock
+	mmio_write_32(PLL_DIV_MUXL_SEL, tmp); // pll_div_mux1_sel = 01 = pll clock
 	udelay(1);
 
 	// set big clkdiv = 1
