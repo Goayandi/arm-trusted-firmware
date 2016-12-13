@@ -232,6 +232,7 @@ typedef enum {
 } CHIP_SW_VER;
 
 unsigned int mt_get_chip_hw_code(void);
+unsigned int mt_get_chip_hw_ver(void);
 CHIP_SW_VER mt_get_chip_sw_ver(void);
 
 /*******************************************************************************
@@ -296,7 +297,8 @@ void bl31_early_platform_setup(bl31_params_t *from_bl2,
 	INFO("BL33_START_ADDRESS=0x%x\n\r", BL33_START_ADDRESS);
 
 	INFO("atf chip_code[%x]\n", mt_get_chip_hw_code());
-	INFO("atf chip_ver[%x]\n", mt_get_chip_sw_ver());
+	INFO("atf chip_ver[%x]\n", mt_get_chip_hw_ver());
+	INFO("atf sw_ver[%x]\n", mt_get_chip_sw_ver());
 
 #if RESET_TO_BL31
 	/* There are no parameters from BL2 if BL31 is a reset vector */
@@ -498,6 +500,11 @@ void enable_ns_access_to_cpuectlr(void) {
 unsigned int mt_get_chip_hw_code(void)
 {
 	return mmio_read_32(APHW_CODE);
+}
+
+unsigned int mt_get_chip_hw_ver(void)
+{
+	return mmio_read_32(APHW_VER);
 }
 
 CHIP_SW_VER mt_get_chip_sw_ver(void)

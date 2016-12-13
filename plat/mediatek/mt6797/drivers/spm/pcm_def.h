@@ -217,7 +217,8 @@ enum SPM_WAKE_SRC_LIST {
 	WAKE_SRC_R12_SEJ_WDT_B_AND_SEJ_GPT_B = (1U << 27),
 	WAKE_SRC_R12_SEJ_WDT_GPT_B = (1U << 27),
 	WAKE_SRC_R12_ALL_MD32_WAKEUP_B = (1U << 28),
-	WAKE_SRC_R12_CPU_IRQ_B_NIRQOUTX_AND_NFIQOUTX = (1U << 29),
+	// WAKE_SRC_R12_CPU_IRQ_B_NIRQOUTX_AND_NFIQOUTX = (1U << 29),
+	WAKE_SRC_R12_CPU_IRQ_B = (1U << 29),
 	WAKE_SRC_R12_APSRC_WAKE = (1U << 30),
 	// WAKE_SRC_R12_APSRC_SLEEP = (1U << 31)
 };
@@ -260,5 +261,159 @@ static const char *wakesrc_str[32] = {
 	[31] = " R12_APSRC_SLEEP",
 };
 #endif
+
+struct pcm_desc {
+	const char *version;	/* PCM code version */
+	const uint32_t *base;	/* binary array base */
+	// dma_addr_t base_dma;	/* dma addr of base */
+	const uint16_t size;		/* binary array size */
+	const uint8_t sess;		/* session number */
+	const uint8_t replace;	/* replace mode */
+	const uint16_t addr_2nd;	/* 2nd binary array size */
+	const uint16_t reserved;	/* for 32bit alignment */
+
+	uint32_t vec0;		/* event vector 0 config */
+	uint32_t vec1;		/* event vector 1 config */
+	uint32_t vec2;		/* event vector 2 config */
+	uint32_t vec3;		/* event vector 3 config */
+	uint32_t vec4;		/* event vector 4 config */
+	uint32_t vec5;		/* event vector 5 config */
+	uint32_t vec6;		/* event vector 6 config */
+	uint32_t vec7;		/* event vector 7 config */
+	uint32_t vec8;		/* event vector 8 config */
+	uint32_t vec9;		/* event vector 9 config */
+	uint32_t vec10;		/* event vector 10 config */
+	uint32_t vec11;		/* event vector 11 config */
+	uint32_t vec12;		/* event vector 12 config */
+	uint32_t vec13;		/* event vector 13 config */
+	uint32_t vec14;		/* event vector 14 config */
+	uint32_t vec15;		/* event vector 15 config */
+};
+
+struct pwr_ctrl {
+	/* for SPM */
+	uint32_t pcm_flags;
+	uint32_t pcm_flags_cust;	/* can override pcm_flags */
+	uint32_t pcm_reserve;
+	uint32_t timer_val;		/* @ 1T 32K */
+	uint32_t timer_val_cust;	/* @ 1T 32K, can override timer_val */
+	uint32_t timer_val_ramp_en;
+	uint32_t timer_val_ramp_en_sec;
+	uint32_t wake_src;
+	uint32_t wake_src_cust;	/* can override wake_src */
+	uint32_t wake_src_md32;
+	uint8_t r0_ctrl_en;
+	uint8_t r7_ctrl_en;
+	uint8_t infra_dcm_lock;
+	uint8_t wdt_disable;
+	uint8_t dvfs_halt_src_chk;
+	uint8_t spm_apsrc_req;
+	uint8_t spm_f26m_req;
+	uint8_t spm_lte_req;
+	uint8_t spm_infra_req;
+	uint8_t spm_vrf18_req;
+	uint8_t spm_dvfs_req;
+	uint8_t spm_dvfs_force_down;
+	uint8_t spm_ddren_req;
+	uint8_t spm_flag_keep_csyspwrupack_high;
+	uint8_t spm_flag_dis_vproc_vsram_dvs;
+	uint8_t spm_flag_run_common_scenario;
+	uint8_t cpu_md_dvfs_sop_force_on;
+
+	/* for AP */
+	uint8_t mcusys_idle_mask;
+	uint8_t mp1top_idle_mask;
+	uint8_t mp0top_idle_mask;
+	uint8_t mp2top_idle_mask;
+	uint8_t mp3top_idle_mask;
+	uint8_t mptop_idle_mask;
+	uint8_t wfi_op;		/* 1:WFI_OP_AND, 0:WFI_OP_OR */
+	uint8_t mp2_cpu0_wfi_en;
+	uint8_t mp2_cpu1_wfi_en;
+	uint8_t mp1_cpu0_wfi_en;
+	uint8_t mp1_cpu1_wfi_en;
+	uint8_t mp1_cpu2_wfi_en;
+	uint8_t mp1_cpu3_wfi_en;
+	uint8_t mp0_cpu0_wfi_en;
+	uint8_t mp0_cpu1_wfi_en;
+	uint8_t mp0_cpu2_wfi_en;
+	uint8_t mp0_cpu3_wfi_en;
+
+	/* for MD */
+	uint8_t md1_req_mask_b;
+	uint8_t md2_req_mask_b;
+	uint8_t md_apsrc0_sel;	/* 1:SEL_MD_DDR_EN, 0:SEL_MD_APSRC_REQ */
+	uint8_t md_apsrc1_sel;	/* 1:SEL_MD2_DDR_EN, 0:SEL_MD2_APSRC_REQ */
+	uint8_t md_ddr_dbc_en;
+	uint8_t ccif0_to_ap_mask_b;
+	uint8_t ccif0_to_md_mask_b;
+	uint8_t ccif1_to_ap_mask_b;
+	uint8_t ccif1_to_md_mask_b;
+	uint8_t lte_mask_b;
+	uint8_t ccifmd_md1_event_mask_b;
+	uint8_t ccifmd_md2_event_mask_b;
+	uint8_t vsync_mask_b;	/* 5bit */
+	uint8_t md_srcclkena_0_infra_mask_b;
+	uint8_t md_srcclkena_1_infra_mask_b;
+	uint8_t conn_srcclkena_infra_mask_b;
+	uint8_t md32_srcclkena_infra_mask_b;
+	uint8_t srcclkeni_infra_mask_b;
+	uint8_t md_apsrcreq_0_infra_mask_b;
+	uint8_t md_apsrcreq_1_infra_mask_b;
+	uint8_t conn_apsrcreq_infra_mask_b;
+	uint8_t md32_apsrcreq_infra_mask_b;
+	uint8_t md_ddr_en_0_mask_b;
+	uint8_t md_ddr_en_1_mask_b;
+	uint8_t md_vrf18_req_0_mask_b;
+	uint8_t md_vrf18_req_1_mask_b;
+	uint8_t md1_dvfs_req_mask;
+	uint8_t cpu_dvfs_req_mask;
+	uint8_t emi_bw_dvfs_req_mask;
+	uint8_t md_srcclkena_0_dvfs_req_mask_b;
+	uint8_t md_srcclkena_1_dvfs_req_mask_b;
+	uint8_t conn_srcclkena_dvfs_req_mask_b;
+
+	uint8_t dvfs_halt_mask_b;	/* 5bit */
+	uint8_t vdec_req_mask_b;
+	uint8_t gce_req_mask_b;
+	uint8_t cpu_md_dvfs_erq_merge_mask_b;
+	uint8_t md1_ddr_en_dvfs_halt_mask_b;
+	uint8_t md2_ddr_en_dvfs_halt_mask_b;
+	uint8_t vsync_dvfs_halt_mask_b;	/* 5bit */
+	uint8_t conn_ddr_en_mask_b;
+	uint8_t disp_req_mask_b;
+	uint8_t disp1_req_mask_b;
+	uint8_t mfg_req_mask_b;
+	uint8_t c2k_ps_rccif_wake_mask_b;
+	uint8_t c2k_l1_rccif_wake_mask_b;
+	uint8_t ps_c2k_rccif_wake_mask_b;
+	uint8_t l1_c2k_rccif_wake_mask_b;
+	uint8_t sdio_on_dvfs_req_mask_b;
+	uint8_t emi_boost_dvfs_req_mask_b;
+	uint8_t cpu_md_emi_dvfs_req_prot_dis;
+	uint8_t disp_od_req_mask_b;
+
+	/* for CONN */
+	uint8_t conn_mask_b;
+	uint8_t conn_apsrc_sel;
+
+	/* for MM */
+	uint8_t dsi0_ddr_en_mask_b;	/* E2 */
+	uint8_t dsi1_ddr_en_mask_b;	/* E2 */
+	uint8_t dpi_ddr_en_mask_b;	/* E2 */
+	uint8_t isp0_ddr_en_mask_b;	/* E2 */
+	uint8_t isp1_ddr_en_mask_b;	/* E2 */
+
+	/* for other SYS */
+	uint8_t scp_req_mask_b;
+	uint8_t syspwreq_mask;	/* make 26M off when attach ICE */
+	uint8_t srclkenai_mask;
+
+	/* for scenario */
+	uint32_t param1;
+	uint32_t param2;
+	uint32_t param3;
+};
+
 
 #endif /* __pcm_def_h__ */

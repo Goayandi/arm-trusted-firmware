@@ -326,13 +326,14 @@
 #define CONN_APSRC_SEL_LSB                  (1U << 27)      /* 1b */
 
 /* PCM_CON0 (0x10006000+0x018) */
-#define PCM_KICK_L_LSB                      (1U << 0)       /* 1b */
-#define IM_KICK_L_LSB                       (1U << 1)       /* 1b */
-#define PCM_CK_EN_LSB                       (1U << 2)       /* 1b */
-#define EN_IM_SLEEP_DVS_LSB                 (1U << 3)       /* 1b */
-#define IM_AUTO_PDN_EN_LSB                  (1U << 4)       /* 1b */
-#define PCM_SW_RESET_LSB                    (1U << 15)      /* 1b */
-#define PROJECT_CODE_LSB                    (1U << 16)      /* 16b */
+#define CON0_PCM_KICK			(1U << 0)       /* 1b */
+#define CON0_IM_KICK			(1U << 1)       /* 1b */
+#define PCM_CK_EN_LSB			(1U << 2)       /* 1b */
+#define EN_IM_SLEEP_DVS_LSB		(1U << 3)       /* 1b */
+#define CON0_IM_AUTO_PDN_EN		(1U << 4)       /* 1b */
+#define PCM_SW_RESET_LSB		(1U << 15)      /* 1b */
+#define PROJECT_CODE_LSB                (1U << 16)      /* 16b */
+
 
 /* PCM_CON1 (0x10006000+0x01C) */
 #define IM_SLAVE_LSB                        (1U << 0)       /* 1b */
@@ -1468,6 +1469,68 @@
 
 #define SPM_PROJECT_CODE	0xb16
 #define SPM_REGWR_CFG_KEY	(SPM_PROJECT_CODE << 16)
+#define CON0_CFG_KEY            (SPM_PROJECT_CODE << 16)
+
+#define WFI_OP_AND		1
+#define WFI_OP_OR		0
+
+#define	PCM_FSM_STA_DEF		0x00048490
+
+struct spm_lp_scen {
+	const struct pcm_desc *pcmdesc;
+	struct pwr_ctrl *pwrctrl;
+};
+
+struct wake_status {
+	uint32_t assert_pc;          /* PCM_REG_DATA_INI */
+	uint32_t r12;                /* PCM_REG12_DATA */
+	uint32_t r12_ext;            /* PCM_REG12_DATA */
+	uint32_t raw_sta;            /* SLEEP_ISR_RAW_STA */
+	uint32_t wake_misc;          /* SLEEP_WAKEUP_MISC */
+	uint32_t raw_ext_sta;        /* SPM_WAKEUP_EXT_STA */
+	uint32_t timer_out;          /* PCM_TIMER_OUT */
+	uint32_t r13;                /* PCM_REG13_DATA */
+	uint32_t idle_sta;           /* SLEEP_SUBSYS_IDLE_STA */
+	uint32_t debug_flag;         /* PCM_PASR_DPD_3 */
+	uint32_t event_reg;          /* PCM_EVENT_REG_STA */
+	uint32_t isr;                /* SLEEP_ISR_STATUS */
+	uint32_t r9;                 /* PCM_REG9_DATA */
+	uint32_t log_index;
+};
+
+typedef enum {
+	WR_NONE = 0,
+	WR_UART_BUSY = 1,
+	WR_PCM_ASSERT = 2,
+	WR_PCM_TIMER = 3,
+	WR_WAKE_SRC = 4,
+	WR_UNKNOWN = 5,
+} wake_reason_t;
+
+extern unsigned int mt_get_chip_hw_ver(void);
+
+static inline void set_pwrctrl_pcm_flags(struct pwr_ctrl *pwrctrl, uint32_t flags)
+{
+	int segment_code = mt_get_chip_hw_ver();
+
+	if (pwrctrl->pcm_flags_cust == 0)
+		pwrctrl->pcm_flags = flags;
+	else
+		pwrctrl->pcm_flags = pwrctrl->pcm_flags_cust;
+
+	if (0xCA01 == segment_code) {
+		pwrctrl->pcm_flags |= SPM_FLAG_EN_SEGMENT_E2;
+		/* for E2*/
+	} else {
+		pwrctrl->pcm_flags &= ~SPM_FLAG_EN_SEGMENT_E2;
+		/* for E1*/
+	}
+}
+
+static inline void set_pwrctrl_pcm_data(struct pwr_ctrl *pwrctrl, uint32_t data)
+{
+	pwrctrl->pcm_reserve = data;
+}
 
 /**************************************
  * Macro and Inline
@@ -1475,8 +1538,28 @@
 #define spm_read(addr)			__raw_readl((void __force __iomem *)(addr))
 #define spm_write(addr, val)		mt_reg_sync_writel(val, addr)
 
+extern void spm_reset_and_init_pcm(void);
+extern void spm_set_power_control(const struct pwr_ctrl *pwrctrl);
+
 extern void spm_lock_init(void);
 extern void spm_lock_get(void);
 extern void spm_lock_release(void);
+
+void spm_set_wakeup_event(const struct pwr_ctrl *pwrctrl);
+void spm_get_wakeup_status(struct wake_status *wakesta);
+void spm_set_sysclk_settle(void);
+void spm_kick_pcm_to_run(struct pwr_ctrl *pwrctrl);
+void spm_clean_after_wakeup(void);
+extern wake_reason_t spm_output_wake_reason(struct wake_status *wakesta);
+void spm_register_init(void);
+void spm_go_to_hotplug(void);
+void spm_init_event_vector(const struct pcm_desc *pcmdesc);
+void spm_kick_im_to_fetch(const struct pcm_desc *pcmdesc);
+void spm_set_sysclk_settle(void);
+extern int is_mcdi_ready(void);
+extern int is_hotplug_ready(void);
+extern void clear_all_ready(void);
+extern void spm_clear_hotplug(void);
+extern void set_mcdi_ready(void);
 
 #endif

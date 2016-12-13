@@ -46,6 +46,7 @@
 #include <power.h>
 #include <scu.h>
 #include <spm.h>
+#include <spm_mcdi.h>
 
 extern void dfd_setup(void);
 extern void gic_cpuif_init(void);
@@ -895,6 +896,7 @@ void platform_pwr_domain_suspend(const psci_power_state_t *state)
 
 	INFO("%s: beginning\n", __FUNCTION__); 
         unsigned long mpidr = read_mpidr_el1();
+
 #if SPMC_SPARK2
 	uint64_t linear_id;
 
@@ -906,7 +908,14 @@ void platform_pwr_domain_suspend(const psci_power_state_t *state)
 	while (mmio_read_32(SPM_CPU_RET_STATUS) & (1 << linear_id));
 	INFO("%s: after spark2 setting\n", __FUNCTION__); 
 #endif
+	if (MTK_SYSTEM_PWR_STATE(state) != MTK_LOCAL_STATE_OFF) {
+		spm_mcdi_prepare_for_off_state(mpidr, MTK_PWR_LVL0);
+		if (MTK_CLUSTER_PWR_STATE(state) == MTK_LOCAL_STATE_OFF) {
+			spm_mcdi_prepare_for_off_state(mpidr, MTK_PWR_LVL1);
+		}
+        }
 
+	INFO("%s: before mt_platform_save_context\n", __FUNCTION__);
 	/* Program the jump address for the target cpu */
 	plat_program_mailbox(mpidr, secure_entrypoint);
 	mt_platform_save_context(mpidr);

@@ -81,7 +81,8 @@ BL31_SOURCES		+=	drivers/arm/cci/cci.c				\
 				${MTK_PLAT_SOC}/drivers/idvfs/mt_idvfs_api.c	\
 				${MTK_PLAT_SOC}/drivers/ocp/mt_ocp_api.c	\
 				${MTK_PLAT_SOC}/drivers/scp/scp.c		\
-				${MTK_PLAT_SOC}/drivers/spm/spm.c
+				${MTK_PLAT_SOC}/drivers/spm/spm.c		\
+				${MTK_PLAT_SOC}/drivers/spm/spm_mcdi.c
 
 BL31_SOURCES		+=	${MTK_PLAT_SOC}/sip_svc/sip_svc_common.c	\
 				${MTK_PLAT_SOC}/sip_svc/sip_svc_setup.c		\
