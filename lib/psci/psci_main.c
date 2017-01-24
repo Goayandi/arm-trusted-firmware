@@ -37,6 +37,8 @@
 #include <runtime_instr.h>
 #include <smcc.h>
 #include <string.h>
+
+#include "power.h"
 #include "psci_private.h"
 
 /*******************************************************************************
@@ -252,6 +254,13 @@ int psci_affinity_info(u_register_t target_affinity,
 	target_idx = plat_core_pos_by_mpidr(target_affinity);
 	if (target_idx == -1)
 		return PSCI_E_INVALID_PARAMS;
+
+	if (psci_get_aff_info_state_by_idx(target_idx) == AFF_STATE_OFF) {
+		if (target_idx < 8)
+			power_off_little(target_idx);
+		else
+			power_off_big(target_idx);
+	}
 
 	return psci_get_aff_info_state_by_idx(target_idx);
 }

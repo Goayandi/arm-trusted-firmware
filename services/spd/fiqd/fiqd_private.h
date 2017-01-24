@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved.
+ * Copyright (c) 2013-2014, ARM Limited and Contributors. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,8 +28,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TSPD_PRIVATE_H__
-#define __TSPD_PRIVATE_H__
+#ifndef __FIQD_PRIVATE_H__
+#define __FIQD_PRIVATE_H__
 
 #include <arch.h>
 #include <context.h>
@@ -53,15 +53,15 @@
 					clr_tsp_pstate(st);		       \
 					st |= (pst & TSP_PSTATE_MASK) <<       \
 						TSP_PSTATE_SHIFT;	       \
-				} while (0);
+				} while (0)
 
 
 /*
- * This flag is used by the TSPD to determine if the TSP is servicing a standard
+ * This flag is used by the FIQD to determine if the TSP is servicing a standard
  * SMC request prior to programming the next entry into the TSP e.g. if TSP
  * execution is preempted by a non-secure interrupt and handed control to the
  * normal world. If another request which is distinct from what the TSP was
- * previously doing arrives, then this flag will be help the TSPD to either
+ * previously doing arrives, then this flag will be help the FIQD to either
  * reject the new request or service it while ensuring that the previous context
  * is not corrupted.
  */
@@ -92,61 +92,33 @@
  * Secure Payload migrate type information as known to the SPD. We assume that
  * the SPD is dealing with an MP Secure Payload.
  ******************************************************************************/
-#define TSP_MIGRATE_INFO		TSP_TYPE_MP
+#define TSP_MIGRATE_INFO	TSP_TYPE_MP
 
 /*******************************************************************************
  * Number of cpus that the present on this platform. TODO: Rely on a topology
  * tree to determine this in the future to avoid assumptions about mpidr
  * allocation
  ******************************************************************************/
-#define TSPD_CORE_COUNT		PLATFORM_CORE_COUNT
+#define FIQD_CORE_COUNT		PLATFORM_CORE_COUNT
 
 /*******************************************************************************
  * Constants that allow assembler code to preserve callee-saved registers of the
  * C runtime context while performing a security state switch.
  ******************************************************************************/
-#define TSPD_C_RT_CTX_X19		0x0
-#define TSPD_C_RT_CTX_X20		0x8
-#define TSPD_C_RT_CTX_X21		0x10
-#define TSPD_C_RT_CTX_X22		0x18
-#define TSPD_C_RT_CTX_X23		0x20
-#define TSPD_C_RT_CTX_X24		0x28
-#define TSPD_C_RT_CTX_X25		0x30
-#define TSPD_C_RT_CTX_X26		0x38
-#define TSPD_C_RT_CTX_X27		0x40
-#define TSPD_C_RT_CTX_X28		0x48
-#define TSPD_C_RT_CTX_X29		0x50
-#define TSPD_C_RT_CTX_X30		0x58
-#define TSPD_C_RT_CTX_SIZE		0x60
-#define TSPD_C_RT_CTX_ENTRIES		(TSPD_C_RT_CTX_SIZE >> DWORD_SHIFT)
-
-/*******************************************************************************
- * Constants that allow assembler code to preserve caller-saved registers of the
- * SP context while performing a TSP preemption.
- * Note: These offsets have to match with the offsets for the corresponding
- * registers in cpu_context as we are using memcpy to copy the values from
- * cpu_context to sp_ctx.
- ******************************************************************************/
-#define TSPD_SP_CTX_X0		0x0
-#define TSPD_SP_CTX_X1		0x8
-#define TSPD_SP_CTX_X2		0x10
-#define TSPD_SP_CTX_X3		0x18
-#define TSPD_SP_CTX_X4		0x20
-#define TSPD_SP_CTX_X5		0x28
-#define TSPD_SP_CTX_X6		0x30
-#define TSPD_SP_CTX_X7		0x38
-#define TSPD_SP_CTX_X8		0x40
-#define TSPD_SP_CTX_X9		0x48
-#define TSPD_SP_CTX_X10		0x50
-#define TSPD_SP_CTX_X11		0x58
-#define TSPD_SP_CTX_X12		0x60
-#define TSPD_SP_CTX_X13		0x68
-#define TSPD_SP_CTX_X14		0x70
-#define TSPD_SP_CTX_X15		0x78
-#define TSPD_SP_CTX_X16		0x80
-#define TSPD_SP_CTX_X17		0x88
-#define TSPD_SP_CTX_SIZE	0x90
-#define TSPD_SP_CTX_ENTRIES		(TSPD_SP_CTX_SIZE >> DWORD_SHIFT)
+#define FIQD_C_RT_CTX_X19		0x0
+#define FIQD_C_RT_CTX_X20		0x8
+#define FIQD_C_RT_CTX_X21		0x10
+#define FIQD_C_RT_CTX_X22		0x18
+#define FIQD_C_RT_CTX_X23		0x20
+#define FIQD_C_RT_CTX_X24		0x28
+#define FIQD_C_RT_CTX_X25		0x30
+#define FIQD_C_RT_CTX_X26		0x38
+#define FIQD_C_RT_CTX_X27		0x40
+#define FIQD_C_RT_CTX_X28		0x48
+#define FIQD_C_RT_CTX_X29		0x50
+#define FIQD_C_RT_CTX_X30		0x58
+#define FIQD_C_RT_CTX_SIZE		0x60
+#define FIQD_C_RT_CTX_ENTRIES		(FIQD_C_RT_CTX_SIZE >> DWORD_SHIFT)
 
 #ifndef __ASSEMBLY__
 
@@ -160,33 +132,22 @@
 #define TSP_NUM_ARGS	0x2
 
 /* AArch64 callee saved general purpose register context structure. */
-DEFINE_REG_STRUCT(c_rt_regs, TSPD_C_RT_CTX_ENTRIES);
+DEFINE_REG_STRUCT(c_rt_regs, FIQD_C_RT_CTX_ENTRIES);
 
 /*
  * Compile time assertion to ensure that both the compiler and linker
  * have the same double word aligned view of the size of the C runtime
  * register context.
  */
-CASSERT(TSPD_C_RT_CTX_SIZE == sizeof(c_rt_regs_t),	\
+CASSERT(sizeof(c_rt_regs_t) == FIQD_C_RT_CTX_SIZE,
 	assert_spd_c_rt_regs_size_mismatch);
-
-/* SEL1 Secure payload (SP) caller saved register context structure. */
-DEFINE_REG_STRUCT(sp_ctx_regs, TSPD_SP_CTX_ENTRIES);
-
-/*
- * Compile time assertion to ensure that both the compiler and linker
- * have the same double word aligned view of the size of the C runtime
- * register context.
- */
-CASSERT(TSPD_SP_CTX_SIZE == sizeof(sp_ctx_regs_t),	\
-	assert_spd_sp_regs_size_mismatch);
 
 /*******************************************************************************
  * Structure which helps the SPD to maintain the per-cpu state of the SP.
- * 'saved_spsr_el3' - temporary copy to allow S-EL1 interrupt handling when
- *                    the TSP has been preempted.
- * 'saved_elr_el3'  - temporary copy to allow S-EL1 interrupt handling when
- *                    the TSP has been preempted.
+ * 'saved_spsr_el3' - temporary copy to allow FIQ handling when the TSP has been
+ *                    preempted.
+ * 'saved_elr_el3'  - temporary copy to allow FIQ handling when the TSP has been
+ *                    preempted.
  * 'state'          - collection of flags to track SP state e.g. on/off
  * 'mpidr'          - mpidr to associate a context with a cpu
  * 'c_rt_ctx'       - stack address to restore C runtime context from after
@@ -194,12 +155,8 @@ CASSERT(TSPD_SP_CTX_SIZE == sizeof(sp_ctx_regs_t),	\
  * 'cpu_ctx'        - space to maintain SP architectural state
  * 'saved_tsp_args' - space to store arguments for TSP arithmetic operations
  *                    which will queried using the TSP_GET_ARGS SMC by TSP.
- * 'sp_ctx'         - space to save the SEL1 Secure Payload(SP) caller saved
- *                    register context after it has been preempted by an EL3
- *                    routed NS interrupt and when a Secure Interrupt is taken
- *                    to SP.
  ******************************************************************************/
-typedef struct tsp_context {
+struct tsp_context {
 	uint64_t saved_elr_el3;
 	uint32_t saved_spsr_el3;
 	uint32_t state;
@@ -207,10 +164,7 @@ typedef struct tsp_context {
 	uint64_t c_rt_ctx;
 	cpu_context_t cpu_ctx;
 	uint64_t saved_tsp_args[TSP_NUM_ARGS];
-#if TSP_NS_INTR_ASYNC_PREEMPT
-	sp_ctx_regs_t sp_ctx;
-#endif
-} tsp_context_t;
+};
 
 /* Helper macros to store and retrieve tsp args from tsp_context */
 #define store_tsp_args(tsp_ctx, x1, x2)		do {\
@@ -223,8 +177,8 @@ typedef struct tsp_context {
 				x2 = tsp_ctx->saved_tsp_args[1];\
 			} while (0)
 
-/* TSPD power management handlers */
-extern const spd_pm_ops_t tspd_pm;
+/* FIQD power management handlers */
+extern const spd_pm_ops_t fiqd_pm;
 
 /*******************************************************************************
  * Forward declarations
@@ -234,18 +188,19 @@ struct tsp_vectors;
 /*******************************************************************************
  * Function & Data prototypes
  ******************************************************************************/
-uint64_t tspd_enter_sp(uint64_t *c_rt_ctx);
-void __dead2 tspd_exit_sp(uint64_t c_rt_ctx, uint64_t ret);
-uint64_t tspd_synchronous_sp_entry(tsp_context_t *tsp_ctx);
-void __dead2 tspd_synchronous_sp_exit(tsp_context_t *tsp_ctx, uint64_t ret);
-void tspd_init_tsp_ep_state(struct entry_point_info *tsp_ep,
+int32_t fiqd_init(void);
+uint64_t fiqd_enter_sp(uint64_t *c_rt_ctx);
+void __dead2 fiqd_exit_sp(uint64_t c_rt_ctx, uint64_t ret);
+uint64_t fiqd_synchronous_sp_entry(struct tsp_context *tsp_ctx);
+void __dead2 fiqd_synchronous_sp_exit(
+				struct tsp_context *tsp_ctx, uint64_t ret);
+void fiqd_init_tsp_ep_state(struct entry_point_info *tsp_ep,
 				uint32_t rw,
 				uint64_t pc,
-				tsp_context_t *tsp_ctx);
-int tspd_abort_preempted_smc(tsp_context_t *tsp_ctx);
+				struct tsp_context *tsp_ctx);
 
-extern tsp_context_t tspd_sp_context[TSPD_CORE_COUNT];
+extern struct tsp_context fiqd_sp_context[FIQD_CORE_COUNT];
 extern struct tsp_vectors *tsp_vectors;
 #endif /*__ASSEMBLY__*/
 
-#endif /* __TSPD_PRIVATE_H__ */
+#endif /* __FIQD_PRIVATE_H__ */

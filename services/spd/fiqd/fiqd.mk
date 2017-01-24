@@ -1,5 +1,5 @@
 #
-# Copyright (c) 2013-2016, ARM Limited and Contributors. All rights reserved.
+# Copyright (c) 2013-2014, ARM Limited and Contributors. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -28,34 +28,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #
 
-include lib/psci/psci_lib.mk
+TSPD_DIR		:=	services/spd/fiqd
+SPD_INCLUDES		:=	-Iinclude/bl32/tsp
 
-BL31_SOURCES		+=	bl31/bl31_main.c				\
-				bl31/interrupt_mgmt.c				\
-				bl31/aarch64/bl31_entrypoint.S			\
-				bl31/aarch64/runtime_exceptions.S		\
-				bl31/aarch64/crash_reporting.S			\
-				bl31/bl31_context_mgmt.c			\
-				common/runtime_svc.c				\
-				services/std_svc/std_svc_setup.c		\
-				${PSCI_LIB_SOURCES}
-
-ifeq (${ENABLE_PMF}, 1)
-BL31_SOURCES		+=	lib/pmf/pmf_main.c
-endif
-
-CHIP_LD_S := $(MTK_PLAT_SOC)/bl31.ld.S
-ifneq ($(wildcard $(CHIP_LD_S)),)
-BL31_LINKERFILE		:=	$(CHIP_LD_S)
-else
-BL31_LINKERFILE		:=	bl31/bl31.ld.S
-endif
-
-# Flag used to indicate if Crash reporting via console should be included
-# in BL31. This defaults to being present in DEBUG builds only
-ifndef CRASH_REPORTING
-CRASH_REPORTING		:=	$(DEBUG)
-endif
-
-$(eval $(call assert_boolean,CRASH_REPORTING))
-$(eval $(call add_define,CRASH_REPORTING))
+SPD_SOURCES		:=	services/spd/fiqd/fiqd_main.c \
+				services/spd/fiqd/fiqd_common.c

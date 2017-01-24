@@ -115,7 +115,7 @@ void boot_to_kernel(uint64_t x1, uint64_t x2, uint64_t x3, uint64_t x4)
 		save_kernel_info(x1, x2, x3, x4);
 		bl31_prepare_kernel_entry(x4);
 		INFO("el3_exit\n");
-		console_uninit();
+		bl31_plat_runtime_setup();
 	}
 }
 #endif
