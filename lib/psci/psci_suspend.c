@@ -169,6 +169,7 @@ void psci_cpu_suspend_start(entry_point_info_t *ep,
 	assert(psci_plat_pm_ops->pwr_domain_suspend &&
 			psci_plat_pm_ops->pwr_domain_suspend_finish);
 
+	INFO("%s: begin\n", __func__);
 	/*
 	 * This function acquires the lock corresponding to each power
 	 * level so that by the time all locks are taken, the system topology
@@ -209,6 +210,7 @@ void psci_cpu_suspend_start(entry_point_info_t *ep,
 	 * program the power controller etc.
 	 */
 	psci_plat_pm_ops->pwr_domain_suspend(state_info);
+	INFO("%s: after pwr_domain_suspend() called\n", __func__);
 
 #if ENABLE_PSCI_STAT
 	/*
@@ -227,9 +229,12 @@ exit:
 	 */
 	psci_release_pwr_domain_locks(end_pwrlvl,
 				  idx);
+
+	INFO("%s: skip_wfi = %x\n", __func__, skip_wfi);
 	if (skip_wfi)
 		return;
 
+	INFO("%s: is_power_down_state = %x\n", __func__, is_power_down_state);
 	if (is_power_down_state) {
 #if ENABLE_RUNTIME_INSTRUMENTATION
 
@@ -262,7 +267,9 @@ exit:
 	 * requested at multiple power levels. This means that the cpu
 	 * context will be preserved.
 	 */
+	INFO("%s: before wfi()\n", __func__);
 	wfi();
+	INFO("%s: after wfi()\n", __func__);
 
 #if ENABLE_RUNTIME_INSTRUMENTATION
 	PMF_CAPTURE_TIMESTAMP(rt_instr_svc,

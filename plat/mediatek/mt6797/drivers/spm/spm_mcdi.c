@@ -513,20 +513,29 @@ void spm_mcdi_prepare_for_off_state(unsigned long mpidr, unsigned int afflvl)
 	struct pwr_ctrl *pwrctrl = spm_mcdi.pwrctrl;
 
 	spm_lock_get();
+	INFO("%s: mpidr, afflvl = %lx, %x\n", __func__, mpidr, afflvl);
 	if (is_mcdi_ready() == 0) {
 #if 0
 		if (is_hotplug_ready() == 1)
 			spm_clear_hotplug();
 #endif
+	INFO("%s: before set_pwrctrl_pcm_flags\n", __func__);
 		set_pwrctrl_pcm_flags(pwrctrl, 0);
+	INFO("%s: before spm_reset_and_init_pcm\n", __func__);
 		spm_reset_and_init_pcm();
+	INFO("%s: before spm_kick_im_to_fetch\n", __func__);
 		spm_kick_im_to_fetch(pcmdesc);
+	INFO("%s: before spm_set_power_control\n", __func__);
 		spm_set_power_control(pwrctrl);
 		spm_set_wakeup_event(pwrctrl);
 		spm_kick_pcm_to_run(pwrctrl);
+	INFO("%s: before spm_set_mcdi_ready\n", __func__);
 		set_mcdi_ready();
+	INFO("%s: after spm_set_mcdi_ready\n", __func__);
 	}
+	INFO("%s: before spm_mcid_wfi_sel_enter\n", __func__);
 	spm_mcdi_wfi_sel_enter(mpidr);
+	INFO("%s: after spm_mcid_wfi_sel_enter\n", __func__);
 #if 0
 	if (afflvl == MPIDR_AFFLVL1)
 		spm_mcdi_set_cputop_pwrctrl_for_cluster_off(mpidr);

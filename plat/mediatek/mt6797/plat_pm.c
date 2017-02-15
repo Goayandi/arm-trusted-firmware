@@ -916,6 +916,7 @@ void platform_pwr_domain_suspend(const psci_power_state_t *state)
 	while (mmio_read_32(SPM_CPU_RET_STATUS) & (1 << linear_id))
 		;
 	INFO("%s: after spark2 setting\n", __func__);
+	INFO("%s: linear_id, mpidr = %lx, %lx\n", __func__, linear_id, mpidr);
 #endif
 	if (MTK_SYSTEM_PWR_STATE(state) != MTK_LOCAL_STATE_OFF) {
 		spm_mcdi_prepare_for_off_state(mpidr, MTK_PWR_LVL0);
@@ -927,6 +928,7 @@ void platform_pwr_domain_suspend(const psci_power_state_t *state)
 	/* Program the jump address for the target cpu */
 	plat_program_mailbox(mpidr, secure_entrypoint);
 	mt_platform_save_context(mpidr);
+	INFO("%s: after mt_platform_save_context\n", __func__);
 
 	/* Perform the common cluster specific operations */
 	// if (afflvl != MPIDR_AFFLVL0) {
@@ -994,6 +996,7 @@ void platform_pwr_domain_suspend_finish(const psci_power_state_t *state)
 {
 	unsigned long mpidr = read_mpidr_el1();
 
+	INFO("%s: begin\n", __func__);
 	if ((MTK_CLUSTER_PWR_STATE(state) == MTK_LOCAL_STATE_OFF) ||
 		(MTK_SYSTEM_PWR_STATE(state) == MTK_LOCAL_STATE_OFF)) {
 		plat_restore_el3_dormant_data();
@@ -1043,6 +1046,7 @@ void platform_pwr_domain_suspend_finish(const psci_power_state_t *state)
 	plat_program_mailbox(read_mpidr_el1(), 0);
 
 	mt_platform_restore_context(mpidr);
+	INFO("%s: after mt_platform_restore_context\n", __func__);
 
 	enable_ns_access_to_cpuectlr();
 }

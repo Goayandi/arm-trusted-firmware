@@ -14,8 +14,46 @@
 #ifndef _MT_SPM_REG_H_
 #define _MT_SPM_REG_H_
 
+#include <console.h>
+#include <debug.h>
+
 #include "sleep_def.h"
 #include "pcm_def.h"
+
+#define PCM_WDT_TIMEOUT		(30 * 32768)    /* 30s */
+#define PCM_TIMER_MAX		(0xffffffff - PCM_WDT_TIMEOUT)
+
+#define PCM_PWRIO_EN_R0		(1U << 0)
+#define PCM_PWRIO_EN_R7		(1U << 7)
+#define PCM_RF_SYNC_R0		(1U << 16)
+#define PCM_RF_SYNC_R6		(1U << 22)
+#define PCM_RF_SYNC_R7		(1U << 23)
+
+#define CC_SYSCLK1_EN_0		(1U << 2)
+#define CC_SYSCLK1_EN_1		(1U << 3)
+#define CC_SRCLKENA_MASK_0	(1U << 6)
+#define CC_SRCLKENA_MASK_1	(1U << 7)
+#define CC_SRCLKENA_MASK_2	(1U << 8)
+#define CC_SYSCLK1_SRC_MASK_B_MD2_SRCCLKENA	(1U << 27)
+
+#define ISRM_TWAM               (1U << 2)
+#define ISRM_PCM_RETURN         (1U << 3)
+#define ISRM_RET_IRQ0           (1U << 8)
+#define ISRM_RET_IRQ1           (1U << 9)
+#define ISRM_RET_IRQ2           (1U << 10)
+#define ISRM_RET_IRQ3           (1U << 11)
+#define ISRM_RET_IRQ4           (1U << 12)
+#define ISRM_RET_IRQ5           (1U << 13)
+#define ISRM_RET_IRQ6           (1U << 14)
+#define ISRM_RET_IRQ7           (1U << 15)
+#define ISRM_RET_IRQ8           (1U << 16)
+#define ISRM_RET_IRQ9           (1U << 17)
+
+#define ISRM_RET_IRQ_AUX	(ISRM_RET_IRQ9 | ISRM_RET_IRQ8 | \
+				ISRM_RET_IRQ7 | ISRM_RET_IRQ6 | \
+				ISRM_RET_IRQ5 | ISRM_RET_IRQ4 | \
+				ISRM_RET_IRQ3 | ISRM_RET_IRQ2 | \
+				ISRM_RET_IRQ1)
 
 /**************************************
  * Define and Declare
@@ -162,9 +200,9 @@
 #define SPM_MP3_CPU2_PWR_CON		(SPM_BASE + 0x258)
 #define SPM_MP3_CPU3_PWR_CON		(SPM_BASE + 0x25C)
 
-#define SPM_CPU_EXT_BUCK_ISO               (SPM_BASE + 0x290)
-#define SPM_DUMMY0_PWR_CON                 (SPM_BASE + 0x2B0)
-#define SPM_DUMMY1_PWR_CON                 (SPM_BASE + 0x2B4)
+#define SPM_CPU_EXT_BUCK_ISO		(SPM_BASE + 0x290)
+#define SPM_DUMMY0_PWR_CON		(SPM_BASE + 0x2B0)
+#define SPM_DUMMY1_PWR_CON		(SPM_BASE + 0x2B4)
 #define SPM_BIG_CLK_CON                    (SPM_BASE + 0x2C0)
 #define SPM_LITTLE_CLK_CON                 (SPM_BASE + 0x2C4)
 #define SPM_VDE_PWR_CON                    (SPM_BASE + 0x300)
@@ -1513,8 +1551,9 @@ extern unsigned int mt_get_chip_hw_ver(void);
 static inline void set_pwrctrl_pcm_flags(struct pwr_ctrl *pwrctrl,
 						uint32_t flags)
 {
-	int segment_code = mt_get_chip_hw_ver();
+	int segment_code = 0xca00; // mt_get_chip_hw_ver();
 
+	INFO("%s: segment_code = %x\n", __func__, segment_code);
 	if (pwrctrl->pcm_flags_cust == 0)
 		pwrctrl->pcm_flags = flags;
 	else
